@@ -14,18 +14,26 @@
     "./primitives": "./src/primitives/index.ts",
     "./primitives/*": "./src/primitives/*.tsx",
     "./shell": "./src/shell/index.ts",
-    "./enterprise": "./src/enterprise/index.ts"
+    "./enterprise": "./src/enterprise/index.ts",
+    "./enterprise-local-accounts": "./src/enterprise-local-accounts/index.tsx"
   },
   "dependencies": {
     "qrcode": "^1.5.4"
   },
   "peerDependencies": {
+    "antd": "^6.5.2",
     "motion": ">=12",
     "react": ">=19",
     "react-dom": ">=19"
   },
+  "peerDependenciesMeta": {
+    "antd": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@types/qrcode": "^1.5.6",
+    "antd": "^6.5.2",
     "vitest": "^3.2.4",
     "@types/react": "^19",
     "@types/react-dom": "^19",
