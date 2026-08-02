@@ -322,3 +322,33 @@ describe("FE-FB-01 retained data and neutral recovery", () => {
     expect(failure).toHaveBeenCalledWith(labels.footerSettings.loadFailed);
   });
 });
+
+describe("login credential-error classification with host-normalized Error.message", () => {
+  it("classifies by error.detail when the host API layer replaces Error.message with a generic sentence", async () => {
+    const credentialError = Object.assign(new Error("请求失败，请稍后重试"), { detail: "用户名或密码错误" });
+    const adapter: EnterpriseLoginAdapter = {
+      loadOidcStatus: vi.fn().mockResolvedValue({ enabled: false, authorizePath: "" }),
+      passwordLogin: vi.fn().mockRejectedValue(credentialError),
+      beginPasskeyLogin: vi.fn(),
+      completePasskeyLogin: vi.fn(),
+      startOidcLogin: vi.fn(),
+    };
+    view = await mount(
+      <EnterpriseLoginController
+        adapter={adapter}
+        labels={labels.login}
+        target="/app"
+        changePasswordTarget="/change-password"
+        navigate={vi.fn()}
+      />,
+    );
+    await input(byTestId(view.host, "login-username") as HTMLInputElement, "admin");
+    await input(byTestId(view.host, "login-password") as HTMLInputElement, "wrong");
+    await click(byTestId(view.host, "login-submit"));
+    await settle();
+
+    expect(view.host.textContent).toContain(labels.login.invalidCredentials);
+    expect(view.host.textContent).not.toContain(labels.login.unknownError);
+    expect(toastBus.getSnapshot()).toHaveLength(0);
+  });
+});

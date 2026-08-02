@@ -170,10 +170,17 @@ function secondFactorMethods(error: unknown): EnterpriseSecondFactorMethod[] | n
 }
 
 function loginError(error: unknown, labels: EnterpriseLoginControllerLabels): string {
-  const message = error instanceof Error && error.message.trim() ? error.message : labels.unknownError;
-  const normalized = message.trim().toLowerCase();
-  if (normalized === "invalid username or password" || normalized === "用户名或密码错误") return labels.invalidCredentials;
-  if (normalized === "totp code is invalid" || normalized === "totp 验证码错误" || normalized === "验证码错误") return labels.invalidTotp;
+  // 宿主 API 层可能把 Error.message 归一成通用文案(如 EasyTrade 的「请求失败，请稍后重试」),
+  // 后端原始文案挂在 error.detail 上——分类须优先读 detail,message 仅作回退。
+  const record = error && typeof error === "object" ? (error as { detail?: unknown }) : null;
+  const detail = record && typeof record.detail === "string" ? record.detail : null;
+  const message = error instanceof Error && error.message.trim() ? error.message : null;
+  for (const candidate of [detail, message]) {
+    if (!candidate) continue;
+    const normalized = candidate.trim().toLowerCase();
+    if (normalized === "invalid username or password" || normalized === "用户名或密码错误") return labels.invalidCredentials;
+    if (normalized === "totp code is invalid" || normalized === "totp 验证码错误" || normalized === "验证码错误") return labels.invalidTotp;
+  }
   return labels.unknownError;
 }
 
