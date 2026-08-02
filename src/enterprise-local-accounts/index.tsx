@@ -18,7 +18,16 @@ import {
   Typography,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  cloneElement,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { ANTD_CONTROL_STATE_TOKEN, ANTD_CONTROL_TOKEN } from "../control-tokens";
 import { InlineNotice } from "../primitives/inline-notice";
 import { PageHeader } from "../primitives/page-header";
@@ -506,6 +515,8 @@ function PermissionPicker({
   }, [catalog]);
 
   const locked = Boolean(disabled || adminLocked);
+  /** True once catalog has settled into a terminal render (groups, empty, or error) — not the loading placeholder. */
+  const catalogReady = Boolean(catalogFailed || !catalogLoading || groups.length > 0);
 
   function toggleGrant(code: string, checked: boolean) {
     if (baselineSet.has(code) || locked) return;
@@ -514,7 +525,11 @@ function PermissionPicker({
   }
 
   return (
-    <div data-test-id="local-accounts-permission-picker" className="space-y-3">
+    <div
+      data-test-id="local-accounts-permission-picker"
+      data-catalog-loaded={catalogReady ? "true" : "false"}
+      className="space-y-3"
+    >
       <Typography.Text strong>{labels.permissionPickerTitle}</Typography.Text>
       {adminLocked ? <Alert type="info" showIcon message={labels.permissionPickerAdminNote} /> : null}
       {catalogFailed ? (
@@ -855,8 +870,34 @@ function EditAccountDrawer({
     }
   }
 
+  const showSavePermissions = Boolean(detail && !detail.isAdmin);
+
   const footer: ReactNode = (
     <Space wrap>
+      {showSavePermissions ? (
+        <Button
+          type="primary"
+          disabled={!canManage}
+          loading={busy === "permissions"}
+          data-test-id="local-accounts-save-permissions"
+          onClick={() => {
+            if (!detail || !canManage) return;
+            void runMutation(
+              "permissions",
+              async () => {
+                await adapter.setPermissions(
+                  detail.id,
+                  stripBaselinePermissions(permissions, effectiveBaseline),
+                );
+              },
+              labels.permissionsSuccess,
+              labels.permissionsFailed,
+            );
+          }}
+        >
+          {labels.savePermissions}
+        </Button>
+      ) : null}
       <Button onClick={onClose}>{labels.close}</Button>
     </Space>
   );
@@ -869,7 +910,17 @@ function EditAccountDrawer({
       title={labels.editTitle}
       destroyOnHidden
       footer={footer}
-      drawerRender={(node) => <div data-test-id="local-accounts-edit-drawer">{node}</div>}
+      // Keep header/footer pinned; only the body scrolls with long permission lists.
+      styles={{ section: { overflow: "hidden" } }}
+      // Attach test id without an extra wrapper div — wrapping breaks the section
+      // height:100% chain and pushes the footer outside the viewport.
+      drawerRender={(node) =>
+        isValidElement(node)
+          ? cloneElement(node as ReactElement<Record<string, unknown>>, {
+              "data-test-id": "local-accounts-edit-drawer",
+            })
+          : node
+      }
     >
       {loading ? (
         <Typography.Text type="secondary">{labels.loading}</Typography.Text>
@@ -1009,29 +1060,6 @@ function EditAccountDrawer({
             adminLocked={detail.isAdmin}
             onRetryCatalog={() => void ensureCatalog()}
           />
-          {!detail.isAdmin ? (
-            <Button
-              type="primary"
-              disabled={!canManage}
-              loading={busy === "permissions"}
-              data-test-id="local-accounts-save-permissions"
-              onClick={() =>
-                void runMutation(
-                  "permissions",
-                  async () => {
-                    await adapter.setPermissions(
-                      detail.id,
-                      stripBaselinePermissions(permissions, effectiveBaseline),
-                    );
-                  },
-                  labels.permissionsSuccess,
-                  labels.permissionsFailed,
-                )
-              }
-            >
-              {labels.savePermissions}
-            </Button>
-          ) : null}
 
           <div>
             <Typography.Title level={5} type="danger">
