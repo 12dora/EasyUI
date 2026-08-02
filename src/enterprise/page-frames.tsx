@@ -16,14 +16,18 @@ export interface EnterprisePublicShellProps {
  * Shared public-page hierarchy used by login, logged-out and OIDC callback routes.
  * FE-PERF-04: CSS-only shell — no `motion/react` on the public critical path.
  * Reduced-motion for any nested animation is handled by the host / remaining local importers.
+ *
+ * Viewport-height frame (not `min-h-dvh`): the content region owns the scrollbar
+ * so the footer stays pinned to the bottom of the viewport instead of sitting at
+ * the bottom of a long document where it scrolls out of view.
  */
 export function EnterprisePublicShell({ topbar, children, footer, contentAs = "main" }: EnterprisePublicShellProps) {
   const Content = contentAs;
   return (
-    <div className="flex min-h-dvh flex-col" data-enterprise-surface="public-shell">
+    <div className="flex h-dvh flex-col overflow-hidden" data-enterprise-surface="public-shell">
       {topbar}
-      <Content className="flex-1">{children}</Content>
-      {footer}
+      <Content className="min-h-0 flex-1 overflow-y-auto">{children}</Content>
+      <div className="shrink-0">{footer}</div>
     </div>
   );
 }

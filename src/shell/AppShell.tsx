@@ -9,6 +9,12 @@ export interface AppShellProps {
   mobileNav?: ReactNode;
   children: ReactNode;
   /**
+   * Footer pinned to the bottom of the viewport frame, usually `<Footer />`.
+   * Rendered as a sibling AFTER the scroll region, so it never scrolls with
+   * `<main>`. Omitted from the DOM entirely when not provided.
+   */
+  footer?: ReactNode;
+  /**
    * Optional centered frame max width. Unset (the default) is full-bleed: the
    * sidebar pins to the left edge and every extra pixel of viewport width goes
    * to `<main>`, which is what wide screens are for. A fixed cap here centres
@@ -51,6 +57,7 @@ export function AppShell({
   sidebar,
   mobileNav,
   children,
+  footer,
   maxWidth,
   mainClassName = "",
 }: AppShellProps) {
@@ -70,6 +77,7 @@ export function AppShell({
           </main>
         </div>
       </div>
+      {footer ? <div className="shrink-0">{footer}</div> : null}
     </div>
   );
 }

@@ -88,7 +88,7 @@ export function EnterpriseLoginPermissions({ labels, activeTab, onTabChange, aut
 
 export interface UpstreamHealthLabels { title: string; description: string; refresh: string; refreshing: string; empty: string; lastChecked: string; endpoint: string; }
 
-export function EnterpriseUpstreamHealth({ labels, integrations, loading, error, onRefresh, canRefresh = true, testId = "upstream-health-page", actionTestId, cardsTestId, feedbackMode = "inline" }: { labels: UpstreamHealthLabels; integrations: readonly EnterpriseIntegrationCard[]; loading?: boolean; error?: string | null; onRefresh: () => void | Promise<void>; canRefresh?: boolean; testId?: string; actionTestId?: string; cardsTestId?: string; /** Default `inline` keeps main-app InlineNotice error path; `toast` keeps a neutral shell + always-present Refresh. */ feedbackMode?: "inline" | "toast" }) {
+export function EnterpriseUpstreamHealth({ labels, integrations, loading, error, onRefresh, canRefresh = true, testId = "upstream-health-page", actionTestId, cardsTestId, feedbackMode = "inline", refreshVariant = "secondary" }: { labels: UpstreamHealthLabels; integrations: readonly EnterpriseIntegrationCard[]; loading?: boolean; error?: string | null; onRefresh: () => void | Promise<void>; canRefresh?: boolean; testId?: string; actionTestId?: string; cardsTestId?: string; /** Default `inline` keeps main-app InlineNotice error path; `toast` keeps a neutral shell + always-present Refresh. */ feedbackMode?: "inline" | "toast"; /** Host-chosen emphasis for the header Refresh action. */ refreshVariant?: "primary" | "secondary" }) {
   const toastMode = feedbackMode === "toast";
   // FE-FB-01: toast mode never mounts a failure-only retry branch; header Refresh is the recovery entry.
   // Default/inline still paints InlineNotice under the header.
@@ -99,7 +99,7 @@ export function EnterpriseUpstreamHealth({ labels, integrations, loading, error,
         subtitle={labels.description}
         actions={
           canRefresh ? (
-            <Button variant="secondary" size="sm" disabled={loading} onClick={() => void onRefresh()} data-test-id={actionTestId}>
+            <Button variant={refreshVariant} size="sm" disabled={loading} onClick={() => void onRefresh()} data-test-id={actionTestId}>
               {loading ? labels.refreshing : labels.refresh}
             </Button>
           ) : null

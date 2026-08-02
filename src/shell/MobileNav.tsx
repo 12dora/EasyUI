@@ -198,7 +198,7 @@ export function MobileNav({
                 </div>
                 <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label={navLabel}>
                   {drillPanel ? (
-                    <div key={`drill-${drillPanel.id}`} className={panelEnterClass(18)}>
+                    <div key={`drill-${drillPanel.id}`} className={panelEnterClass(18)} data-test-id={drillPanel.viewTestId}>
                       <NavPanelView
                         panel={drillPanel}
                         backLabel={backLabel}
