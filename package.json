@@ -1,0 +1,30 @@
+{
+  "name": "@easy-enterprise/ui",
+  "version": "0.1.0",
+  "private": true,
+  "sideEffects": ["**/*.css"],
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./src/theme.css",
+    "./motion": "./src/motion.ts",
+    "./toast": "./src/toast.ts",
+    "./control-tokens": "./src/control-tokens.ts",
+    "./primitives": "./src/primitives/index.ts",
+    "./primitives/*": "./src/primitives/*.tsx",
+    "./shell": "./src/shell/index.ts",
+    "./enterprise": "./src/enterprise/index.ts"
+  },
+
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "peerDependencies": {
+    "motion": ">=12",
+    "react": ">=19",
+    "react-dom": ">=19"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.6",
+    "vitest": "^3.2.4"
+  }
+}

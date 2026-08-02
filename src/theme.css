@@ -1,0 +1,466 @@
+/* ==========================================================================
+   EasyUI — Design tokens & base styling
+   --------------------------------------------------------------------------
+   Portable theme for the EasyUI kit. Import this AFTER `@import "tailwindcss";`
+   (Tailwind v4 required — it consumes the `@theme inline` block below).
+
+     @import "tailwindcss";
+     @import "<path-to>/easy-ui/theme.css";
+
+   Everything here is intentionally app-agnostic: colors, surfaces, motion
+   easings, typography, base resets and the animation utilities that EasyUI
+   primitives + shell rely on. Drop it into any project to get the same look.
+   ========================================================================== */
+
+:root {
+  /* Surfaces */
+  --paper: 255 255 255;          /* #FFFFFF  primary bg */
+  --paper-deep: 248 250 252;     /* #F8FAFC  secondary bg */
+  --paper-soft: 255 255 255;     /* #FFFFFF  card surface */
+
+  /* Text — every ink token carries informational text (field labels, tabs,
+     empty states, eyebrows), so all three must clear WCAG AA 4.5:1 on both
+     `--paper` (#FFFFFF) and `--paper-deep` (#F8FAFC, used by table headers and
+     inset panels). Measured contrast ratios:
+       --ink       #0F172A → 17.85:1 on paper / 17.06:1 on paper-deep
+       --ink-soft  #475569 →  7.58:1 on paper /  7.24:1 on paper-deep
+       --ink-faint #64748B →  4.76:1 on paper /  4.55:1 on paper-deep
+     Do not lighten `--ink-faint` past #64748B: #94A3B8 (the previous value)
+     measures 2.56:1 and fails AA for the tertiary text it is used for. */
+  --ink: 15 23 42;               /* #0F172A  primary */
+  --ink-soft: 71 85 105;         /* #475569  secondary */
+  --ink-faint: 100 116 139;      /* #64748B  tertiary */
+
+  /* Borders */
+  --hairline: 226 232 240 / 1;
+  --hairline-strong: 203 213 225 / 1;
+  --hairline-soft: 241 245 249 / 1;
+
+  /* Accents */
+  --amber: 37 99 235;            /* #2563EB  blue — primary action */
+  --amber-soft: 219 234 254;     /* #DBEAFE  blue tint */
+  --signal: 220 38 38;           /* #DC2626  red — destructive */
+  --bond: 79 70 229;             /* #4F46E5  indigo — secondary */
+  --evergreen: 5 150 105;        /* #059669  emerald — success */
+
+  /* Status tones */
+  --status-draft: 148 163 184;
+  --status-pending: 217 119 6;
+  --status-active: 5 150 105;
+  --status-stop: 220 38 38;
+  --status-archive: 71 85 105;
+
+  /* Motion — keep in lockstep with `DURATION` / easings in motion.ts.
+     CSS classes MUST use these vars (never raw 0.3s / 0.4s literals). */
+  --duration-fast: 0.16s;
+  --duration-base: 0.2s;
+  --duration-dialog: 0.28s;
+  --duration-page: 0.3s;
+  --duration-slow: 0.4s;
+  --ease-out-paper: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-press: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-pop: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Type families — `--font-geist-*` are optional host-provided font vars
+     (e.g. Next.js next/font). They gracefully fall back to system fonts when
+     absent, so the theme is drop-in without any font wiring. */
+  --font-sans: var(--font-geist-sans), "Geist", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), "Geist Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  /* --font-display kept for backward compat, maps to same sans */
+  --font-display: var(--font-geist-sans), "Geist", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-paper: rgb(var(--paper));
+  --color-paper-deep: rgb(var(--paper-deep));
+  --color-paper-soft: rgb(var(--paper-soft));
+  --color-ink: rgb(var(--ink));
+  --color-ink-soft: rgb(var(--ink-soft));
+  --color-ink-faint: rgb(var(--ink-faint));
+  --color-hairline: rgb(var(--hairline));
+  --color-hairline-strong: rgb(var(--hairline-strong));
+  --color-hairline-soft: rgb(var(--hairline-soft));
+  --color-amber-ink: rgb(var(--amber));
+  --color-signal: rgb(var(--signal));
+  --color-bond: rgb(var(--bond));
+  --color-evergreen: rgb(var(--evergreen));
+
+  --color-background: rgb(var(--paper));
+  --color-foreground: rgb(var(--ink));
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
+}
+
+/* Tailwind stops at 2xl (96rem / 1536px), which leaves 1080p-and-wider desktops
+   — where these apps actually live — with no way to spend the extra width. The
+   two steps below let layouts add columns / breathing room instead of just
+   stretching the same cards. Plain `@theme` (not `@theme inline`) so the
+   `3xl:` / `4xl:` variants get registered. */
+@theme {
+  --breakpoint-3xl: 120rem; /* 1920px — 1080p and up */
+  --breakpoint-4xl: 160rem; /* 2560px — 1440p ultrawide and up */
+}
+
+html,
+body {
+  background: rgb(var(--paper));
+  color: rgb(var(--ink));
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv01", "cv02";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography helpers */
+.font-display {
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "ss02", "tnum", "zero";
+}
+
+table,
+.tabular,
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Selection */
+::selection {
+  background: rgb(var(--amber) / 0.2);
+  color: rgb(var(--ink));
+}
+
+/* Focus ring — only for genuine keyboard navigation (:focus-visible), crisp and
+   tight so it reads as an intentional highlight rather than a detached box. */
+:where(input, select, textarea, button, a, [tabindex]):focus-visible {
+  outline: 2px solid rgb(var(--amber));
+  outline-offset: 1px;
+}
+
+/* Never show a focus box from mouse/programmatic focus (e.g. dialogs moving focus). */
+:where(input, select, textarea, button, a, [tabindex]):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Native form resets */
+input,
+select,
+textarea {
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+select {
+  background-color: rgb(var(--paper));
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%23475569' opacity='0.55'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 1.65rem;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--ink) / 0.15);
+  border-radius: 999px;
+  border: 2px solid rgb(var(--paper));
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--ink) / 0.28); }
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Keyframes */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes treeRowIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Shell / toast CSS motion (FE-PERF-04) — keep motion/react off the critical path */
+@keyframes easyNavPanelInRight {
+  from { opacity: 0; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes easyNavPanelInLeft {
+  from { opacity: 0; transform: translateX(-18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes easyDrawerBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes easyDrawerBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes easyDrawerPanelIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes easyDrawerPanelOut {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+@keyframes easyToastIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes easyToastOut {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(24px); }
+}
+@keyframes easyPageHeaderIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes easySectionIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up { animation: fadeUp var(--duration-slow) var(--ease-out-paper) both; }
+.animate-fade-in { animation: fadeIn var(--duration-base) var(--ease-out-paper) both; }
+.animate-ticker { animation: ticker 60s linear infinite; }
+.animate-tree-row-in { animation: treeRowIn var(--duration-fast) var(--ease-out-paper) both; }
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--paper-deep)) 0%,
+    rgb(var(--paper)) 50%,
+    rgb(var(--paper-deep)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Nav panel enter (Sidebar / MobileNav drill) — MOTION.list / --duration-fast */
+.easy-nav-panel-enter-right {
+  animation: easyNavPanelInRight var(--duration-fast) var(--ease-out-paper) both;
+}
+.easy-nav-panel-enter-left {
+  animation: easyNavPanelInLeft var(--duration-fast) var(--ease-out-paper) both;
+}
+
+/* Mobile drawer backdrop + panel */
+.easy-drawer-backdrop-enter {
+  animation: easyDrawerBackdropIn var(--duration-base) var(--ease-out-paper) both;
+}
+.easy-drawer-backdrop-exit {
+  animation: easyDrawerBackdropOut var(--duration-base) var(--ease-out-paper) both;
+}
+.easy-drawer-panel-enter {
+  animation: easyDrawerPanelIn var(--duration-base) var(--ease-out-paper) both;
+}
+.easy-drawer-panel-exit {
+  animation: easyDrawerPanelOut var(--duration-base) var(--ease-out-paper) both;
+}
+
+/* Toast enter/exit — replaces motion/react in Toaster */
+.easy-toast-enter {
+  animation: easyToastIn var(--duration-base) var(--ease-out-paper) both;
+}
+.easy-toast-exit {
+  animation: easyToastOut var(--duration-fast) var(--ease-out-paper) both;
+}
+
+/* PageHeader enter — MOTION.route / --duration-page (single source with DURATION.page) */
+.easy-page-header-enter {
+  animation: easyPageHeaderIn var(--duration-page) var(--ease-out-paper) both;
+}
+/* Section enter — MOTION settle via --duration-slow (DURATION.slow) */
+.easy-section-enter {
+  animation: easySectionIn var(--duration-slow) var(--ease-out-paper) both;
+}
+
+/* PopoverSurface enter/exit — MOTION.state / --duration-fast (no motion/react) */
+.easy-popover-enter {
+  animation: easyPopoverIn var(--duration-fast) var(--ease-out-paper) both;
+}
+.easy-popover-exit {
+  animation: easyPopoverOut var(--duration-fast) var(--ease-out-paper) both;
+  pointer-events: none;
+}
+@keyframes easyPopoverIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes easyPopoverOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+
+/* Dialog overlay + panel — MOTION.dialog / --duration-dialog (no motion/react) */
+.easy-dialog-overlay-enter {
+  animation: easyDialogOverlayIn var(--duration-base) var(--ease-out-paper) both;
+}
+.easy-dialog-overlay-exit {
+  animation: easyDialogOverlayOut var(--duration-base) var(--ease-out-paper) both;
+}
+.easy-dialog-panel-enter {
+  animation: easyDialogPanelIn var(--duration-dialog) var(--ease-pop) both;
+}
+.easy-dialog-panel-exit {
+  animation: easyDialogPanelOut var(--duration-dialog) var(--ease-pop) both;
+}
+@keyframes easyDialogOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes easyDialogOverlayOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes easyDialogPanelIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes easyDialogPanelOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+
+/* CollapseReveal — height via grid 0fr/1fr, no motion/react */
+.easy-collapse {
+  display: grid;
+  transition:
+    grid-template-rows var(--duration-page) var(--ease-out-paper),
+    opacity var(--duration-page) var(--ease-out-paper);
+}
+.easy-collapse-closed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+.easy-collapse-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.easy-collapse > .easy-collapse-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* AsyncStateTransition crossfade (MOTION.state / --duration-fast) */
+.easy-async-state {
+  transition: opacity var(--duration-fast) var(--ease-out-paper);
+}
+.easy-async-state-out {
+  opacity: 0;
+}
+.easy-async-state-in {
+  opacity: 1;
+  animation: fadeIn var(--duration-fast) var(--ease-out-paper) both;
+}
+.easy-async-state-steady {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* 全局兜底:中和 transition(如 Button/漏斗的 transition-all)与关键帧,但不动 transform
+     —— transform 被用于静态定位(-translate-x/y-1/2 居中、active:translate-y-px),清零会错位。 */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-tree-row-in,
+  .animate-fade-up,
+  .animate-fade-in,
+  .animate-ticker,
+  .animate-shimmer,
+  .animate-spin,
+  .animate-pulse,
+  .easy-nav-panel-enter-right,
+  .easy-nav-panel-enter-left,
+  .easy-drawer-backdrop-enter,
+  .easy-drawer-backdrop-exit,
+  .easy-drawer-panel-enter,
+  .easy-drawer-panel-exit,
+  .easy-toast-enter,
+  .easy-toast-exit,
+  .easy-page-header-enter,
+  .easy-section-enter,
+  .easy-popover-enter,
+  .easy-popover-exit,
+  .easy-dialog-overlay-enter,
+  .easy-dialog-overlay-exit,
+  .easy-dialog-panel-enter,
+  .easy-dialog-panel-exit,
+  .easy-async-state-in {
+    animation: none !important;
+  }
+  .easy-collapse {
+    transition: none !important;
+  }
+  .easy-async-state-out,
+  .easy-async-state-in,
+  .easy-async-state-steady {
+    opacity: 1 !important;
+    transition: none !important;
+  }
+}
+
+/* Card surface */
+.paper-card {
+  background: rgb(var(--paper));
+  border: 1px solid rgb(var(--hairline));
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+/* Eyebrow label */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgb(var(--ink-faint));
+}
+
+/* Definition row */
+.def-row {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+.def-row > :nth-child(2) {
+  border-bottom: 1px dotted rgb(var(--ink) / 0.12);
+  transform: translateY(-4px);
+}
+
+/* Rule line — single hairline only */
+.rule-double {
+  display: block;
+  height: 1px;
+  background: rgb(var(--hairline));
+}
