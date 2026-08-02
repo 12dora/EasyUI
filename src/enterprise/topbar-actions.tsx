@@ -33,6 +33,8 @@ export interface EnterpriseTopbarActionsProps {
      */
     unreadCount?: number;
     onOpen?: () => void;
+    /** 条目带 href 时点击深链的回调(宿主常在此乐观标记已读)。 */
+    onItemOpen?: (id: string) => void;
     onDismiss?: (id: string) => void;
     onDismissAll?: () => void;
   };
@@ -135,7 +137,7 @@ function LanguageAction({ locale, localeOptions, onLocaleChange, labels, open, t
   );
 }
 
-function NotificationsAction({ items, loading, error, viewAllHref, unreadCount, onDismiss, onDismissAll, labels, locale, renderLink, open, toggle }: NonNullable<EnterpriseTopbarActionsProps["notifications"]> & { labels: EnterpriseShellLabels; locale?: EnterpriseLocale; renderLink: EnterpriseLinkRenderer; open: boolean; toggle: () => void }) {
+function NotificationsAction({ items, loading, error, viewAllHref, unreadCount, onItemOpen, onDismiss, onDismissAll, labels, locale, renderLink, open, toggle }: NonNullable<EnterpriseTopbarActionsProps["notifications"]> & { labels: EnterpriseShellLabels; locale?: EnterpriseLocale; renderLink: EnterpriseLinkRenderer; open: boolean; toggle: () => void }) {
   const menu = useTopbarMenuFocus(open);
   // Prefer explicit unreadCount (cold-load badge); fall back to loaded items.
   const badgeCount = typeof unreadCount === "number" ? unreadCount : items.length;
@@ -148,7 +150,7 @@ function NotificationsAction({ items, loading, error, viewAllHref, unreadCount, 
       {open ? (
         <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.notifications} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-11 z-30 w-[300px] origin-top-right rounded-md border border-hairline bg-paper p-3 shadow-lg shadow-ink/10 focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-notifications-menu">
           <div className="flex items-center justify-between gap-2"><div className="text-[13px] font-medium text-ink">{labels.notifications}</div>{items.length ? <button type="button" onClick={onDismissAll} className="text-[11px] text-ink-soft hover:text-[rgb(var(--signal))]" data-test-id="topbar-notifications-clear-all">{labels.notificationsClearAll}</button> : null}</div>
-          {loading && !items.length ? <div className="mt-2 text-[12px] text-ink-faint">…</div> : error ? <div className="mt-2 text-[12px] text-[rgb(var(--signal))]">{labels.notificationsLoadFailed}</div> : !items.length ? <div className="mt-1 text-[12px] text-ink-faint">{labels.notificationsEmpty}</div> : <ul className="mt-2 max-h-[320px] space-y-1 overflow-y-auto pr-0.5" data-test-id="topbar-notifications-list">{items.map((item) => <li key={item.id} className="flex items-start justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-ink/[0.03]" data-test-id="topbar-notification-item"><div className="min-w-0"><div className="truncate text-[12px] text-ink">{item.title}</div><div className={`mt-0.5 text-[11px] ${item.urgent ? "text-[rgb(var(--signal))]" : "text-ink-faint"}`}>{item.detail}</div><RelativeTimestamp value={item.createdAt} absoluteLabel={item.createdAtLabel} locale={locale} className="mt-0.5 block text-[11px] text-ink-faint" testId="topbar-notification-time" /></div>{onDismiss ? <button type="button" onClick={() => onDismiss(item.id)} aria-label={labels.notificationsDismiss} title={labels.notificationsDismiss} className="shrink-0 rounded p-0.5 text-ink-faint hover:text-[rgb(var(--signal))]" data-test-id="topbar-notification-dismiss">×</button> : null}</li>)}</ul>}
+          {loading && !items.length ? <div className="mt-2 text-[12px] text-ink-faint">…</div> : error ? <div className="mt-2 text-[12px] text-[rgb(var(--signal))]">{labels.notificationsLoadFailed}</div> : !items.length ? <div className="mt-1 text-[12px] text-ink-faint">{labels.notificationsEmpty}</div> : <ul className="mt-2 max-h-[320px] space-y-1 overflow-y-auto pr-0.5" data-test-id="topbar-notifications-list">{items.map((item) => <li key={item.id} className="flex items-start justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-ink/[0.03]" data-test-id="topbar-notification-item"><div className="min-w-0">{item.href ? renderLink({ href: item.href, className: "block truncate text-[12px] text-ink hover:underline", testId: "topbar-notification-deeplink", onClick: () => onItemOpen?.(item.id), children: item.title }) : <div className="truncate text-[12px] text-ink">{item.title}</div>}{item.detail ? <div className={`mt-0.5 text-[11px] ${item.urgent ? "text-[rgb(var(--signal))]" : "text-ink-faint"}`}>{item.detail}</div> : null}<RelativeTimestamp value={item.createdAt} absoluteLabel={item.createdAtLabel} locale={locale} className="mt-0.5 block text-[11px] text-ink-faint" testId="topbar-notification-time" /></div>{onDismiss ? <button type="button" onClick={() => onDismiss(item.id)} aria-label={labels.notificationsDismiss} title={labels.notificationsDismiss} className="shrink-0 rounded p-0.5 text-ink-faint hover:text-[rgb(var(--signal))]" data-test-id="topbar-notification-dismiss">×</button> : null}</li>)}</ul>}
           {renderLink({ href: viewAllHref, role: "menuitem", className: "mt-2 block text-center text-[11px] text-ink-soft transition-colors hover:text-ink", testId: "topbar-notifications-view-all", children: labels.notificationsViewAll })}
         </PopoverSurface>
       ) : null}

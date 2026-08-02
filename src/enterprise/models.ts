@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEventHandler, ReactNode } from "react";
 
 export type EnterpriseLocale = "zh-CN" | "en" | (string & {});
 
@@ -10,8 +10,14 @@ export interface EnterpriseLocaleOption {
 export interface EnterpriseNotification {
   id: string;
   title: string;
-  detail: string;
+  detail?: string;
   urgent?: boolean;
+  /** Host-owned internal destination. The package never rewrites this URL. */
+  href?: string;
+  /** Explicit inbox state. Prefer this when the host applies optimistic updates. */
+  unread?: boolean;
+  /** Raw server read timestamp; null/undefined means unread when `unread` is absent. */
+  readAt?: string | null;
   /** ISO 8601 creation time; render sites show it as relative age. Optional: hosts that don't supply it simply render no time. */
   createdAt?: string;
   /** Absolute time already formatted by the host (business timezone), shown as the tooltip of the relative age. */
@@ -30,6 +36,7 @@ export interface EnterpriseLinkRenderArgs {
   className: string;
   testId?: string;
   role?: string;
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
   children: ReactNode;
 }
 

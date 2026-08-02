@@ -18,6 +18,8 @@ export interface EnterpriseLoginAdapter {
   beginPasskeyLogin(username: string, password: string): Promise<{ options: unknown; stateToken: string }>;
   completePasskeyLogin(username: string, password: string, stateToken: string, credential: SerializedPublicKeyCredential): Promise<EnterpriseLoginResult>;
   startOidcLogin(status: EnterpriseOidcStatus, target: string): void;
+  /** 宿主自有错误 DTO → 文案的前置映射;返回 null/undefined 时回落共享分类。 */
+  mapLoginError?(error: unknown): string | null;
 }
 
 export interface EnterpriseLoginControllerLabels extends EnterpriseCredentialLoginLabels {
@@ -122,6 +124,12 @@ export function EnterpriseLoginController({ adapter, labels, target, oidcTarget,
   const blockedReason = !username.trim() ? labels.usernameRequired : !password ? labels.passwordRequired : methods && activeMethod === "totp" && !totpCode ? labels.totpRequired : "";
   // 单一分发点: 每次登录失败只落到 inline / hint / toast 三者之一。
   function announceLoginError(reason: unknown) {
+    const mapped = adapter.mapLoginError?.(reason);
+    if (mapped) {
+      if (feedbackMode === "toast") { setFeedback(null); toast.error(mapped); return; }
+      setFeedback({ tone: "error", message: mapped });
+      return;
+    }
     const report = reportLoginError(reason, labels, feedbackMode);
     if (report.channel === "toast") { setFeedback(null); toast.error(report.message); return; }
     if (report.channel === "hint" && feedbackMode === "toast") { setFeedback(null); toast.info(report.message); return; }
