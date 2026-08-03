@@ -39,7 +39,7 @@ export interface EnterpriseLoginControllerLabels extends EnterpriseCredentialLog
   oidcErrors: Record<EnterpriseOidcErrorKind, string>;
 }
 
-export const ENTERPRISE_OIDC_ERROR_KINDS = ["access_denied", "not_configured", "state_mismatch", "missing_code", "unreachable", "invalid_response", "invalid_token", "inactive_user"] as const;
+export const ENTERPRISE_OIDC_ERROR_KINDS = ["access_denied", "not_configured", "state_mismatch", "missing_code", "unreachable", "invalid_response", "invalid_token", "inactive_user", "identity_binding_conflict"] as const;
 export type EnterpriseOidcErrorKind = (typeof ENTERPRISE_OIDC_ERROR_KINDS)[number];
 export interface EnterpriseOidcErrorInput { kind?: string | null; detail?: string | null; }
 export interface EnterpriseOidcError { kind: EnterpriseOidcErrorKind | "unknown"; detailProvided: boolean; }

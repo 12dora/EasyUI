@@ -79,6 +79,7 @@ function legacyCatalog(catalog: EnterpriseStaticLabelCatalog): EnterpriseStaticL
           invalid_response: "上游身份提供方返回了无效响应。",
           invalid_token: "上游令牌校验失败。",
           inactive_user: "该账号已停用。",
+          identity_binding_conflict: "当前工作账号无法自动关联已有账号，请联系管理员处理后重试。",
         },
       },
       security: {
@@ -182,6 +183,7 @@ function legacyCatalog(catalog: EnterpriseStaticLabelCatalog): EnterpriseStaticL
         invalid_response: "The upstream identity provider returned an invalid response.",
         invalid_token: "The upstream token failed validation.",
         inactive_user: "This account has been deactivated.",
+        identity_binding_conflict: "This work account cannot be linked to an existing account automatically. Contact an administrator and retry.",
       },
     },
     security: {
@@ -290,7 +292,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       secondFactorTitle: "二次验证", secondFactorSubtitle: "请选择一种方式完成验证", secondFactorSubtitleTotp: "请输入验证器中的 6 位验证码", secondFactorSubtitlePasskey: "请使用通行密钥完成验证", methodTotp: "验证器验证码", methodPasskey: "通行密钥", totpCode: "TOTP 验证码", verifyAndLogin: "验证并登录", passkeyHint: "使用指纹、面容或安全密钥完成验证。", passkeyVerify: "使用通行密钥验证", passkeyVerifying: "验证中…", passkeyUnsupported: "当前浏览器不支持通行密钥",
       usernameRequired: "请输入用户名", passwordRequired: "请输入密码", totpRequired: "请输入验证码", invalidCredentials: "用户名或密码错误", invalidTotp: "TOTP 验证码错误", unknownError: "登录失败", passkeyCancelled: "已取消通行密钥验证", passkeyFailed: "通行密钥验证失败",
       oidcLoading: "正在检查工作账号登录…", oidcLoadFailed: "无法读取工作账号登录状态，请重试。", oidcRetry: "重试",
-      oidcErrorTitle: "工作账号登录未完成", oidcErrorUnknown: "工作账号登录失败，请重试或联系管理员。", oidcErrors: { access_denied: "工作账号登录被取消或拒绝，请重试。", not_configured: "工作账号登录暂未启用，请联系管理员。", state_mismatch: "登录已过期，请重新开始。", missing_code: "工作账号登录未完成，请重试。", unreachable: "工作账号登录暂时不可用，请稍后重试。", invalid_response: "工作账号登录暂时不可用，请稍后重试。", invalid_token: "工作账号登录未完成，请重试。", inactive_user: "该账号已停用。" },
+      oidcErrorTitle: "工作账号登录未完成", oidcErrorUnknown: "工作账号登录失败，请重试或联系管理员。", oidcErrors: { access_denied: "工作账号登录被取消或拒绝，请重试。", not_configured: "工作账号登录暂未启用，请联系管理员。", state_mismatch: "登录已过期，请重新开始。", missing_code: "工作账号登录未完成，请重试。", unreachable: "工作账号登录暂时不可用，请稍后重试。", invalid_response: "工作账号登录暂时不可用，请稍后重试。", invalid_token: "工作账号登录未完成，请重试。", inactive_user: "该账号已停用。", identity_binding_conflict: "当前工作账号无法自动关联已有账号，请联系管理员处理后重试。" },
     },
     security: {
       page: { title: "安全", description: "管理本地应急账号的密码和两步认证。", passwordTitle: "密码", passwordDescription: "定期更新密码；生产工作账号的密码由身份服务管理。", twoFactorTitle: "两步认证", twoFactorDescription: "管理验证器与通行密钥。" },
@@ -334,7 +336,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       secondFactorTitle: "Second-factor verification", secondFactorSubtitle: "Choose a verification method", secondFactorSubtitleTotp: "Enter the six-digit code from your authenticator", secondFactorSubtitlePasskey: "Verify with your passkey", methodTotp: "Authenticator code", methodPasskey: "Passkey", totpCode: "TOTP code", verifyAndLogin: "Verify and sign in", passkeyHint: "Use your fingerprint, face, or security key.", passkeyVerify: "Verify with passkey", passkeyVerifying: "Verifying…", passkeyUnsupported: "This browser does not support passkeys",
       usernameRequired: "Enter your username", passwordRequired: "Enter your password", totpRequired: "Enter the verification code", invalidCredentials: "Invalid username or password", invalidTotp: "Invalid TOTP code", unknownError: "Sign-in failed", passkeyCancelled: "Passkey verification was cancelled", passkeyFailed: "Passkey verification failed",
       oidcLoading: "Checking work-account sign-in…", oidcLoadFailed: "Work-account sign-in status could not be loaded. Please try again.", oidcRetry: "Retry",
-      oidcErrorTitle: "Work-account sign-in didn’t finish", oidcErrorUnknown: "Work-account sign-in failed. Please try again or contact an administrator.", oidcErrors: { access_denied: "Work-account sign-in was cancelled or denied. Please try again.", not_configured: "Work-account sign-in is not available. Contact an administrator.", state_mismatch: "Your sign-in attempt expired. Start again.", missing_code: "Work-account sign-in didn’t finish. Try again.", unreachable: "Work-account sign-in is temporarily unavailable. Contact an administrator if this continues.", invalid_response: "Work-account sign-in is temporarily unavailable. Contact an administrator if this continues.", invalid_token: "Work-account sign-in didn’t finish. Try again.", inactive_user: "This account has been deactivated." },
+      oidcErrorTitle: "Work-account sign-in didn’t finish", oidcErrorUnknown: "Work-account sign-in failed. Please try again or contact an administrator.", oidcErrors: { access_denied: "Work-account sign-in was cancelled or denied. Please try again.", not_configured: "Work-account sign-in is not available. Contact an administrator.", state_mismatch: "Your sign-in attempt expired. Start again.", missing_code: "Work-account sign-in didn’t finish. Try again.", unreachable: "Work-account sign-in is temporarily unavailable. Contact an administrator if this continues.", invalid_response: "Work-account sign-in is temporarily unavailable. Contact an administrator if this continues.", invalid_token: "Work-account sign-in didn’t finish. Try again.", inactive_user: "This account has been deactivated.", identity_binding_conflict: "This work account cannot be linked to an existing account automatically. Contact an administrator and retry." },
     },
     security: {
       page: { title: "Security", description: "Manage the local break-glass account password and second factor.", passwordTitle: "Password", passwordDescription: "Rotate this password regularly. Work-account passwords are managed by the identity service.", twoFactorTitle: "Two-step verification", twoFactorDescription: "Manage authenticators and passkeys." },
