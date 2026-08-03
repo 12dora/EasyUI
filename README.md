@@ -11,6 +11,7 @@ Consumed by host repos as a **git submodule** mounted at `frontend/packages/easy
 - `src/primitives/` — base primitives (Button, inputs, …)
 - `src/shell/` — data-driven app shell (Sidebar / MobileNav / Topbar)
 - `src/enterprise/` — enterprise surfaces (auth controller, security / access / settings workspaces)
+- `src/table/` — antd-backed data table boundary (`DataTableShell`, `useAnimatedExpand`; antd ≥ 6.5 optional peer, own entry `@easy-enterprise/ui/table` + `table.css`)
 - `src/theme.css` — design tokens
 - `src/control-tokens.ts`, `src/motion.ts`, `src/toast.ts`
 

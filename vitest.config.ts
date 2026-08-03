@@ -8,6 +8,9 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: false,
-    include: [resolve(import.meta.dirname, "src/enterprise/**/*.behavior.test.{ts,tsx}")],
+    include: [
+      resolve(import.meta.dirname, "src/enterprise/**/*.behavior.test.{ts,tsx}"),
+      resolve(import.meta.dirname, "src/table/**/*.behavior.test.{ts,tsx}"),
+    ],
   },
 });

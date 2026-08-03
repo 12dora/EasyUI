@@ -4,10 +4,13 @@ The reusable workspace package shared by EasyTrade and the deployable blank
 enterprise app. It is the single implementation source for the visual language,
 application shell and reusable account/settings surfaces.
 
-> Tables are intentionally **not** part of the package. Other projects are expected to
-> bring their own table (antd, TanStack, AG Grid…). The package gives you the theme,
-> the shell (sidebar / topbar / app frame) and the form + action primitives that
-> make everything else look consistent.
+> Tables ship behind their own entry point: `@easy-enterprise/ui/table` wraps
+> **antd ≥ 6.5** (`DataTableShell` server-pagination boundary + `useAnimatedExpand`
+> tree-row animation; import `@easy-enterprise/ui/table.css` alongside). antd stays
+> an *optional* peer — hosts that bring their own table (TanStack, AG Grid…) simply
+> never import that entry. The package core remains the theme, the shell
+> (sidebar / topbar / app frame) and the form + action primitives that make
+> everything else look consistent.
 
 ## What's inside
 
@@ -22,6 +25,8 @@ packages/easy-enterprise/src/
   shell/               ← AppShell, Sidebar (drill-down + mobile drawer), Topbar
   enterprise/          ← complete login, security, Login & Permissions, footer,
                          notification and upstream-health surfaces
+  table/               ← antd Table boundary (DataTableShell, useAnimatedExpand,
+                         table.css) — separate entry, antd ≥ 6.5 optional peer
   index.ts             ← barrel — import only what you need
 ```
 

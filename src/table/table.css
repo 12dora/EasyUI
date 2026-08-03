@@ -1,0 +1,64 @@
+/* ==========================================================================
+   EasyUI table — antd Table companion styles
+   --------------------------------------------------------------------------
+   Import once from the host's global stylesheet, next to theme.css:
+
+     @import "@easy-enterprise/ui/table.css";
+
+   Only rules that antd's theme tokens cannot express belong here. Each rule
+   must note: (1) the antd version it targets, (2) why a token cannot express
+   it, (3) the condition under which it can be removed.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Enter/leave animation for Table tree child rows (pairs with
+   src/table/animated-expand.tsx)
+   1. antd version: ≥ 6.5;
+   2. not expressible as a token: this is missing *behaviour*, not styling —
+      tree child rows from `expandable.childrenColumnName` mount/unmount
+      directly, official motion only covers `expandedRowRender` extra rows,
+      and there is no class hook to configure;
+   3. remove when antd ships official expand/collapse motion for tree child
+      rows — together with animated-expand.tsx.
+   The animation attaches to `> td` rather than the <tr>: transforms on
+   table-row boxes are unreliable in some browsers, while cells are ordinary
+   boxes where opacity/translate behave consistently.
+   -------------------------------------------------------------------------- */
+@keyframes eui-tree-row-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes eui-tree-row-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.eui-tree-row-enter > td {
+  animation: eui-tree-row-enter 180ms ease-out both;
+}
+
+/* forwards: the animation parks on "gone" while JS waits the same duration
+   before actually removing the row from the dataSource. */
+.eui-tree-row-leave > td {
+  animation: eui-tree-row-leave 180ms ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eui-tree-row-enter > td,
+  .eui-tree-row-leave > td {
+    animation: none;
+  }
+}
