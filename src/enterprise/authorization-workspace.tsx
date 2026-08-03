@@ -10,6 +10,7 @@ import { InfoTooltip } from "../primitives/info-tooltip";
 import { Section } from "../primitives/section";
 import { AsyncStateTransition } from "../primitives/async-state-transition";
 import { formatEnterpriseTimestamp, type EnterpriseTimestampFormatter } from "./format-timestamp";
+import { HairlineGrid, hairlineHeaderCell } from "./hairline-grid";
 import { EnterpriseIntegrationFactGrid } from "./shared-settings";
 import { EnterpriseAuthorizationWorkspaceSkeleton } from "./surface-helpers";
 import { toast } from "../toast";
@@ -307,46 +308,36 @@ export function EnterpriseAuthorizationWorkspace({
           {!restrictedViewer && adapter.loadMyGrants ? (
             <Section title={labels.myGrantsTitle} description={labels.myGrantsDescription}>
               <div className="overflow-x-auto" data-data-grid="authz-my-grants">
-                <table className="w-full text-left text-[12px]">
-                  <tbody>
-                    {grants.map((grant) => (
-                      <tr key={`${grant.permissionCode}:${grant.dataScope}`} className="border-b border-hairline-soft">
-                        <td className="p-2 font-mono">{grant.permissionCode}</td>
-                        <td className="p-2"><Badge tone="neutral">{scopeLabel(grant.dataScope, labels)}</Badge></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!grants.length ? <p className="p-4 text-center text-ink-faint">{labels.empty}</p> : null}
+                <HairlineGrid<EnterpriseCurrentGrant>
+                  className="w-full"
+                  showHeader={false}
+                  rowKey={(grant) => `${grant.permissionCode}:${grant.dataScope}`}
+                  dataSource={grants}
+                  empty={labels.empty}
+                  columns={[
+                    { key: "code", dataIndex: "permissionCode", onCell: () => ({ className: "font-mono" }) },
+                    { key: "scope", render: (_, grant) => <Badge tone="neutral">{scopeLabel(grant.dataScope, labels)}</Badge> },
+                  ]}
+                />
               </div>
             </Section>
           ) : null}
           {!restrictedViewer ? (
             <Section title={labels.catalogTitle} description={labels.catalogDescription}>
               <div className="overflow-x-auto" data-test-id="authz-permission-catalog">
-                <table className="w-full min-w-[680px] text-left text-[12px]">
-                  <thead>
-                    <tr className="border-b border-hairline text-ink-faint">
-                      <th className="p-2">{labels.permissionCode}</th>
-                      <th className="p-2">{labels.permissionName}</th>
-                      <th className="p-2">{labels.scopes}</th>
-                      <th className="p-2">{labels.risk}</th>
-                      <th className="p-2">{labels.status}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {catalog.map((item) => (
-                      <tr key={item.code} className="border-b border-hairline-soft">
-                        <td className="p-2 font-mono">{item.code}</td>
-                        <td className="p-2">{(locale.startsWith("zh") ? item.nameZh : item.nameEn) || labels.notAvailable}</td>
-                        <td className="p-2 font-mono">{item.supportedScopes.join(", ")}</td>
-                        <td className="p-2">{item.riskLevel}</td>
-                        <td className="p-2"><StateBadge value={item.active} labels={labels}/></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {!catalog.length ? <p className="p-4 text-center text-ink-faint">{labels.empty}</p> : null}
+                <HairlineGrid<EnterprisePermissionCatalogItem>
+                  className="w-full min-w-[680px]"
+                  rowKey={(item) => item.code}
+                  dataSource={catalog}
+                  empty={labels.empty}
+                  columns={[
+                    { key: "code", title: labels.permissionCode, dataIndex: "code", onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-mono" }) },
+                    { key: "name", title: labels.permissionName, onHeaderCell: hairlineHeaderCell, render: (_, item) => (locale.startsWith("zh") ? item.nameZh : item.nameEn) || labels.notAvailable },
+                    { key: "scopes", title: labels.scopes, onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-mono" }), render: (_, item) => item.supportedScopes.join(", ") },
+                    { key: "risk", title: labels.risk, dataIndex: "riskLevel", onHeaderCell: hairlineHeaderCell },
+                    { key: "status", title: labels.status, onHeaderCell: hairlineHeaderCell, render: (_, item) => <StateBadge value={item.active} labels={labels}/> },
+                  ]}
+                />
               </div>
             </Section>
           ) : null}
@@ -455,37 +446,31 @@ function SnapshotsSection({
   return (
     <Section title={labels.snapshotsTitle} description={labels.snapshotsDescription}>
       <div className="overflow-x-auto" data-test-id="authz-snapshots">
-        <table className="w-full min-w-[700px] text-left text-[12px]">
-          <thead>
-            <tr className="border-b border-hairline text-ink-faint">
-              <th className="p-2">{labels.user}</th>
-              <th className="p-2">{labels.roles}</th>
-              <th className="p-2">{labels.grants}</th>
-              <th className="p-2">{labels.fetchedAt}</th>
-              <th className="p-2">{labels.status}</th>
-              {canManage ? <th/> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.userId} className="border-b border-hairline-soft">
-                <td className="p-2 font-medium">{item.displayName || labels.notAvailable}</td>
-                <td className="p-2">{item.roleGroups?.join(labels.roleGroupSeparator) || labels.notAvailable}</td>
-                <td className="p-2 font-mono">{item.grantCount}</td>
-                <td className="p-2 font-mono">{formatEnterpriseTimestamp(item.fetchedAt, formatOpts)}</td>
-                <td className="p-2"><StateBadge value={!item.expired} labels={labels}/></td>
-                {canManage ? (
-                  <td className="p-2 text-right">
+        <HairlineGrid<EnterprisePermissionSnapshot>
+          className="w-full min-w-[700px]"
+          rowKey={(item) => item.userId}
+          dataSource={items}
+          empty={labels.empty}
+          columns={[
+            { key: "user", title: labels.user, onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-medium" }), render: (_, item) => item.displayName || labels.notAvailable },
+            { key: "roles", title: labels.roles, onHeaderCell: hairlineHeaderCell, render: (_, item) => item.roleGroups?.join(labels.roleGroupSeparator) || labels.notAvailable },
+            { key: "grants", title: labels.grants, dataIndex: "grantCount", onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-mono" }) },
+            { key: "fetchedAt", title: labels.fetchedAt, onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-mono" }), render: (_, item) => formatEnterpriseTimestamp(item.fetchedAt, formatOpts) },
+            { key: "status", title: labels.status, onHeaderCell: hairlineHeaderCell, render: (_, item) => <StateBadge value={!item.expired} labels={labels}/> },
+            ...(canManage
+              ? [{
+                  key: "actions",
+                  onHeaderCell: hairlineHeaderCell,
+                  onCell: () => ({ className: "text-right" }),
+                  render: (_: unknown, item: EnterprisePermissionSnapshot) => (
                     <Button variant="ghost" size="sm" loading={refreshing === item.userId} onClick={() => setTarget(item)} data-test-id={`authz-snapshot-refresh-${item.userId}`}>
                       {refreshing === item.userId ? labels.refreshing : labels.refresh}
                     </Button>
-                  </td>
-                ) : null}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!items.length ? <p className="p-4 text-center text-ink-faint">{labels.empty}</p> : null}
+                  ),
+                }]
+              : []),
+          ]}
+        />
       </div>
       <Dialog
         open={Boolean(target)}
@@ -523,25 +508,40 @@ export function EnterpriseDescriptorKeysTable({
       style={{ maxWidth: "100%", overflowX: "auto" }}
       data-test-id="authz-descriptor-keys"
     >
-      <table
-        className="w-full min-w-[520px] text-left text-[12px]"
+      {/* min-width doubles as inline style: the overflow behavior test renders
+          without any stylesheet, and the scroll contract must hold there too. */}
+      <HairlineGrid<EnterpriseDescriptorKey>
+        className="w-full min-w-[520px]"
         style={{ minWidth: 520, width: "100%" }}
-        data-testid="authz-descriptor-keys-table"
-      >
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.id} className="border-b border-hairline">
-              <td className="min-w-0 max-w-[200px] break-all p-2" style={{ maxWidth: 200, overflowWrap: "anywhere" }}>{item.name}</td>
-              <td className="min-w-0 break-all p-2 font-mono" style={{ overflowWrap: "anywhere" }}>{item.tokenPrefix}</td>
-              <td className="whitespace-nowrap p-2 text-right">
+        showHeader={false}
+        rowKey={(item) => item.id}
+        dataSource={items}
+        empty={labels.empty}
+        columns={[
+          // Unlike the other grids, descriptor rows used the stronger
+          // `border-hairline` (#E2E8F0) as their row separator.
+          {
+            key: "name",
+            dataIndex: "name",
+            onCell: () => ({ className: "min-w-0 max-w-[200px] break-all", style: { maxWidth: 200, overflowWrap: "anywhere", borderBottomColor: "#E2E8F0" } }),
+          },
+          {
+            key: "token",
+            dataIndex: "tokenPrefix",
+            onCell: () => ({ className: "min-w-0 break-all font-mono", style: { overflowWrap: "anywhere", borderBottomColor: "#E2E8F0" } }),
+          },
+          {
+            key: "actions",
+            onCell: () => ({ className: "whitespace-nowrap text-right", style: { borderBottomColor: "#E2E8F0" } }),
+            render: (_, item) => (
+              <>
                 <Button variant="ghost" size="sm" onClick={() => onToggle(item)} data-test-id={`authz-descriptor-key-toggle-${item.id}`}>{item.active ? labels.disable : labels.enabled}</Button>
                 <Button variant="ghost-danger" size="sm" onClick={() => onDelete(item)} data-test-id={`authz-descriptor-key-delete-${item.id}`}>{labels.delete}</Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {!items.length ? <p className="p-4 text-center text-ink-faint">{labels.empty}</p> : null}
+              </>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
