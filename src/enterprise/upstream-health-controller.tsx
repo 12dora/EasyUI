@@ -34,6 +34,7 @@ export function EnterpriseUpstreamHealthController({
   actionTestId,
   cardsTestId,
   feedbackMode = "inline",
+  refreshVariant,
   permissionDeniedActions,
 }: {
   adapter: EnterpriseUpstreamHealthAdapter;
@@ -42,6 +43,8 @@ export function EnterpriseUpstreamHealthController({
   canView: boolean;
   canManage: boolean;
   pollIntervalMs?: number;
+  /** Host-chosen emphasis for the header Refresh action (forwarded to the surface). */
+  refreshVariant?: "primary" | "secondary";
   testId?: string;
   actionTestId?: string;
   cardsTestId?: string;
@@ -117,6 +120,7 @@ export function EnterpriseUpstreamHealthController({
       actionTestId={actionTestId}
       cardsTestId={cardsTestId}
       feedbackMode={feedbackMode}
+      refreshVariant={refreshVariant}
     />
   );
 }
