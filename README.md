@@ -43,9 +43,7 @@ There is no standalone dev server — you develop this package from inside a hos
 (e.g. EasyFrame's `frontend/`, where `pnpm --dir frontend blank:dev` picks up the sources live)
 and typecheck it through the host (`pnpm --dir frontend blank:typecheck`).
 
-Tests: `vitest.config.ts` currently points its `root` at `../../apps/customs` and the DOM behavior
-tests rely on `happy-dom`, which this package does not declare. Both are only satisfied inside the
-EasyCustoms host checkout — `pnpm vitest run` from a bare EasyUI clone (or from a host without an
-`apps/customs`) fails to resolve them. Note also that the config's `include` only covers
-`**/*.behavior.test.{ts,tsx}` under `src/enterprise/` and `src/table/`, so the plain unit tests
-(`relative-time.test.ts`, `label-builders.test.ts`, `format-timestamp.test.ts`) are not run by it.
+Tests run standalone: `pnpm install && pnpm exec vitest run` (root is this package; `happy-dom`
+is a declared devDependency; JSX uses the automatic runtime via `vitest.config.ts`). Two behavior
+suites (`timestamp-consumer`, `overflow`) import EasyCustoms host pages and are excluded here —
+they only run inside the host monorepo; see the `exclude` note in `vitest.config.ts`.

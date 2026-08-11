@@ -1,17 +1,15 @@
 /**
  * FE-CODE-14: dead defineEnterpriseOidcCompleteLabels must not be re-exported.
  */
+import { expect, it } from "vitest";
+
 import * as builders from "./label-builders";
 
-function assert(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new Error(message);
-}
+it("exports the two live label builders", () => {
+  expect(typeof builders.defineEnterpriseLoginLabels).toBe("function");
+  expect(typeof builders.defineEnterpriseSecurityLabels).toBe("function");
+});
 
-assert(typeof builders.defineEnterpriseLoginLabels === "function", "login builder present");
-assert(typeof builders.defineEnterpriseSecurityLabels === "function", "security builder present");
-assert(
-  !("defineEnterpriseOidcCompleteLabels" in builders),
-  "defineEnterpriseOidcCompleteLabels must be removed (FE-CODE-14)",
-);
-
-console.log("label-builders.test.ts: ok");
+it("does not re-export dead defineEnterpriseOidcCompleteLabels (FE-CODE-14)", () => {
+  expect("defineEnterpriseOidcCompleteLabels" in builders).toBe(false);
+});
