@@ -9,10 +9,12 @@ import {
   catalogGroupKey,
   defaultScopeForCode,
   flattenGroupKeys,
+  isCapabilitiesAccountIdReady,
   isGrantable,
   isHighRisk,
   isPrivilegedTarget,
   isSelfAccount,
+  isSelfDangerLocked,
   isTargetReadOnlyForOperator,
   isVersionConflictError,
   stripBaselinePermissions,
@@ -187,6 +189,36 @@ it("isTargetReadOnlyForOperator fails closed when catalog is not ready", () => {
   expect(isTargetReadOnlyForOperator(true, highGrant, [], false)).toBe(false);
   // Catalog ready + high grant → read-only for non-superadmin.
   expect(isTargetReadOnlyForOperator(false, highGrant, catalog, true)).toBe(true);
+});
+
+it("empty accountId is capabilities-not-ready: non-superadmin all-rows read-only; self danger locked", () => {
+  const ordinary = {
+    isAdmin: false,
+    permissions: [{ code: "accounts.local.view", scope: "ALL" }],
+  };
+
+  expect(isCapabilitiesAccountIdReady("")).toBe(false);
+  expect(isCapabilitiesAccountIdReady("   ")).toBe(false);
+  expect(isCapabilitiesAccountIdReady(null)).toBe(false);
+  expect(isCapabilitiesAccountIdReady(undefined)).toBe(false);
+  expect(isCapabilitiesAccountIdReady("acc-1")).toBe(true);
+
+  // Non-superadmin + empty accountId → every target read-only (same as catalog not ready).
+  expect(isTargetReadOnlyForOperator(false, ordinary, catalog, true, false)).toBe(true);
+  // Superadmin is not force-readonly by missing accountId (only loses self-exempt actions).
+  expect(isTargetReadOnlyForOperator(true, ordinary, catalog, true, false)).toBe(false);
+  // Ready accountId keeps ordinary targets editable for non-superadmin.
+  expect(isTargetReadOnlyForOperator(false, ordinary, catalog, true, true)).toBe(false);
+
+  // Self-danger: empty accountId locks every row (cannot distinguish self).
+  expect(isSelfDangerLocked("", "acc-1")).toBe(true);
+  expect(isSelfDangerLocked("   ", "acc-1")).toBe(true);
+  expect(isSelfDangerLocked(null, "acc-1")).toBe(true);
+  // Known accountId still locks only the self row.
+  expect(isSelfDangerLocked("acc-1", "acc-1")).toBe(true);
+  expect(isSelfDangerLocked("acc-1", "acc-2")).toBe(false);
+  // isSelfAccount keeps prior empty semantics (false) — callers use isSelfDangerLocked.
+  expect(isSelfAccount("", "acc-1")).toBe(false);
 });
 
 it("isVersionConflictError detects 409 from host-thrown errors", () => {

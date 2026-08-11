@@ -177,6 +177,16 @@ export function isPrivilegedTarget(
   return grants.some((grant) => highCodes.has(grant.code));
 }
 
+/**
+ * Whether the host supplied a non-empty `capabilities.accountId` for self-lockout.
+ * Empty / absent / whitespace-only ⇒ capabilities-not-ready (cannot distinguish self).
+ */
+export function isCapabilitiesAccountIdReady(
+  accountId: string | null | undefined,
+): boolean {
+  return typeof accountId === "string" && accountId.trim().length > 0;
+}
+
 /** Self-row lockout: deactivate / demote / delete / reset-password / TOTP rescue. */
 export function isSelfAccount(
   accountId: string | null | undefined,
@@ -184,6 +194,19 @@ export function isSelfAccount(
 ): boolean {
   if (!accountId || !rowId) return false;
   return accountId === rowId;
+}
+
+/**
+ * Self-danger actions (deactivate / demote / delete / reset-password / TOTP).
+ * When `accountId` is not ready, self cannot be computed → lock on every row
+ * (including for superadmin self-exempt actions).
+ */
+export function isSelfDangerLocked(
+  accountId: string | null | undefined,
+  rowId: string | null | undefined,
+): boolean {
+  if (!isCapabilitiesAccountIdReady(accountId)) return true;
+  return isSelfAccount(accountId, rowId);
 }
 
 /**
@@ -208,19 +231,24 @@ export function canToggleHighRisk(isLocalSuperadmin: boolean): boolean {
  * Full read-only for non-superadmin against privileged targets.
  * Superadmins are never force-readonly by this rule.
  *
- * Fail-closed: when the permission catalog has not loaded successfully
- * (`catalogReady === false`), a non-superadmin cannot detect high-grant
- * privileged targets (empty catalog would otherwise fail open). Every target
- * is treated as read-only until the catalog is ready.
+ * Fail-closed:
+ * - when the permission catalog has not loaded successfully
+ *   (`catalogReady === false`), a non-superadmin cannot detect high-grant
+ *   privileged targets (empty catalog would otherwise fail open);
+ * - when `capabilities.accountId` is empty/absent (`capabilitiesReady === false`),
+ *   self-lockout cannot be computed, so every target is read-only for a
+ *   non-superadmin. Superadmin only loses self-exempt actions via
+ *   {@link isSelfDangerLocked}, not full read-only.
  */
 export function isTargetReadOnlyForOperator(
   isLocalSuperadmin: boolean,
   account: Pick<LocalAccountSummary, "isAdmin"> & { permissions?: readonly LocalGrant[] },
   catalog: readonly LocalAccountsPermissionCatalogItem[],
   catalogReady = true,
+  capabilitiesReady = true,
 ): boolean {
   if (isLocalSuperadmin) return false;
-  if (!catalogReady) return true;
+  if (!catalogReady || !capabilitiesReady) return true;
   return isPrivilegedTarget(account, catalog);
 }
 

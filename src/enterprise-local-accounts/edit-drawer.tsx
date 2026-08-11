@@ -25,7 +25,9 @@ import {
 import { InlineNotice } from "../primitives/inline-notice";
 import { toast } from "../toast";
 import {
+  isCapabilitiesAccountIdReady,
   isSelfAccount,
+  isSelfDangerLocked,
   isTargetReadOnlyForOperator,
   isVersionConflictError,
   normalizeDetailGrants,
@@ -93,15 +95,25 @@ export function EditAccountDrawer({
     ? detail.baselinePermissions
     : baselinePermissions;
 
-  const isSelf = isSelfAccount(capabilities.accountId, detail?.id ?? accountId);
+  const rowId = detail?.id ?? accountId;
+  const isSelf = isSelfAccount(capabilities.accountId, rowId);
   // Catalog must be successfully loaded before high-grant privileged targets can be
   // detected. While loading or after error, non-superadmins treat every target as read-only.
+  // Empty/absent accountId is likewise capabilities-not-ready: non-superadmin locks all
+  // rows (self-lockout cannot be computed); superadmin only loses self-exempt actions.
   const catalogReady = catalogLoaded && !catalogFailed && !catalogLoading;
+  const capabilitiesReady = isCapabilitiesAccountIdReady(capabilities.accountId);
   const targetReadOnly = detail
-    ? isTargetReadOnlyForOperator(capabilities.isLocalSuperadmin, detail, catalog, catalogReady)
+    ? isTargetReadOnlyForOperator(
+        capabilities.isLocalSuperadmin,
+        detail,
+        catalog,
+        catalogReady,
+        capabilitiesReady,
+      )
     : false;
   const formDisabled = !canManage || targetReadOnly;
-  const selfDangerLocked = isSelf;
+  const selfDangerLocked = isSelfDangerLocked(capabilities.accountId, rowId);
 
   const loadDetail = useCallback(async () => {
     if (!accountId) return;
@@ -159,8 +171,16 @@ export function EditAccountDrawer({
   }
 
   const showSavePermissions = Boolean(detail && !detail.isAdmin);
-  const showExpiryEditor = capabilities.isLocalSuperadmin && detail && !detail.isAdmin && !isSelf;
-  const showAdminToggle = capabilities.isLocalSuperadmin && detail && !isSelf;
+  // Superadmin self-exempt controls require a known accountId; without it every
+  // row could be self, so hide promote/demote and expiry editors.
+  const showExpiryEditor =
+    capabilities.isLocalSuperadmin &&
+    capabilitiesReady &&
+    detail &&
+    !detail.isAdmin &&
+    !isSelf;
+  const showAdminToggle =
+    capabilities.isLocalSuperadmin && capabilitiesReady && detail && !isSelf;
 
   const footer: ReactNode = (
     <Space wrap>
