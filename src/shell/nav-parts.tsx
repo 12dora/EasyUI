@@ -8,7 +8,8 @@ import type { NavGroup, NavLink, NavPanel, RenderNavLink } from "./nav-model";
 /** Shared item class for links + panel entries (active vs idle). */
 export function navItemClass(active: boolean, extra = ""): string {
   return `group relative flex items-center gap-3 rounded-md px-3 py-2 text-[13px] transition-colors ${extra} ${
-    active ? "bg-ink/[0.06] text-ink font-medium" : "text-ink-soft hover:bg-ink/[0.04] hover:text-ink"
+    // 选中态只保留左侧指示条(ActiveMarker)+ 加重文字,不再铺底色块。
+    active ? "text-ink font-medium" : "text-ink-soft hover:bg-ink/[0.04] hover:text-ink"
   }`;
 }
 

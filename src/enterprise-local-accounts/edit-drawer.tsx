@@ -139,10 +139,11 @@ export function EditAccountDrawer({
   // 为已切换/已关闭的目标发起新一轮加载——代际号只挡"旧响应",挡不住"旧闭包发新请求"。
   const currentTargetRef = useRef<string | null>(null);
 
-  const loadDetail = useCallback(async () => {
+  // silent:变更后的静默刷新——不进 loading 骨架屏,内容原地更新,避免整个抽屉闪一下。
+  const loadDetail = useCallback(async (options?: { silent?: boolean }) => {
     if (!accountId || currentTargetRef.current !== accountId) return;
     const seq = ++loadSeqRef.current;
-    setLoading(true);
+    if (!options?.silent) setLoading(true);
     setLoadFailed(false);
     setGrantsConflict(false);
     try {
@@ -184,13 +185,13 @@ export function EditAccountDrawer({
     try {
       await action();
       toast.success(success);
-      await loadDetail();
+      await loadDetail({ silent: true });
       await onChanged();
     } catch (error) {
       if (key === "permissions" && isVersionConflictError(error)) {
         toast.error(labels.grantsConflict);
         // Refresh detail first (loadDetail clears the banner), then re-show conflict.
-        await loadDetail();
+        await loadDetail({ silent: true });
         setGrantsConflict(true);
         return;
       }

@@ -2,6 +2,10 @@
 
 import { Button, ConfigProvider, Empty, Input, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import enUS from "antd/locale/en_US";
+import zhCN from "antd/locale/zh_CN";
+import dayjs from "dayjs";
+import "dayjs/locale/zh-cn";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ANTD_CONTROL_STATE_TOKEN, ANTD_CONTROL_TOKEN, ANTD_NAVY_BUTTON_TOKEN } from "../control-tokens";
 import { InlineNotice } from "../primitives/inline-notice";
@@ -79,12 +83,21 @@ export function EnterpriseLocalAccountsSurface({
    */
   baselinePermissions?: readonly string[];
 }) {
+  const isZh = !(locale === "en" || locale.startsWith("en"));
+
+  // DatePicker/Calendar 面板的星期起始与格式化跟随 dayjs 全局 locale;
+  // antd 组件内建文案(Popconfirm 确定/取消、Select 暂无数据等)走 ConfigProvider locale。
+  useEffect(() => {
+    dayjs.locale(isZh ? "zh-cn" : "en");
+  }, [isZh]);
+
   if (!permissions.view) {
     return <InlineNotice tone="error" message={labels.permissionDenied} data-test-id="permission-denied" />;
   }
 
   return (
     <ConfigProvider
+      locale={isZh ? zhCN : enUS}
       theme={{
         token: {
           ...ANTD_CONTROL_TOKEN,
