@@ -17,6 +17,8 @@ import {
   isValidElement,
   useCallback,
   useEffect,
+  useId,
+  useRef,
   useState,
   type ReactElement,
   type ReactNode,
@@ -115,6 +117,7 @@ export function EditAccountDrawer({
   const [resetMustChange, setResetMustChange] = useState(true);
   const [grantsConflict, setGrantsConflict] = useState(false);
   const [receiptPassword, setReceiptPassword] = useState<string | null>(null);
+  const emailInputId = useId();
 
   const effectiveBaseline = detail?.baselinePermissions?.length
     ? detail.baselinePermissions
@@ -130,14 +133,22 @@ export function EditAccountDrawer({
   const formDisabled = !canManage || targetReadOnly;
   const selfDangerLocked = isSelf;
 
+  // 请求代际号:快速关闭/切换账户时,旧的在途响应一律作废,防止串号覆盖新账户。
+  const loadSeqRef = useRef(0);
+  // 抽屉当前目标账户:陈旧闭包(如 A 账户的慢速变更完成后回调 loadDetail)不得
+  // 为已切换/已关闭的目标发起新一轮加载——代际号只挡"旧响应",挡不住"旧闭包发新请求"。
+  const currentTargetRef = useRef<string | null>(null);
+
   const loadDetail = useCallback(async () => {
-    if (!accountId) return;
+    if (!accountId || currentTargetRef.current !== accountId) return;
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     setLoadFailed(false);
     setGrantsConflict(false);
     try {
       // 打开速度关键路径:目录与账户详情并行拉取(此前串行,叠加两轮网络往返)。
       const [next] = await Promise.all([adapter.getAccount(accountId), ensureCatalog()]);
+      if (seq !== loadSeqRef.current || currentTargetRef.current !== accountId) return;
       setDetail(next);
       setEmail(next.email ?? "");
       setPermissions(normalizeDetailGrants(next, baselinePermissions));
@@ -145,21 +156,25 @@ export function EditAccountDrawer({
       setResetPassword("");
       setResetMustChange(true);
     } catch {
+      if (seq !== loadSeqRef.current || currentTargetRef.current !== accountId) return;
       setLoadFailed(true);
       setDetail(null);
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }, [accountId, adapter, baselinePermissions, ensureCatalog]);
 
   useEffect(() => {
     if (!open || !accountId) {
+      currentTargetRef.current = null;
+      loadSeqRef.current += 1;
       setDetail(null);
       setReceiptPassword(null);
       setResetPassword("");
       setResetMustChange(true);
       return;
     }
+    currentTargetRef.current = accountId;
     void loadDetail();
   }, [accountId, loadDetail, open]);
 
@@ -261,9 +276,12 @@ export function EditAccountDrawer({
             <DrawerSection title={labels.profileSection}>
               <div className="space-y-3">
                 <div>
-                  <div className="mb-1 text-[12px] text-ink-soft">{labels.email}</div>
+                  <label htmlFor={emailInputId} className="mb-1 block text-[12px] text-ink-soft">
+                    {labels.email}
+                  </label>
                   <Space.Compact style={{ width: "100%" }}>
                     <Input
+                      id={emailInputId}
                       value={email}
                       disabled={formDisabled}
                       onChange={(event) => setEmail(event.target.value)}

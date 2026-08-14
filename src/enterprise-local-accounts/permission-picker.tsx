@@ -128,10 +128,20 @@ export function PermissionPicker({
       const baseline =
         detail.baselinePermissions?.length > 0 ? detail.baselinePermissions : baselinePermissions;
       const next = stripBaselinePermissions(detail.permissions ?? [], baseline);
-      // Non-superadmin cannot import high codes into the working set as toggles —
-      // strip high grants they cannot hold/edit so the picker stays consistent.
-      const highCodes = new Set(catalog.filter((item) => isHighRisk(item)).map((item) => item.code));
-      const filtered = isLocalSuperadmin ? next : next.filter((grant) => !highCodes.has(grant.code));
+      // 白名单式过滤(fail-closed):只放行当前目录中可授予、且操作者有权持有的
+      // 代码——目录未加载/加载失败时白名单为空,导入结果为空而不是照单全收;
+      // 作用域不合法时回退到默认作用域。
+      const allowed = new Map(catalog.filter((item) => isGrantable(item)).map((item) => [item.code, item]));
+      const filtered: LocalGrant[] = [];
+      for (const grant of next) {
+        const item = allowed.get(grant.code);
+        if (!item) continue;
+        if (isHighRisk(item) && !isLocalSuperadmin) continue;
+        const scopes = item.grantableScopes ?? [];
+        const scope = scopes.includes(grant.scope) ? grant.scope : defaultScopeForCode(item);
+        if (!scope) continue;
+        filtered.push({ code: grant.code, scope });
+      }
       onChange(filtered);
     } catch {
       setCopyError(true);
@@ -263,7 +273,7 @@ export function PermissionPicker({
             loading={copyLoading}
             value={copySourceId}
             onFocus={() => void ensureCopyOptions()}
-            onDropdownVisibleChange={(open) => {
+            onOpenChange={(open) => {
               if (open) void ensureCopyOptions();
             }}
             onChange={(next) => {

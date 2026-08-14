@@ -166,27 +166,37 @@ function LocalAccountsBody({
     return () => window.clearTimeout(timer);
   }, [loadList]);
 
-  const ensureCatalog = useCallback(async () => {
+  // 单飞(single-flight):预取、创建按钮、对话框/抽屉可能并发调用,共享同一
+  // 在途请求,避免后到的失败结果覆盖先前成功加载的目录。
+  const catalogInFlightRef = useRef<Promise<readonly LocalAccountsPermissionCatalogItem[]> | null>(null);
+
+  const ensureCatalog = useCallback(() => {
     const state = catalogStateRef.current;
-    if (state.catalogLoaded && !state.catalogFailed) return state.catalog;
+    if (state.catalogLoaded && !state.catalogFailed) return Promise.resolve(state.catalog);
+    if (catalogInFlightRef.current) return catalogInFlightRef.current;
     setCatalogLoading(true);
-    try {
-      const items = await adapter.loadPermissionCatalog();
-      setCatalog(items);
-      setCatalogLoaded(true);
-      setCatalogFailed(false);
-      catalogStateRef.current = { catalog: items, catalogLoaded: true, catalogFailed: false };
-      return items;
-    } catch {
-      // Fail closed: empty catalog must not be treated as "loaded successfully".
-      setCatalog([]);
-      setCatalogLoaded(false);
-      setCatalogFailed(true);
-      catalogStateRef.current = { catalog: [], catalogLoaded: false, catalogFailed: true };
-      return [];
-    } finally {
-      setCatalogLoading(false);
-    }
+    const request = (async () => {
+      try {
+        const items = await adapter.loadPermissionCatalog();
+        setCatalog(items);
+        setCatalogLoaded(true);
+        setCatalogFailed(false);
+        catalogStateRef.current = { catalog: items, catalogLoaded: true, catalogFailed: false };
+        return items;
+      } catch {
+        // Fail closed: empty catalog must not be treated as "loaded successfully".
+        setCatalog([]);
+        setCatalogLoaded(false);
+        setCatalogFailed(true);
+        catalogStateRef.current = { catalog: [], catalogLoaded: false, catalogFailed: true };
+        return [] as readonly LocalAccountsPermissionCatalogItem[];
+      } finally {
+        catalogInFlightRef.current = null;
+        setCatalogLoading(false);
+      }
+    })();
+    catalogInFlightRef.current = request;
+    return request;
   }, [adapter]);
 
   // 目录很小且创建/编辑都要用:进页面就预取,点开编辑抽屉时无需再等目录往返。
