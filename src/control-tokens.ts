@@ -104,6 +104,21 @@ export const ANTD_CONTROL_TOKEN = {
   borderRadiusXS: CONTROL.radius,
 } as const;
 
+/**
+ * antd `components.Button` fragment — navy action buttons.
+ *
+ * Buttons follow the enterprise kit's primary action colour (`bg-ink` navy,
+ * see `primitives/button.tsx`), NOT the blue control accent. Blue (#2563EB)
+ * remains the selection/focus accent for fields, checkboxes and focus rings;
+ * filled action buttons are navy so antd surfaces match native EasyUI pages.
+ */
+export const ANTD_NAVY_BUTTON_TOKEN = {
+  colorPrimary: "#0F172A",
+  colorPrimaryHover: "#1E293B",
+  colorPrimaryActive: "#020617",
+  primaryShadow: "none",
+} as const;
+
 export interface ControlStatePalette {
   background: string;
   border: string;

@@ -33,8 +33,9 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 const VARIANTS: Record<Variant, string> = {
   primary:
     "bg-ink text-paper border border-ink hover:bg-ink/90 active:translate-y-px disabled:bg-ink/40 disabled:border-ink/40 disabled:cursor-not-allowed",
+  // 蓝色填充按钮已退役:动作按钮统一 navy(与 primary 同色);蓝色仅作选中/聚焦强调。
   secondary:
-    "bg-[rgb(var(--amber))] text-paper border border-[rgb(var(--amber))] hover:bg-[rgb(var(--amber))]/90 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed",
+    "bg-ink text-paper border border-ink hover:bg-ink/90 active:translate-y-px disabled:bg-ink/40 disabled:border-ink/40 disabled:cursor-not-allowed",
   outline:
     "bg-transparent text-ink border border-ink/30 hover:border-ink/60 hover:bg-ink/[0.04] active:translate-y-px disabled:opacity-40 disabled:cursor-not-allowed",
   ghost:
