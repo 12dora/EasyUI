@@ -154,10 +154,22 @@ export interface EnterpriseLocalAccountsLabels {
   copyPassword: string;
   passwordCopied: string;
   copyFailed: string;
-  mustChangePasswordHint: string;
+  /** Long-form toggle label on create/reset forms (force change on first sign-in). */
+  mustChangePasswordFirstLogin: string;
   isAdmin: string;
   isAdminHint: string;
   permissionPickerTitle: string;
+  /** Single toggle button: shown when at least one group is collapsed. */
+  expandAll: string;
+  /** Single toggle button: shown when every group is expanded. */
+  collapseAll: string;
+  selectAll: string;
+  selectNone: string;
+  /**
+   * Optional display names for permission group keys (e.g. `accounts` → 账户).
+   * Missing keys fall back to the raw group segment.
+   */
+  permissionGroupLabels?: Record<string, string>;
   permissionPickerAdminNote: string;
   permissionPickerEmpty: string;
   /** Hint on locked baseline self-service codes (host-supplied i18n). */

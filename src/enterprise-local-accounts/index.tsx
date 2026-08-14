@@ -3,7 +3,7 @@
 import { Button, ConfigProvider, Empty, Input, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ANTD_CONTROL_STATE_TOKEN, ANTD_CONTROL_TOKEN } from "../control-tokens";
+import { ANTD_CONTROL_STATE_TOKEN, ANTD_CONTROL_TOKEN, ANTD_NAVY_BUTTON_TOKEN } from "../control-tokens";
 import { InlineNotice } from "../primitives/inline-notice";
 import { PageHeader } from "../primitives/page-header";
 import { toast } from "../toast";
@@ -90,6 +90,13 @@ export function EnterpriseLocalAccountsSurface({
           ...ANTD_CONTROL_TOKEN,
           ...ANTD_CONTROL_STATE_TOKEN,
           fontSize: 13,
+        },
+        components: {
+          // 按钮走项目统一的 navy 主色(与 EasyUI bg-ink 主按钮对齐);蓝色仅保留为
+          // 选中/聚焦强调色(勾选框、输入框聚焦边等)。
+          Button: { ...ANTD_NAVY_BUTTON_TOKEN },
+          // 紧凑表单密度:对话框内条目间距从默认 24px 收敛到 14px。
+          Form: { itemMarginBottom: 14, verticalLabelPadding: "0 0 4px" },
         },
       }}
     >
@@ -182,6 +189,11 @@ function LocalAccountsBody({
     }
   }, [adapter]);
 
+  // 目录很小且创建/编辑都要用:进页面就预取,点开编辑抽屉时无需再等目录往返。
+  useEffect(() => {
+    void ensureCatalog();
+  }, [ensureCatalog]);
+
   const columns: ColumnsType<LocalAccountSummary> = useMemo(
     () => [
       {
@@ -221,7 +233,7 @@ function LocalAccountsBody({
         key: "actions",
         width: 100,
         render: (_: unknown, row) => (
-          <Button type="link" size="small" data-test-id={`local-accounts-open-${row.id}`} onClick={() => setEditId(row.id)}>
+          <Button size="small" data-test-id={`local-accounts-open-${row.id}`} onClick={() => setEditId(row.id)}>
             {labels.open}
           </Button>
         ),

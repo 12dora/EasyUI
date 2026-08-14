@@ -1,8 +1,8 @@
 "use client";
 
-import { DatePicker, Form, Input, Modal, Switch, Typography } from "antd";
+import { DatePicker, Form, Input, Modal, Switch } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "../toast";
 import { PasswordWithGenerator } from "./password-fields";
 import { PermissionPicker } from "./permission-picker";
@@ -25,6 +25,20 @@ const CREATE_FORM_DEFAULTS = {
   permissions: [] as LocalGrant[],
   expiresAt: null as Dayjs | null,
 };
+
+/** 必填星号排在文案之后(设计约定:标签 → *)。 */
+function renderRequiredMark(label: ReactNode, info: { required: boolean }): ReactNode {
+  return (
+    <>
+      {label}
+      {info.required ? (
+        <span aria-hidden className="ml-0.5 text-[rgb(var(--signal))]">
+          *
+        </span>
+      ) : null}
+    </>
+  );
+}
 
 export function CreateAccountModal({
   open,
@@ -145,40 +159,59 @@ export function CreateAccountModal({
       confirmLoading={submitting}
       okButtonProps={{ disabled: !canManage, "data-test-id": "local-accounts-create-submit" } as never}
       destroyOnHidden
-      width={640}
+      width={680}
       modalRender={(node) => <div data-test-id="local-accounts-create-modal">{node}</div>}
     >
       <Form
         form={form}
         layout="vertical"
+        requiredMark={renderRequiredMark}
         initialValues={{ mustChangePassword: true, isAdmin: false, permissions: [], expiresAt: null }}
         disabled={!canManage}
+        className="pt-1"
       >
-        <Form.Item name="username" label={labels.username} rules={[{ required: true, message: labels.usernameRequired }]}>
-          <Input data-test-id="local-accounts-create-username" autoComplete="off" />
-        </Form.Item>
-        <Form.Item name="email" label={labels.email}>
-          <Input data-test-id="local-accounts-create-email" autoComplete="off" />
-        </Form.Item>
-        <Form.Item name="password" label={labels.password} rules={[{ required: true, message: labels.passwordRequired }]}>
-          <PasswordWithGenerator labels={labels} disabled={!canManage} testIdPrefix="local-accounts-create" />
-        </Form.Item>
-        <Form.Item name="mustChangePassword" label={labels.mustChangePassword} valuePropName="checked">
-          <Switch data-test-id="local-accounts-create-must-change" />
-        </Form.Item>
-        <Typography.Paragraph type="secondary" className="!mt-0">
-          {labels.mustChangePasswordHint}
-        </Typography.Paragraph>
+        <div className="grid grid-cols-1 gap-x-5 sm:grid-cols-2">
+          <Form.Item
+            name="username"
+            label={labels.username}
+            rules={[{ required: true, message: labels.usernameRequired }]}
+          >
+            <Input data-test-id="local-accounts-create-username" autoComplete="off" />
+          </Form.Item>
+          <Form.Item name="email" label={labels.email}>
+            <Input data-test-id="local-accounts-create-email" autoComplete="off" />
+          </Form.Item>
+        </div>
+
+        <div className="grid grid-cols-1 gap-x-5 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Form.Item
+            name="password"
+            label={labels.password}
+            required
+            rules={[{ required: true, message: labels.passwordRequired }]}
+          >
+            <PasswordWithGenerator labels={labels} disabled={!canManage} testIdPrefix="local-accounts-create" />
+          </Form.Item>
+          <Form.Item
+            name="mustChangePassword"
+            label={labels.mustChangePasswordFirstLogin}
+            valuePropName="checked"
+          >
+            <Switch data-test-id="local-accounts-create-must-change" />
+          </Form.Item>
+        </div>
 
         {isLocalSuperadmin ? (
-          <>
-            <Form.Item name="isAdmin" label={labels.isAdmin} valuePropName="checked">
+          <div className="grid grid-cols-1 gap-x-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+            <Form.Item
+              name="isAdmin"
+              label={labels.isAdmin}
+              valuePropName="checked"
+              tooltip={labels.isAdminHint}
+            >
               <Switch data-test-id="local-accounts-create-is-admin" />
             </Form.Item>
-            <Typography.Paragraph type="secondary" className="!mt-0">
-              {labels.isAdminHint}
-            </Typography.Paragraph>
-            <Form.Item name="expiresAt" label={labels.expiresAt}>
+            <Form.Item name="expiresAt" label={labels.expiresAt} tooltip={labels.expiresAtHint}>
               <DatePicker
                 showTime
                 allowClear
@@ -189,10 +222,7 @@ export function CreateAccountModal({
                 data-test-id="local-accounts-create-expires-at"
               />
             </Form.Item>
-            <Typography.Paragraph type="secondary" className="!mt-0">
-              {labels.expiresAtHint}
-            </Typography.Paragraph>
-          </>
+          </div>
         ) : null}
 
         <Form.Item name="permissions" hidden>

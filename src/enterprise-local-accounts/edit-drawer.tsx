@@ -4,13 +4,12 @@ import {
   Button,
   DatePicker,
   Drawer,
-  Form,
   Input,
   Popconfirm,
+  Skeleton,
   Space,
   Switch,
   Tag,
-  Typography,
 } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import {
@@ -42,6 +41,34 @@ import type {
   LocalAccountsPermissionCatalogItem,
   LocalGrant,
 } from "./types";
+
+/** 统一的分节样式:首节无上边线,其余节以发丝线分隔。 */
+function DrawerSection({
+  title,
+  first = false,
+  danger = false,
+  children,
+  "data-test-id": testId,
+}: {
+  title?: ReactNode;
+  first?: boolean;
+  danger?: boolean;
+  children: ReactNode;
+  "data-test-id"?: string;
+}) {
+  return (
+    <section data-test-id={testId} className={first ? "" : "border-t border-hairline pt-4"}>
+      {title ? (
+        <h4
+          className={`mb-2.5 text-[13px] font-semibold ${danger ? "text-[rgb(var(--signal))]" : "text-ink"}`}
+        >
+          {title}
+        </h4>
+      ) : null}
+      {children}
+    </section>
+  );
+}
 
 export function EditAccountDrawer({
   accountId,
@@ -109,8 +136,8 @@ export function EditAccountDrawer({
     setLoadFailed(false);
     setGrantsConflict(false);
     try {
-      await ensureCatalog();
-      const next = await adapter.getAccount(accountId);
+      // 打开速度关键路径:目录与账户详情并行拉取(此前串行,叠加两轮网络往返)。
+      const [next] = await Promise.all([adapter.getAccount(accountId), ensureCatalog()]);
       setDetail(next);
       setEmail(next.email ?? "");
       setPermissions(normalizeDetailGrants(next, baselinePermissions));
@@ -197,7 +224,7 @@ export function EditAccountDrawer({
       <Drawer
         open={open}
         onClose={onClose}
-        width={520}
+        width={560}
         title={labels.editTitle}
         destroyOnHidden
         footer={footer}
@@ -211,15 +238,14 @@ export function EditAccountDrawer({
         }
       >
         {loading ? (
-          <Typography.Text type="secondary">{labels.loading}</Typography.Text>
+          <Skeleton active paragraph={{ rows: 6 }} title={false} />
         ) : loadFailed || !detail ? (
           <InlineNotice tone="error" message={labels.loadFailed} actionLabel={labels.retry} onAction={() => void loadDetail()} />
         ) : (
-          <div className="space-y-6">
-            <div>
-              <Typography.Title level={5}>{labels.profileSection}</Typography.Title>
-              <Space size={4} wrap className="mb-3">
-                <Typography.Text strong>{detail.username}</Typography.Text>
+          <div className="space-y-4">
+            <DrawerSection first>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-[15px] font-semibold text-ink">{detail.username}</span>
                 {detail.isAdmin ? <Tag color="blue">{labels.admin}</Tag> : null}
                 <Tag color={detail.active ? "green" : "default"}>{detail.active ? labels.active : labels.inactive}</Tag>
                 {detail.totpEnabled ? <Tag color="green">{labels.totpEnabled}</Tag> : null}
@@ -229,54 +255,120 @@ export function EditAccountDrawer({
                     {labels.expired}
                   </Tag>
                 ) : null}
-              </Space>
-              <Form layout="vertical" disabled={formDisabled}>
-                <Form.Item label={labels.email}>
-                  <Input
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    data-test-id="local-accounts-edit-email"
-                  />
-                </Form.Item>
-                <Button
-                  type="primary"
-                  loading={busy === "profile"}
-                  disabled={formDisabled}
-                  data-test-id="local-accounts-edit-save-profile"
-                  onClick={() =>
-                    void runMutation(
-                      "profile",
-                      async () => {
-                        await adapter.updateAccount(detail.id, { email: email.trim() || null });
-                      },
-                      labels.updateSuccess,
-                      labels.updateFailed,
-                    )
-                  }
-                >
-                  {busy === "profile" ? labels.saving : labels.save}
-                </Button>
-              </Form>
-            </div>
+              </div>
+            </DrawerSection>
+
+            <DrawerSection title={labels.profileSection}>
+              <div className="space-y-3">
+                <div>
+                  <div className="mb-1 text-[12px] text-ink-soft">{labels.email}</div>
+                  <Space.Compact style={{ width: "100%" }}>
+                    <Input
+                      value={email}
+                      disabled={formDisabled}
+                      onChange={(event) => setEmail(event.target.value)}
+                      data-test-id="local-accounts-edit-email"
+                    />
+                    <Button
+                      type="primary"
+                      loading={busy === "profile"}
+                      disabled={formDisabled}
+                      data-test-id="local-accounts-edit-save-profile"
+                      onClick={() =>
+                        void runMutation(
+                          "profile",
+                          async () => {
+                            await adapter.updateAccount(detail.id, { email: email.trim() || null });
+                          },
+                          labels.updateSuccess,
+                          labels.updateFailed,
+                        )
+                      }
+                    >
+                      {busy === "profile" ? labels.saving : labels.save}
+                    </Button>
+                  </Space.Compact>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    disabled={formDisabled || selfDangerLocked}
+                    loading={busy === "status"}
+                    data-test-id="local-accounts-toggle-active"
+                    onClick={() =>
+                      void runMutation(
+                        "status",
+                        async () => {
+                          await adapter.updateAccount(detail.id, { active: !detail.active });
+                        },
+                        labels.statusUpdateSuccess,
+                        labels.statusUpdateFailed,
+                      )
+                    }
+                  >
+                    {detail.active ? labels.deactivate : labels.activate}
+                  </Button>
+                  {showAdminToggle ? (
+                    <Button
+                      disabled={formDisabled || selfDangerLocked}
+                      loading={busy === "admin"}
+                      data-test-id="local-accounts-toggle-admin"
+                      onClick={() =>
+                        void runMutation(
+                          "admin",
+                          async () => {
+                            await adapter.updateAccount(detail.id, { isAdmin: !detail.isAdmin });
+                          },
+                          labels.adminUpdateSuccess,
+                          labels.adminUpdateFailed,
+                        )
+                      }
+                    >
+                      {detail.isAdmin ? labels.demoteAdmin : labels.promoteAdmin}
+                    </Button>
+                  ) : null}
+                  {detail.totpEnabled ? (
+                    <Popconfirm
+                      title={labels.disableTotpConfirm}
+                      disabled={formDisabled || selfDangerLocked}
+                      onConfirm={() =>
+                        void runMutation(
+                          "totp",
+                          async () => {
+                            await adapter.disableTotp(detail.id);
+                          },
+                          labels.disableTotpSuccess,
+                          labels.disableTotpFailed,
+                        )
+                      }
+                    >
+                      <Button
+                        danger
+                        disabled={formDisabled || selfDangerLocked}
+                        loading={busy === "totp"}
+                        data-test-id="local-accounts-disable-totp"
+                      >
+                        {labels.disableTotp}
+                      </Button>
+                    </Popconfirm>
+                  ) : null}
+                </div>
+              </div>
+            </DrawerSection>
 
             {showExpiryEditor ? (
-              <div data-test-id="local-accounts-expiry-editor" className="space-y-2">
-                <Typography.Title level={5}>{labels.expiresAt}</Typography.Title>
-                <Typography.Paragraph type="secondary" className="!mt-0">
-                  {labels.expiresAtHint}
-                </Typography.Paragraph>
-                <DatePicker
-                  showTime
-                  allowClear
-                  style={{ width: "100%" }}
-                  value={expiresAt}
-                  onChange={(value) => setExpiresAt(value)}
-                  disabled={formDisabled}
-                  disabledDate={(current) => Boolean(current && current.isBefore(dayjs().startOf("day")))}
-                  placeholder={labels.expiresAtPermanent}
-                  data-test-id="local-accounts-edit-expires-at"
-                />
-                <Space wrap>
+              <DrawerSection title={labels.expiresAt} data-test-id="local-accounts-expiry-editor">
+                <div className="flex flex-wrap items-center gap-2">
+                  <DatePicker
+                    showTime
+                    allowClear
+                    className="min-w-[220px] flex-1"
+                    value={expiresAt}
+                    onChange={(value) => setExpiresAt(value)}
+                    disabled={formDisabled}
+                    disabledDate={(current) => Boolean(current && current.isBefore(dayjs().startOf("day")))}
+                    placeholder={labels.expiresAtPermanent}
+                    data-test-id="local-accounts-edit-expires-at"
+                  />
                   <Button
                     disabled={formDisabled}
                     loading={busy === "expiry"}
@@ -285,10 +377,7 @@ export function EditAccountDrawer({
                       void runMutation(
                         "expiry",
                         async () => {
-                          await adapter.updateAccount(
-                            detail.id,
-                            mapExpiryUpdatePatch(expiresAt),
-                          );
+                          await adapter.updateAccount(detail.id, mapExpiryUpdatePatch(expiresAt));
                         },
                         labels.updateSuccess,
                         labels.updateFailed,
@@ -315,79 +404,13 @@ export function EditAccountDrawer({
                   >
                     {labels.clearExpiry}
                   </Button>
-                </Space>
-              </div>
+                </div>
+                <p className="mb-0 mt-1.5 text-[11px] text-ink-faint">{labels.expiresAtHint}</p>
+              </DrawerSection>
             ) : null}
 
-            <div className="space-y-2">
-              <Space wrap>
-                <Button
-                  disabled={formDisabled || selfDangerLocked}
-                  loading={busy === "status"}
-                  data-test-id="local-accounts-toggle-active"
-                  onClick={() =>
-                    void runMutation(
-                      "status",
-                      async () => {
-                        await adapter.updateAccount(detail.id, { active: !detail.active });
-                      },
-                      labels.statusUpdateSuccess,
-                      labels.statusUpdateFailed,
-                    )
-                  }
-                >
-                  {detail.active ? labels.deactivate : labels.activate}
-                </Button>
-                {showAdminToggle ? (
-                  <Button
-                    disabled={formDisabled || selfDangerLocked}
-                    loading={busy === "admin"}
-                    data-test-id="local-accounts-toggle-admin"
-                    onClick={() =>
-                      void runMutation(
-                        "admin",
-                        async () => {
-                          await adapter.updateAccount(detail.id, { isAdmin: !detail.isAdmin });
-                        },
-                        labels.adminUpdateSuccess,
-                        labels.adminUpdateFailed,
-                      )
-                    }
-                  >
-                    {detail.isAdmin ? labels.demoteAdmin : labels.promoteAdmin}
-                  </Button>
-                ) : null}
-                {detail.totpEnabled ? (
-                  <Popconfirm
-                    title={labels.disableTotpConfirm}
-                    disabled={formDisabled || selfDangerLocked}
-                    onConfirm={() =>
-                      void runMutation(
-                        "totp",
-                        async () => {
-                          await adapter.disableTotp(detail.id);
-                        },
-                        labels.disableTotpSuccess,
-                        labels.disableTotpFailed,
-                      )
-                    }
-                  >
-                    <Button
-                      danger
-                      disabled={formDisabled || selfDangerLocked}
-                      loading={busy === "totp"}
-                      data-test-id="local-accounts-disable-totp"
-                    >
-                      {labels.disableTotp}
-                    </Button>
-                  </Popconfirm>
-                ) : null}
-              </Space>
-            </div>
-
-            <div>
-              <Typography.Title level={5}>{labels.resetPasswordTitle}</Typography.Title>
-              <div className="space-y-3">
+            <DrawerSection title={labels.resetPasswordTitle}>
+              <div className="space-y-2.5">
                 <PasswordWithGenerator
                   value={resetPassword}
                   onChange={setResetPassword}
@@ -395,74 +418,76 @@ export function EditAccountDrawer({
                   disabled={formDisabled || selfDangerLocked}
                   testIdPrefix="local-accounts-reset"
                 />
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={resetMustChange}
-                    onChange={setResetMustChange}
-                    disabled={formDisabled || selfDangerLocked}
-                    data-test-id="local-accounts-reset-must-change"
-                  />
-                  <span>{labels.mustChangePassword}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 text-[13px] text-ink">
+                    <Switch
+                      checked={resetMustChange}
+                      onChange={setResetMustChange}
+                      disabled={formDisabled || selfDangerLocked}
+                      data-test-id="local-accounts-reset-must-change"
+                    />
+                    <span>{labels.mustChangePasswordFirstLogin}</span>
+                  </label>
+                  <Button
+                    disabled={formDisabled || selfDangerLocked || !resetPassword}
+                    loading={busy === "password"}
+                    data-test-id="local-accounts-reset-password-submit"
+                    onClick={() => {
+                      if (!detail || formDisabled || selfDangerLocked) return;
+                      const password = resetPassword;
+                      void runMutation(
+                        "password",
+                        async () => {
+                          await adapter.resetPassword(detail.id, {
+                            password,
+                            mustChangePassword: resetMustChange,
+                          });
+                          setResetPassword("");
+                          setReceiptPassword(password);
+                        },
+                        labels.resetPasswordSuccess,
+                        labels.resetPasswordFailed,
+                      );
+                    }}
+                  >
+                    {labels.resetPassword}
+                  </Button>
                 </div>
-                <Button
-                  disabled={formDisabled || selfDangerLocked || !resetPassword}
-                  loading={busy === "password"}
-                  data-test-id="local-accounts-reset-password-submit"
-                  onClick={() => {
-                    if (!detail || formDisabled || selfDangerLocked) return;
-                    const password = resetPassword;
-                    void runMutation(
-                      "password",
-                      async () => {
-                        await adapter.resetPassword(detail.id, {
-                          password,
-                          mustChangePassword: resetMustChange,
-                        });
-                        setResetPassword("");
-                        setReceiptPassword(password);
-                      },
-                      labels.resetPasswordSuccess,
-                      labels.resetPasswordFailed,
-                    );
-                  }}
-                >
-                  {labels.resetPassword}
-                </Button>
               </div>
-            </div>
+            </DrawerSection>
 
-            {grantsConflict ? (
-              <InlineNotice
-                tone="error"
-                message={labels.grantsConflict}
-                actionLabel={labels.retry}
-                onAction={() => void loadDetail()}
-                data-test-id="local-accounts-grants-conflict"
-              />
-            ) : null}
+            <DrawerSection>
+              <div className="space-y-2.5">
+                {grantsConflict ? (
+                  <InlineNotice
+                    tone="error"
+                    message={labels.grantsConflict}
+                    actionLabel={labels.retry}
+                    onAction={() => void loadDetail()}
+                    data-test-id="local-accounts-grants-conflict"
+                  />
+                ) : null}
+                <PermissionPicker
+                  labels={labels}
+                  locale={locale}
+                  catalog={catalog}
+                  catalogFailed={catalogFailed}
+                  catalogLoading={catalogLoading}
+                  baselinePermissions={effectiveBaseline}
+                  value={permissions}
+                  onChange={(next) => setPermissions(stripBaselinePermissions(next, effectiveBaseline))}
+                  disabled={formDisabled || detail.isAdmin}
+                  adminLocked={detail.isAdmin}
+                  isLocalSuperadmin={capabilities.isLocalSuperadmin}
+                  onRetryCatalog={() => void ensureCatalog()}
+                  adapter={adapter}
+                  excludeAccountId={detail.id}
+                  showCopyFrom={!formDisabled && !detail.isAdmin}
+                />
+              </div>
+            </DrawerSection>
 
-            <PermissionPicker
-              labels={labels}
-              locale={locale}
-              catalog={catalog}
-              catalogFailed={catalogFailed}
-              catalogLoading={catalogLoading}
-              baselinePermissions={effectiveBaseline}
-              value={permissions}
-              onChange={(next) => setPermissions(stripBaselinePermissions(next, effectiveBaseline))}
-              disabled={formDisabled || detail.isAdmin}
-              adminLocked={detail.isAdmin}
-              isLocalSuperadmin={capabilities.isLocalSuperadmin}
-              onRetryCatalog={() => void ensureCatalog()}
-              adapter={adapter}
-              excludeAccountId={detail.id}
-              showCopyFrom={!formDisabled && !detail.isAdmin}
-            />
-
-            <div>
-              <Typography.Title level={5} type="danger">
-                {labels.dangerSection}
-              </Typography.Title>
+            <DrawerSection title={labels.dangerSection} danger>
               <Popconfirm
                 title={labels.deleteConfirm}
                 disabled={formDisabled || selfDangerLocked}
@@ -487,7 +512,7 @@ export function EditAccountDrawer({
                   {labels.delete}
                 </Button>
               </Popconfirm>
-            </div>
+            </DrawerSection>
           </div>
         )}
       </Drawer>

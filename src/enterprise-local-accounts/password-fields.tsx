@@ -1,10 +1,43 @@
 "use client";
 
-import { Button, Input, Modal, Space, Typography } from "antd";
+import { Button, Input, Modal, Space, Tooltip, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { toast } from "../toast";
 import { generatePolicyPassword } from "./password";
 import type { EnterpriseLocalAccountsLabels } from "./types";
+
+function GenerateIcon() {
+  return (
+    <svg viewBox="0 0 14 14" aria-hidden className="size-3.5">
+      <path
+        d="M12 7a5 5 0 1 1-1.47-3.54M12 1.5V4h-2.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 14 14" aria-hidden className="size-3.5">
+      <rect x="4.5" y="4.5" width="8" height="8" rx="1.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M9.5 4.5v-2A1 1 0 0 0 8.5 1.5h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+async function copyToClipboard(value: string, labels: EnterpriseLocalAccountsLabels) {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast.success(labels.passwordCopied);
+  } catch {
+    toast.error(labels.copyFailed);
+  }
+}
 
 export function PasswordWithGenerator({
   value,
@@ -30,27 +63,24 @@ export function PasswordWithGenerator({
         autoComplete="new-password"
         data-test-id={`${testIdPrefix}-password-input`}
       />
-      <Button
-        disabled={disabled}
-        data-test-id={`${testIdPrefix}-generate-password`}
-        onClick={() => setValue(generatePolicyPassword())}
-      >
-        {labels.generatePassword}
-      </Button>
-      <Button
-        disabled={disabled || !current}
-        data-test-id={`${testIdPrefix}-copy-password`}
-        onClick={async () => {
-          try {
-            await navigator.clipboard.writeText(current);
-            toast.success(labels.passwordCopied);
-          } catch {
-            toast.error(labels.copyFailed);
-          }
-        }}
-      >
-        {labels.copyPassword}
-      </Button>
+      <Tooltip title={labels.generatePassword}>
+        <Button
+          disabled={disabled}
+          aria-label={labels.generatePassword}
+          icon={<GenerateIcon />}
+          data-test-id={`${testIdPrefix}-generate-password`}
+          onClick={() => setValue(generatePolicyPassword())}
+        />
+      </Tooltip>
+      <Tooltip title={labels.copyPassword}>
+        <Button
+          disabled={disabled || !current}
+          aria-label={labels.copyPassword}
+          icon={<CopyIcon />}
+          data-test-id={`${testIdPrefix}-copy-password`}
+          onClick={() => void copyToClipboard(current, labels)}
+        />
+      </Tooltip>
     </Space.Compact>
   );
 }
@@ -122,14 +152,8 @@ export function PasswordReceiptModal({
         />
         <Button
           data-test-id="local-accounts-password-receipt-copy"
-          onClick={async () => {
-            if (!heldPassword) return;
-            try {
-              await navigator.clipboard.writeText(heldPassword);
-              toast.success(labels.passwordCopied);
-            } catch {
-              toast.error(labels.copyFailed);
-            }
+          onClick={() => {
+            if (heldPassword) void copyToClipboard(heldPassword, labels);
           }}
         >
           {labels.copyPassword}
