@@ -47,3 +47,10 @@ Tests run standalone: `pnpm install && pnpm exec vitest run` (root is this packa
 is a declared devDependency; JSX uses the automatic runtime via `vitest.config.ts`). Two behavior
 suites (`timestamp-consumer`, `overflow`) import EasyCustoms host pages and are excluded here —
 they only run inside the host monorepo; see the `exclude` note in `vitest.config.ts`.
+
+## License
+
+[Apache License 2.0](LICENSE) — free to use, modify and redistribute, commercially included,
+with an explicit patent grant. Redistributions must keep the license and copyright notice and
+state any changes made. The reference host [EasyFrame](https://github.com/12dora/EasyFrame) is
+published under the same license.
