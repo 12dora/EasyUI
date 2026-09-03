@@ -46,7 +46,6 @@ export interface EnterpriseAccessSettingsAdapter extends EnterpriseAuthorization
   saveEasyAuthSettings(value: EnterpriseEasyAuthConfigurationValue, credential?: string): Promise<EnterpriseEasyAuthConfigurationValue>;
   discoverIdentity?(issuer: string): Promise<EnterpriseIdentityDiscoveryResult>;
   testIdentityConnection?(): Promise<EnterpriseIdentityOperationResult>;
-  syncIdentityUsers?(): Promise<EnterpriseIdentityOperationResult>;
 }
 
 export interface EnterpriseAccessSettingsLabels {
@@ -80,9 +79,8 @@ export interface EnterpriseOidcStatusSummary {
   enabled: boolean;
   configured: boolean;
   hasClientSecret: boolean;
-  hasAuthentikApiToken: boolean;
-  userSyncEnabled: boolean;
-  userSyncSupported?: boolean;
+  /** Optional: hosts whose backend dropped the Authentik admin API may omit it. */
+  hasAuthentikApiToken?: boolean;
 }
 
 /**
@@ -186,7 +184,7 @@ function IdentityPanel({
   const [value, setValue] = useState<EnterpriseOidcConfigurationValue | EnterpriseOidcStatusSummary | null>(null);
   const [clientSecret, setClientSecret] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
   const [apiToken, setApiToken] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
-  const [busy, setBusy] = useState<"load" | "save" | "discover" | "test" | "sync" | null>("load");
+  const [busy, setBusy] = useState<"load" | "save" | "discover" | "test" | null>("load");
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [loadRevision, setLoadRevision] = useState(0);
   const retryLabel = labels.retry ?? "Retry";
@@ -279,10 +277,10 @@ function IdentityPanel({
     }
   }
 
-  async function operation(kind: "test" | "sync") {
-    const action = kind === "test" ? adapter.testIdentityConnection : adapter.syncIdentityUsers;
+  async function testConnection() {
+    const action = adapter.testIdentityConnection;
     if (!action) return;
-    setBusy(kind);
+    setBusy("test");
     if (!toastMode) setResult(null);
     try {
       const next = await action();
@@ -302,7 +300,6 @@ function IdentityPanel({
 
   // Inline manage path (value guaranteed above).
   if (!toastMode && value && canManage) {
-    const userSyncSupported = value.userSyncSupported === true;
     return (
       <EnterpriseOidcConfigurationForm
         labels={labels}
@@ -313,9 +310,7 @@ function IdentityPanel({
         saving={busy === "save"}
         discovering={busy === "discover"}
         testing={busy === "test"}
-        syncing={busy === "sync"}
         operationResult={result}
-        showUserSync={userSyncSupported}
         hideAdvancedWhenDisabled={false}
         onChange={(patch) =>
           setValue((current) =>
@@ -332,8 +327,7 @@ function IdentityPanel({
         onApiTokenChange={setApiToken}
         onSave={save}
         onDiscover={adapter.discoverIdentity ? discover : undefined}
-        onTest={adapter.testIdentityConnection ? () => operation("test") : undefined}
-        onSync={userSyncSupported && adapter.syncIdentityUsers ? () => operation("sync") : undefined}
+        onTest={adapter.testIdentityConnection ? () => void testConnection() : undefined}
       />
     );
   }
@@ -347,7 +341,6 @@ function IdentityPanel({
   if (value && !canManage) {
     readyBody = <IdentityStatusSummary value={value} labels={labels} />;
   } else if (value && canManage) {
-    const userSyncSupported = value.userSyncSupported === true;
     readyBody = (
       <EnterpriseOidcConfigurationForm
         labels={labels}
@@ -358,9 +351,7 @@ function IdentityPanel({
         saving={busy === "save"}
         discovering={busy === "discover"}
         testing={busy === "test"}
-        syncing={busy === "sync"}
         operationResult={null}
-        showUserSync={userSyncSupported}
         hideAdvancedWhenDisabled={toastMode}
         onChange={(patch) =>
           setValue((current) =>
@@ -377,8 +368,7 @@ function IdentityPanel({
         onApiTokenChange={setApiToken}
         onSave={save}
         onDiscover={adapter.discoverIdentity ? discover : undefined}
-        onTest={adapter.testIdentityConnection ? () => operation("test") : undefined}
-        onSync={userSyncSupported && adapter.syncIdentityUsers ? () => operation("sync") : undefined}
+        onTest={adapter.testIdentityConnection ? () => void testConnection() : undefined}
       />
     );
   }
@@ -423,10 +413,7 @@ function IdentityStatusSummary({
       <dl className="grid gap-2 text-[13px] sm:grid-cols-2">
         <StatusFact label={labels.enabled} value={value.enabled ? labels.enabled : labels.notConfigured} />
         <StatusFact label={labels.clientSecret} value={value.hasClientSecret ? labels.configured : labels.notConfigured} />
-        <StatusFact label={labels.authentikApiToken} value={value.hasAuthentikApiToken ? labels.configured : labels.notConfigured} />
-        {value.userSyncSupported ? (
-          <StatusFact label={labels.userSyncEnabled} value={value.userSyncEnabled ? labels.enabled : labels.notConfigured} />
-        ) : null}
+        <StatusFact label={labels.authentikApiToken} value={value.hasAuthentikApiToken === true ? labels.configured : labels.notConfigured} />
       </dl>
     </div>
   );

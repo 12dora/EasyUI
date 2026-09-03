@@ -25,12 +25,12 @@ export interface EnterpriseOidcConfigurationValue {
   redirectUri: string;
   frontendBaseUrl: string;
   serverBaseUrl: string;
-  authentikApiBaseUrl: string;
-  hasAuthentikApiToken: boolean;
-  userSyncEnabled: boolean;
-  /** Server-owned capability; absent/false means directory sync controls are unavailable. */
-  userSyncSupported?: boolean;
-  userSyncIntervalMinutes: number;
+  /**
+   * Authentik admin API access. Optional: the backend owns whether it still
+   * exposes these, and hosts that omit them must keep rendering.
+   */
+  authentikApiBaseUrl?: string;
+  hasAuthentikApiToken?: boolean;
 }
 
 export interface EnterpriseEasyAuthConfigurationValue {
@@ -71,9 +71,6 @@ export interface EnterpriseIntegrationConfigurationLabels {
   permissionRequestUrl: string;
   discover: string;
   connectionTest: string;
-  userSync: string;
-  userSyncEnabled: string;
-  userSyncInterval: string;
   advancedTitle: string;
   advancedDescription: string;
   advancedShow: string;
@@ -81,7 +78,7 @@ export interface EnterpriseIntegrationConfigurationLabels {
   operationSucceeded: string;
   operationFailed: string;
   guideAriaLabel: string;
-  guides?: Partial<Record<"issuer" | "clientId" | "clientSecret" | "authentikApiToken" | "userSyncInterval", string>>;
+  guides?: Partial<Record<"issuer" | "clientId" | "clientSecret" | "authentikApiToken", string>>;
 }
 
 export interface EnterpriseWriteOnlySecret { value: string; clear: boolean; }
@@ -99,7 +96,6 @@ interface OidcFormProps {
   saving?: boolean;
   discovering?: boolean;
   testing?: boolean;
-  syncing?: boolean;
   operationResult?: { ok: boolean; message: string } | null;
   onChange: (patch: Partial<EnterpriseOidcConfigurationValue>) => void;
   onClientSecretChange: (next: EnterpriseWriteOnlySecret) => void;
@@ -107,8 +103,6 @@ interface OidcFormProps {
   onSave: () => void | Promise<void>;
   onDiscover?: () => void | Promise<void>;
   onTest?: () => void | Promise<void>;
-  onSync?: () => void | Promise<void>;
-  showUserSync?: boolean;
   /** Customs hides protocol endpoints from disabled/view-only forms; omitted preserves the legacy form. */
   hideAdvancedWhenDisabled?: boolean;
 }
@@ -155,11 +149,9 @@ export function EnterpriseOidcConfigurationForm(props: OidcFormProps) {
                 <TextField id="enterprise-oidc-jwks-uri" label={labels.jwksUri} value={value.jwksUri} disabled={disabled} onChange={(jwksUri) => props.onChange({ jwksUri })} />
                 <TextField id="enterprise-oidc-userinfo-endpoint" label={labels.userinfoEndpoint} value={value.userinfoEndpoint} disabled={disabled} onChange={(userinfoEndpoint) => props.onChange({ userinfoEndpoint })} />
                 <TextField id="enterprise-oidc-server-base" label={labels.serverBaseUrl} value={value.serverBaseUrl} disabled={disabled} onChange={(serverBaseUrl) => props.onChange({ serverBaseUrl })} />
-                <TextField id="enterprise-authentik-api" label={labels.authentikApiBaseUrl} value={value.authentikApiBaseUrl} disabled={disabled} onChange={(authentikApiBaseUrl) => props.onChange({ authentikApiBaseUrl })} />
-                <EnterpriseSecretField id="enterprise-authentik-token" label={<GuidedLabel label={labels.authentikApiToken} guide={labels.guides?.authentikApiToken} ariaLabel={labels.guideAriaLabel} testId="identity-guide-authentik-api-token" />} keepHint={labels.authorityHint} clearLabel={labels.clearSecret} configuredHint={value.hasAuthentikApiToken ? labels.configured : labels.notConfigured} value={props.apiToken.value} clear={props.apiToken.clear} disabled={disabled} onValueChange={(token) => props.onApiTokenChange({ value: token, clear: false })} onClearChange={(clear) => props.onApiTokenChange({ value: clear ? "" : props.apiToken.value, clear })} />
-                {props.showUserSync ? <TextField id="enterprise-user-sync-interval" label={<GuidedLabel label={labels.userSyncInterval} guide={labels.guides?.userSyncInterval} ariaLabel={labels.guideAriaLabel} testId="identity-guide-user-sync-interval" />} value={String(value.userSyncIntervalMinutes)} disabled={disabled} type="number" onChange={(raw) => props.onChange({ userSyncIntervalMinutes: Number.parseInt(raw, 10) || 0 })} /> : null}
+                <TextField id="enterprise-authentik-api" label={labels.authentikApiBaseUrl} value={value.authentikApiBaseUrl ?? ""} disabled={disabled} onChange={(authentikApiBaseUrl) => props.onChange({ authentikApiBaseUrl })} />
+                <EnterpriseSecretField id="enterprise-authentik-token" label={<GuidedLabel label={labels.authentikApiToken} guide={labels.guides?.authentikApiToken} ariaLabel={labels.guideAriaLabel} testId="identity-guide-authentik-api-token" />} keepHint={labels.authorityHint} clearLabel={labels.clearSecret} configuredHint={value.hasAuthentikApiToken === true ? labels.configured : labels.notConfigured} value={props.apiToken.value} clear={props.apiToken.clear} disabled={disabled} onValueChange={(token) => props.onApiTokenChange({ value: token, clear: false })} onClearChange={(clear) => props.onApiTokenChange({ value: clear ? "" : props.apiToken.value, clear })} />
               </EnterpriseConfigurationFieldGrid>
-              {props.showUserSync ? <div className="flex flex-wrap items-center gap-3"><Checkbox label={labels.userSyncEnabled} checked={value.userSyncEnabled} disabled={disabled} onChange={(event) => props.onChange({ userSyncEnabled: event.target.checked })} data-test-id="identity-user-sync-enabled" />{!disabled && props.onSync ? <Button variant="outline" size="sm" loading={props.syncing} onClick={() => void props.onSync?.()} data-test-id="identity-user-sync">{labels.userSync}</Button> : null}</div> : null}
             </div>
           </CollapseReveal>
         </Section>

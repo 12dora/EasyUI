@@ -21,19 +21,15 @@ export interface EnterpriseIdentityIntegrationSettings {
   clientId: string;
   redirectUri: string;
   hasClientSecret: boolean;
-  authentikApiBaseUrl: string;
-  hasAuthentikApiToken: boolean;
-  userSyncEnabled: boolean;
-  userSyncSupported?: boolean;
+  authentikApiBaseUrl?: string;
+  hasAuthentikApiToken?: boolean;
 }
 
 export interface EnterpriseIdentityIntegrationSummary {
   enabled: boolean;
   configured: boolean;
   hasClientSecret: boolean;
-  hasAuthentikApiToken: boolean;
-  userSyncEnabled: boolean;
-  userSyncSupported?: boolean;
+  hasAuthentikApiToken?: boolean;
 }
 
 export interface EnterpriseAuthzStatus {
@@ -251,7 +247,7 @@ export function EnterpriseAuthorizationWorkspace({
               </>
             ) : null}
             <Fact label={labels.clientSecret} value={<StateBadge value={currentIdentity.hasClientSecret} labels={labels}/>} empty={labels.notAvailable}/>
-            <Fact label={labels.apiToken} value={<StateBadge value={currentIdentity.hasAuthentikApiToken} labels={labels}/>} empty={labels.notAvailable}/>
+            <Fact label={labels.apiToken} value={<StateBadge value={currentIdentity.hasAuthentikApiToken === true} labels={labels}/>} empty={labels.notAvailable}/>
           </div>
         </Section>
       ) : null}
