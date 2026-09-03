@@ -1,6 +1,7 @@
 import type { EnterpriseFooterSettingsLabels } from "./footer-settings-surface";
 import type { EnterpriseLoginControllerLabels, EnterpriseOidcCompleteLabels } from "./auth-controller";
 import type { EnterpriseAccessSettingsLabels } from "./access-settings-surface";
+import type { EnterpriseDeliveryStatusLabels } from "./delivery-status";
 import type { EnterpriseSecurityOperationsLabels } from "./security-workspace";
 import type { EnterpriseUpstreamHealthControllerLabels } from "./upstream-health-controller";
 import type { EnterpriseShellLabels } from "./models";
@@ -23,6 +24,8 @@ export interface EnterpriseStaticLabelCatalog {
   security: EnterpriseSecurityOperationsLabels;
   access: EnterpriseAccessSettingsLabels;
   upstream: EnterpriseUpstreamHealthControllerLabels;
+  /** Notification outbox delivery wording, shared by every host that sends through EasyAuth notify. */
+  delivery: EnterpriseDeliveryStatusLabels;
   notifications: { title: string; description: string; empty: string; loadFailed: string; retry: string; dismiss: string };
   footerSettings: EnterpriseFooterSettingsLabels;
   public: { loginEyebrow: string; loggedOutTitle: string; loggedOutDescription: string; loginAgain: string; footer: string };
@@ -335,6 +338,22 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       permissionDeniedAction,
     },
     upstream: { title: "系统服务", description: "查看登录与权限等系统服务的运行状态。", refresh: "立即刷新", refreshing: "正在刷新", empty: "暂无服务", lastChecked: "最近检查", endpoint: "地址", loadFailed: "系统服务状态加载失败", checkSucceeded: "状态检查完成", checkFailed: "状态检查失败", permissionDenied: "当前账号没有访问系统服务状态的权限。", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `检查于 ${relative}`, checkedAtNever: "尚未检查", status: { healthy: "正常", warning: "警告", unhealthy: "异常", unknown: "未知" }, dependencyNames: { database: "数据库", easyauth: "权限服务", authentik: "工作账号登录", authentik_directory: "用户目录", scheduler: "定时任务" }, summaries: { healthy: "运行正常", warning: "需要关注", unhealthy: "服务异常", unknown: "状态未知", notChecked: "尚未检查", notSupported: "当前环境不支持此服务" } },
+    delivery: {
+      title: "发送状态",
+      statusLabels: { queued: "排队中", accepted: "已受理(待发送)", sent: "已发送", delivered: "已投递(不代表已读)", failed: "失败", superseded: "已作废" },
+      statusExplanations: {
+        queued: "已进入发送队列，还没有提交给通知服务。",
+        accepted: "通知服务已受理，正在等待发往钉钉。",
+        sent: "钉钉已接收这条消息，这是目前能拿到的最强保证。",
+        delivered: "钉钉回执确认消息已送到对方，但不代表对方已经读过。",
+        failed: "发送失败，详情见下方错误信息；本版本不支持手动重发。",
+        superseded: "已被更新的一条提醒取代，本条不会再发送。",
+      },
+      acceptedAt: "受理时间", sentAt: "发送时间", deliveredAt: "投递时间", lastReconciledAt: "最近对账",
+      providerMessageId: "通知服务消息号", recipientCount: "接收人数", lastError: "错误信息",
+      unconfirmedHint: "已发送超过 24 小时仍未收到投递回执，可能对方并未收到，请通过其他方式确认。",
+      notAvailable: "—",
+    },
     notifications: { title: "通知中心", description: "查看并处理当前账号的企业通知。", empty: "暂无通知", loadFailed: "通知加载失败", retry, dismiss: "忽略" },
     footerSettings: { title: "页脚设置", loading: "正在加载页脚设置", loadFailed: "页脚设置加载失败", retry, chineseHtml: "中文页脚 HTML", englishHtml: "英文页脚 HTML", save: "保存", saving: "正在保存", saved: "页脚设置已保存", saveFailed: "页脚设置保存失败" },
     public: { loginEyebrow: "企业账号", loggedOutTitle: "已退出登录", loggedOutDescription: "当前会话已结束。", loginAgain: "重新登录", footer: brand.footerText ?? brand.appName },
@@ -404,6 +423,22 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       permissionDeniedAction,
     },
     upstream: { title: "System services", description: "Check the status of sign-in and permissions services.", refresh: "Refresh now", refreshing: "Refreshing", empty: "No services", lastChecked: "Last checked", endpoint: "URL", loadFailed: "Failed to load system service status", checkSucceeded: "Status check completed", checkFailed: "Status check failed", permissionDenied: "This account cannot view system service status.", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `Checked ${relative}`, checkedAtNever: "Not checked yet", status: { healthy: "Healthy", warning: "Warning", unhealthy: "Unhealthy", unknown: "Unknown" }, dependencyNames: { database: "Database", easyauth: "Permissions service", authentik: "Work-account sign-in", authentik_directory: "User directory", scheduler: "Task scheduler" }, summaries: { healthy: "Running normally", warning: "Needs attention", unhealthy: "Service issue", unknown: "Status unknown", notChecked: "Not checked yet", notSupported: "Not available in this environment" } },
+    delivery: {
+      title: "Delivery status",
+      statusLabels: { queued: "Queued", accepted: "Accepted (not sent yet)", sent: "Sent", delivered: "Delivered (not a read receipt)", failed: "Failed", superseded: "Superseded" },
+      statusExplanations: {
+        queued: "Queued for sending; not handed to the notification service yet.",
+        accepted: "The notification service accepted it and is waiting to send it to DingTalk.",
+        sent: "DingTalk accepted the message. This is the strongest guarantee available.",
+        delivered: "DingTalk confirmed the message reached the recipient. It is not a read receipt.",
+        failed: "Sending failed — see the error below. Manual resend is not available in this version.",
+        superseded: "Replaced by a newer reminder; this one will not be sent.",
+      },
+      acceptedAt: "Accepted at", sentAt: "Sent at", deliveredAt: "Delivered at", lastReconciledAt: "Last reconciled",
+      providerMessageId: "Provider message ID", recipientCount: "Recipients", lastError: "Last error",
+      unconfirmedHint: "Sent more than 24 hours ago with no delivery receipt — the recipient may not have got it. Confirm another way.",
+      notAvailable: "—",
+    },
     notifications: { title: "Notification center", description: "Review and dismiss notifications for this account.", empty: "No notifications", loadFailed: "Failed to load notifications", retry, dismiss: "Dismiss" },
     footerSettings: { title: "Footer settings", loading: "Loading footer settings", loadFailed: "Failed to load footer settings", retry, chineseHtml: "Chinese footer HTML", englishHtml: "English footer HTML", save: "Save", saving: "Saving", saved: "Footer settings saved", saveFailed: "Failed to save footer settings" },
     public: { loginEyebrow: "Enterprise account", loggedOutTitle: "You’re signed out", loggedOutDescription: "The current session has ended.", loginAgain: "Sign in again", footer: brand.footerText ?? brand.appName },
