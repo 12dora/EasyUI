@@ -80,8 +80,12 @@ export interface EnterpriseDirectorySettingsLabels {
   statusLabels: Record<EnterpriseDirectorySyncStatus, string>;
   /** Plain-words explanation of what the status means for the local user list. */
   statusExplanations: Record<EnterpriseDirectorySyncStatus, string>;
+  /** Only ever shown for a completed + authoritative run: people really were deactivated. */
   trustAuthoritative: string;
   trustNotAuthoritative: string;
+  /** Run did not finish (failed / drift): the local list was left untouched. */
+  trustUnchanged: string;
+  trustNotConfigured: string;
   incomplete: string;
   stale: string;
   counts: {
@@ -94,6 +98,20 @@ export interface EnterpriseDirectorySettingsLabels {
   unmappedHint: string;
   errorDetail: string;
   notAvailable: string;
+}
+
+/**
+ * What this run did to the local user list.
+ *
+ * The deactivation sentence is gated on status AND `authoritative`: a failed or
+ * drifted run can still carry `authoritative: true` from the snapshot metadata,
+ * and claiming departures were applied there would be a lie about real people.
+ */
+function trustLine(labels: EnterpriseDirectorySettingsLabels, lastSync: EnterpriseDirectorySyncResult): string {
+  if (lastSync.status === "not_configured") return labels.trustNotConfigured;
+  if (lastSync.status === "failed" || lastSync.status === "drift") return labels.trustUnchanged;
+  if (lastSync.status === "completed" && lastSync.authoritative) return labels.trustAuthoritative;
+  return labels.trustNotAuthoritative;
 }
 
 const STATUS_TONE: Record<EnterpriseDirectorySyncStatus, BadgeTone> = {
@@ -297,7 +315,7 @@ export function EnterpriseDirectorySyncStatusBlock({
         {labels.statusExplanations[lastSync.status]}
       </p>
       <p className="text-[12px] leading-5 text-ink-soft" data-test-id="directory-last-sync-trust">
-        {lastSync.authoritative ? labels.trustAuthoritative : labels.trustNotAuthoritative}
+        {trustLine(labels, lastSync)}
       </p>
       {!lastSync.complete ? (
         <p className="text-[12px] leading-5 text-ink-faint" data-test-id="directory-last-sync-incomplete">{labels.incomplete}</p>

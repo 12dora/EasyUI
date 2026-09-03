@@ -21,15 +21,12 @@ export interface EnterpriseIdentityIntegrationSettings {
   clientId: string;
   redirectUri: string;
   hasClientSecret: boolean;
-  authentikApiBaseUrl?: string;
-  hasAuthentikApiToken?: boolean;
 }
 
 export interface EnterpriseIdentityIntegrationSummary {
   enabled: boolean;
   configured: boolean;
   hasClientSecret: boolean;
-  hasAuthentikApiToken?: boolean;
 }
 
 export interface EnterpriseAuthzStatus {
@@ -83,7 +80,7 @@ export interface EnterpriseAuthorizationAdapter {
 
 export interface AuthorizationWorkspaceLabels {
   identityTitle: string; identityDescription: string; authorizationTitle: string; authorizationDescription: string;
-  enabled: string; disabled: string; configured: string; notConfigured: string; credential: string; clientSecret: string; apiToken: string;
+  enabled: string; disabled: string; configured: string; notConfigured: string; credential: string; clientSecret: string;
   issuer: string; clientId: string; redirectUri: string; endpoint: string; appKey: string; principalMode: string;
   connectionTest: string; testing: string; connectionOk: string; connectionFailed: string;
   catalogTitle: string; catalogDescription: string; permissionCode: string; permissionName: string; scopes: string; risk: string; status: string;
@@ -247,7 +244,6 @@ export function EnterpriseAuthorizationWorkspace({
               </>
             ) : null}
             <Fact label={labels.clientSecret} value={<StateBadge value={currentIdentity.hasClientSecret} labels={labels}/>} empty={labels.notAvailable}/>
-            <Fact label={labels.apiToken} value={<StateBadge value={currentIdentity.hasAuthentikApiToken === true} labels={labels}/>} empty={labels.notAvailable}/>
           </div>
         </Section>
       ) : null}

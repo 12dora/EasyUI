@@ -29,18 +29,35 @@ afterEach(async () => {
 });
 
 describe("EnterpriseDeliveryStatusBadge", () => {
-  it("renders the localized label and status marker for every status", async () => {
-    for (const labels of [zh, en]) {
-      for (const status of ALL_STATUSES) {
-        const mounted = await mount(<EnterpriseDeliveryStatusBadge status={status} labels={labels} />);
-        const badge = byTestId(mounted.host, "delivery-status-badge");
-        expect(badge.dataset.status).toBe(status);
-        expect(badge.textContent).toBe(labels.statusLabels[status]);
-        await mounted.unmount();
-      }
+  /** The product owner signed off on these exact Chinese strings; assert the literals. */
+  const ZH_LITERALS: Record<EnterpriseDeliveryStatus, string> = {
+    queued: "排队中",
+    accepted: "已受理(待发送)",
+    sent: "已发送",
+    delivered: "已投递(不代表已读)",
+    failed: "失败",
+    superseded: "已作废",
+  };
+
+  it("renders the agreed zh-CN wording and status marker for every status", async () => {
+    for (const status of ALL_STATUSES) {
+      const mounted = await mount(<EnterpriseDeliveryStatusBadge status={status} labels={zh} />);
+      const badge = byTestId(mounted.host, "delivery-status-badge");
+      expect(badge.dataset.status).toBe(status);
+      expect(badge.textContent).toBe(ZH_LITERALS[status]);
+      await mounted.unmount();
     }
-    expect(zh.statusLabels.delivered).toBe("已投递(不代表已读)");
-    expect(zh.statusLabels.accepted).toBe("已受理(待发送)");
+  });
+
+  it("renders an English label for every status", async () => {
+    for (const status of ALL_STATUSES) {
+      const mounted = await mount(<EnterpriseDeliveryStatusBadge status={status} labels={en} />);
+      const badge = byTestId(mounted.host, "delivery-status-badge");
+      expect(badge.dataset.status).toBe(status);
+      expect(badge.textContent).toBe(en.statusLabels[status]);
+      expect(badge.textContent).not.toBe("");
+      await mounted.unmount();
+    }
   });
 });
 

@@ -25,12 +25,6 @@ export interface EnterpriseOidcConfigurationValue {
   redirectUri: string;
   frontendBaseUrl: string;
   serverBaseUrl: string;
-  /**
-   * Authentik admin API access. Optional: the backend owns whether it still
-   * exposes these, and hosts that omit them must keep rendering.
-   */
-  authentikApiBaseUrl?: string;
-  hasAuthentikApiToken?: boolean;
 }
 
 export interface EnterpriseEasyAuthConfigurationValue {
@@ -61,8 +55,6 @@ export interface EnterpriseIntegrationConfigurationLabels {
   redirectUri?: string;
   frontendBaseUrl: string;
   serverBaseUrl: string;
-  authentikApiBaseUrl: string;
-  authentikApiToken: string;
   easyAuthTitle: string;
   easyAuthDescription: string;
   baseUrl: string;
@@ -78,7 +70,7 @@ export interface EnterpriseIntegrationConfigurationLabels {
   operationSucceeded: string;
   operationFailed: string;
   guideAriaLabel: string;
-  guides?: Partial<Record<"issuer" | "clientId" | "clientSecret" | "authentikApiToken", string>>;
+  guides?: Partial<Record<"issuer" | "clientId" | "clientSecret", string>>;
 }
 
 export interface EnterpriseWriteOnlySecret { value: string; clear: boolean; }
@@ -91,7 +83,6 @@ interface OidcFormProps {
   labels: EnterpriseIntegrationConfigurationLabels;
   value: EnterpriseOidcConfigurationValue;
   clientSecret: EnterpriseWriteOnlySecret;
-  apiToken: EnterpriseWriteOnlySecret;
   disabled?: boolean;
   saving?: boolean;
   discovering?: boolean;
@@ -99,7 +90,6 @@ interface OidcFormProps {
   operationResult?: { ok: boolean; message: string } | null;
   onChange: (patch: Partial<EnterpriseOidcConfigurationValue>) => void;
   onClientSecretChange: (next: EnterpriseWriteOnlySecret) => void;
-  onApiTokenChange: (next: EnterpriseWriteOnlySecret) => void;
   onSave: () => void | Promise<void>;
   onDiscover?: () => void | Promise<void>;
   onTest?: () => void | Promise<void>;
@@ -149,8 +139,6 @@ export function EnterpriseOidcConfigurationForm(props: OidcFormProps) {
                 <TextField id="enterprise-oidc-jwks-uri" label={labels.jwksUri} value={value.jwksUri} disabled={disabled} onChange={(jwksUri) => props.onChange({ jwksUri })} />
                 <TextField id="enterprise-oidc-userinfo-endpoint" label={labels.userinfoEndpoint} value={value.userinfoEndpoint} disabled={disabled} onChange={(userinfoEndpoint) => props.onChange({ userinfoEndpoint })} />
                 <TextField id="enterprise-oidc-server-base" label={labels.serverBaseUrl} value={value.serverBaseUrl} disabled={disabled} onChange={(serverBaseUrl) => props.onChange({ serverBaseUrl })} />
-                <TextField id="enterprise-authentik-api" label={labels.authentikApiBaseUrl} value={value.authentikApiBaseUrl ?? ""} disabled={disabled} onChange={(authentikApiBaseUrl) => props.onChange({ authentikApiBaseUrl })} />
-                <EnterpriseSecretField id="enterprise-authentik-token" label={<GuidedLabel label={labels.authentikApiToken} guide={labels.guides?.authentikApiToken} ariaLabel={labels.guideAriaLabel} testId="identity-guide-authentik-api-token" />} keepHint={labels.authorityHint} clearLabel={labels.clearSecret} configuredHint={value.hasAuthentikApiToken === true ? labels.configured : labels.notConfigured} value={props.apiToken.value} clear={props.apiToken.clear} disabled={disabled} onValueChange={(token) => props.onApiTokenChange({ value: token, clear: false })} onClearChange={(clear) => props.onApiTokenChange({ value: clear ? "" : props.apiToken.value, clear })} />
               </EnterpriseConfigurationFieldGrid>
             </div>
           </CollapseReveal>

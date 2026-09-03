@@ -147,6 +147,35 @@ describe("directory settings section", () => {
     expect(byTestId(mounted.host, "directory-operation-result").textContent).toContain(result.summary);
   });
 
+  it("never claims people were deactivated when the run did not finish, even if the snapshot says authoritative", async () => {
+    // A failed run can still carry authoritative snapshot metadata; nothing was written.
+    const result: EnterpriseDirectorySyncResult = {
+      status: "failed",
+      at: "2026-09-03T02:00:00Z",
+      authoritative: true,
+      complete: true,
+      stale: false,
+      upstreamTotal: 120,
+      created: 0,
+      updated: 0,
+      deactivated: 0,
+      unmapped: 0,
+      summary: "Upstream returned 503.",
+      errorDetail: "directory_unavailable",
+    };
+    const adapter = makeAdapter({ syncDirectory: vi.fn().mockResolvedValue(result) });
+    const mounted = await mountSurface(adapter);
+
+    await click(byTestId(mounted.host, "directory-sync-now"));
+    await settle();
+
+    const trust = byTestId(mounted.host, "directory-last-sync-trust").textContent;
+    expect(trust).toBe(directoryLabels.trustUnchanged);
+    expect(trust).not.toBe(directoryLabels.trustAuthoritative);
+    expect(byTestId(mounted.host, "directory-last-sync-status").dataset.status).toBe("failed");
+    expect(byTestId(mounted.host, "directory-last-sync-error").textContent).toContain("directory_unavailable");
+  });
+
   it("reports a completed run as authoritative with the counts that were written", async () => {
     const result: EnterpriseDirectorySyncResult = {
       status: "completed",

@@ -47,7 +47,7 @@ export interface EnterpriseAccessSettingsAdapter extends EnterpriseAuthorization
   /** Whether this host persists EasyAuth base URL, app key and credential from the UI. */
   easyAuthConnectionEditable: boolean;
   loadOidcSettings(): Promise<EnterpriseOidcConfigurationValue | EnterpriseOidcStatusSummary>;
-  saveOidcSettings(value: EnterpriseOidcConfigurationValue, secrets: { clientSecret?: string; authentikApiToken?: string }): Promise<EnterpriseOidcConfigurationValue>;
+  saveOidcSettings(value: EnterpriseOidcConfigurationValue, secrets: { clientSecret?: string }): Promise<EnterpriseOidcConfigurationValue>;
   loadEasyAuthSettings(): Promise<EnterpriseEasyAuthConfigurationValue>;
   saveEasyAuthSettings(value: EnterpriseEasyAuthConfigurationValue, credential?: string): Promise<EnterpriseEasyAuthConfigurationValue>;
   discoverIdentity?(issuer: string): Promise<EnterpriseIdentityDiscoveryResult>;
@@ -95,8 +95,6 @@ export interface EnterpriseOidcStatusSummary {
   enabled: boolean;
   configured: boolean;
   hasClientSecret: boolean;
-  /** Optional: hosts whose backend dropped the Authentik admin API may omit it. */
-  hasAuthentikApiToken?: boolean;
 }
 
 /**
@@ -213,7 +211,6 @@ function IdentityPanel({
   const toastMode = feedbackMode === "toast";
   const [value, setValue] = useState<EnterpriseOidcConfigurationValue | EnterpriseOidcStatusSummary | null>(null);
   const [clientSecret, setClientSecret] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
-  const [apiToken, setApiToken] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
   const [busy, setBusy] = useState<"load" | "save" | "discover" | "test" | null>("load");
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [loadRevision, setLoadRevision] = useState(0);
@@ -259,11 +256,9 @@ function IdentityPanel({
     try {
       const next = await adapter.saveOidcSettings(editableValue, {
         ...(clientSecret.clear ? { clientSecret: "" } : clientSecret.value ? { clientSecret: clientSecret.value } : {}),
-        ...(apiToken.clear ? { authentikApiToken: "" } : apiToken.value ? { authentikApiToken: apiToken.value } : {}),
       });
       setValue(next);
       setClientSecret({ value: "", clear: false });
-      setApiToken({ value: "", clear: false });
       if (toastMode) toast.success(labels.saved);
       else setResult({ ok: true, message: labels.saved });
     } catch {
@@ -335,7 +330,6 @@ function IdentityPanel({
         labels={labels}
         value={value as EnterpriseOidcConfigurationValue}
         clientSecret={clientSecret}
-        apiToken={apiToken}
         disabled={!canManage}
         saving={busy === "save"}
         discovering={busy === "discover"}
@@ -354,7 +348,6 @@ function IdentityPanel({
           )
         }
         onClientSecretChange={setClientSecret}
-        onApiTokenChange={setApiToken}
         onSave={save}
         onDiscover={adapter.discoverIdentity ? discover : undefined}
         onTest={adapter.testIdentityConnection ? () => void testConnection() : undefined}
@@ -376,7 +369,6 @@ function IdentityPanel({
         labels={labels}
         value={value as EnterpriseOidcConfigurationValue}
         clientSecret={clientSecret}
-        apiToken={apiToken}
         disabled={!canManage}
         saving={busy === "save"}
         discovering={busy === "discover"}
@@ -395,7 +387,6 @@ function IdentityPanel({
           )
         }
         onClientSecretChange={setClientSecret}
-        onApiTokenChange={setApiToken}
         onSave={save}
         onDiscover={adapter.discoverIdentity ? discover : undefined}
         onTest={adapter.testIdentityConnection ? () => void testConnection() : undefined}
@@ -597,7 +588,6 @@ function IdentityStatusSummary({
       <dl className="grid gap-2 text-[13px] sm:grid-cols-2">
         <StatusFact label={labels.enabled} value={value.enabled ? labels.enabled : labels.notConfigured} />
         <StatusFact label={labels.clientSecret} value={value.hasClientSecret ? labels.configured : labels.notConfigured} />
-        <StatusFact label={labels.authentikApiToken} value={value.hasAuthentikApiToken === true ? labels.configured : labels.notConfigured} />
       </dl>
     </div>
   );
