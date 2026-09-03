@@ -12,6 +12,7 @@ export * from "./footer-settings-surface";
 export * from "./authorization-workspace";
 export * from "./format-timestamp";
 export * from "./access-settings-surface";
+export * from "./directory-settings-form";
 export * from "./security-workspace";
 export * from "./webauthn";
 export * from "./shared-settings";

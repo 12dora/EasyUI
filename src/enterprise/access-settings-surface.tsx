@@ -9,6 +9,12 @@ import { EnterpriseAuthorizationWorkspace } from "./authorization-workspace";
 import type { EnterpriseTimestampFormatter } from "./format-timestamp";
 import type { EnterpriseIntegrationCard } from "./models";
 import {
+  EnterpriseDirectorySettingsForm,
+  type EnterpriseDirectorySettingsLabels,
+  type EnterpriseDirectorySettingsValue,
+  type EnterpriseDirectorySyncResult,
+} from "./directory-settings-form";
+import {
   EnterpriseEasyAuthConfigurationForm,
   EnterpriseOidcConfigurationForm,
   type EnterpriseEasyAuthConfigurationValue,
@@ -46,6 +52,14 @@ export interface EnterpriseAccessSettingsAdapter extends EnterpriseAuthorization
   saveEasyAuthSettings(value: EnterpriseEasyAuthConfigurationValue, credential?: string): Promise<EnterpriseEasyAuthConfigurationValue>;
   discoverIdentity?(issuer: string): Promise<EnterpriseIdentityDiscoveryResult>;
   testIdentityConnection?(): Promise<EnterpriseIdentityOperationResult>;
+  /**
+   * EasyAuth directory (user source of truth). All four are optional: the
+   * directory section renders only for hosts that implement load + save.
+   */
+  loadDirectorySettings?(): Promise<EnterpriseDirectorySettingsValue>;
+  saveDirectorySettings?(value: EnterpriseDirectorySettingsValue, credential?: string): Promise<EnterpriseDirectorySettingsValue>;
+  testDirectory?(): Promise<EnterpriseIdentityOperationResult>;
+  syncDirectory?(): Promise<EnterpriseDirectorySyncResult>;
 }
 
 export interface EnterpriseAccessSettingsLabels {
@@ -59,6 +73,8 @@ export interface EnterpriseAccessSettingsLabels {
     retry?: string;
   };
   authorization: AuthorizationWorkspaceLabels;
+  /** Directory-section copy. Required for hosts whose adapter exposes the directory methods. */
+  directory?: EnterpriseDirectorySettingsLabels;
   permissionDenied: string;
   /** Page-unavailable detail for toast-mode EmptyState (FE-FB-02). */
   permissionDeniedDetail?: string;
@@ -152,7 +168,21 @@ export function EnterpriseAccessSettingsSurface({
         showHeader={showHeader}
       >
         {activeTab === "login" ? (
-          <IdentityPanel adapter={adapter} labels={labels.configuration} canManage={permissions.manageIdentity} feedbackMode={feedbackMode} />
+          <div className="space-y-2">
+            <IdentityPanel adapter={adapter} labels={labels.configuration} canManage={permissions.manageIdentity} feedbackMode={feedbackMode} />
+            {adapter.loadDirectorySettings && adapter.saveDirectorySettings && labels.directory ? (
+              <DirectoryPanel
+                adapter={adapter}
+                labels={labels.configuration}
+                directoryLabels={labels.directory}
+                canManage={permissions.manageIdentity}
+                feedbackMode={feedbackMode}
+                locale={locale}
+                formatTimestamp={formatTimestamp}
+                timeZone={timeZone}
+              />
+            ) : null}
+          </div>
         ) : (
           <AuthorizationPanel
             adapter={adapter}
@@ -391,6 +421,160 @@ function IdentityPanel({
         loading={<EnterpriseSettingsFormSkeleton testId="identity-settings-skeleton" />}
         empty={missingShell}
         ready={readyBody}
+      />
+    </div>
+  );
+}
+
+/**
+ * EasyAuth directory settings + last-run report.
+ *
+ * Separate from the OIDC panel on purpose: sign-in (OIDC) and the user source
+ * of truth (directory) are configured, credentialed and failing independently,
+ * so one failing load must never blank the other.
+ */
+function DirectoryPanel({
+  adapter,
+  labels,
+  directoryLabels,
+  canManage,
+  feedbackMode,
+  locale,
+  formatTimestamp,
+  timeZone,
+}: {
+  adapter: EnterpriseAccessSettingsAdapter;
+  labels: EnterpriseAccessSettingsLabels["configuration"];
+  directoryLabels: EnterpriseDirectorySettingsLabels;
+  canManage: boolean;
+  feedbackMode: EnterpriseSettingsFeedbackMode;
+  locale: string;
+  formatTimestamp?: EnterpriseTimestampFormatter;
+  timeZone?: string;
+}) {
+  const toastMode = feedbackMode === "toast";
+  const [value, setValue] = useState<EnterpriseDirectorySettingsValue | null>(null);
+  const [credential, setCredential] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
+  const [busy, setBusy] = useState<"load" | "save" | "test" | "sync" | null>("load");
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    const load = adapter.loadDirectorySettings;
+    if (!load) return;
+    let active = true;
+    setBusy("load");
+    load
+      .call(adapter)
+      .then((next) => {
+        if (active) setValue(next);
+      })
+      .catch(() => {
+        if (!active) return;
+        if (toastMode) toast.error(labels.loadFailed);
+        else setResult({ ok: false, message: labels.loadFailed });
+      })
+      .finally(() => {
+        if (active) setBusy(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [adapter, labels.loadFailed, toastMode]);
+
+  async function save() {
+    const persist = adapter.saveDirectorySettings;
+    if (!persist || !value) return;
+    setBusy("save");
+    setResult(null);
+    try {
+      // Write-only credential: blank keeps the stored one, clear sends "".
+      const next = await persist.call(adapter, value, credential.clear ? "" : credential.value || undefined);
+      setValue(next);
+      setCredential({ value: "", clear: false });
+      if (toastMode) toast.success(labels.saved);
+      else setResult({ ok: true, message: labels.saved });
+    } catch {
+      if (toastMode) toast.error(labels.saveFailed);
+      else setResult({ ok: false, message: labels.saveFailed });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function test() {
+    const probe = adapter.testDirectory;
+    if (!probe) return;
+    setBusy("test");
+    setResult(null);
+    try {
+      const next = await probe.call(adapter);
+      const message = next.ok
+        ? `${directoryLabels.operationSucceeded}${next.latencyMs === undefined ? "" : ` \u00b7 ${next.latencyMs} ms`}`
+        : next.errorDetail || directoryLabels.operationFailed;
+      if (toastMode) (next.ok ? toast.success : toast.error)(message);
+      else setResult({ ok: next.ok, message });
+    } catch {
+      if (toastMode) toast.error(directoryLabels.operationFailed);
+      else setResult({ ok: false, message: directoryLabels.operationFailed });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function sync() {
+    const run = adapter.syncDirectory;
+    if (!run) return;
+    setBusy("sync");
+    setResult(null);
+    try {
+      const next = await run.call(adapter);
+      setValue((current) => (current ? { ...current, lastSync: next } : current));
+      // Only `completed` actually wrote: everything else is reported as a failure
+      // so nobody reads "sync finished" as "the user list is up to date".
+      const ok = next.status === "completed";
+      const message = next.summary || directoryLabels.statusLabels[next.status];
+      if (toastMode) (ok ? toast.success : toast.error)(message);
+      else setResult({ ok, message });
+    } catch {
+      if (toastMode) toast.error(directoryLabels.operationFailed);
+      else setResult({ ok: false, message: directoryLabels.operationFailed });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (busy === "load" && !value) {
+    return toastMode ? (
+      <EnterpriseSettingsFormSkeleton testId="directory-settings-skeleton" rows={3} />
+    ) : (
+      <p className="text-[13px] text-ink-soft" data-test-id="directory-settings-loading">{labels.loading}</p>
+    );
+  }
+  if (!value) {
+    return toastMode ? null : (
+      <InlineNotice tone="error" message={result?.message ?? labels.loadFailed} data-test-id="directory-settings-failed" />
+    );
+  }
+
+  return (
+    <div data-test-id="directory-settings-section">
+      <EnterpriseDirectorySettingsForm
+        labels={directoryLabels}
+        value={value}
+        credential={credential}
+        disabled={!canManage}
+        saving={busy === "save"}
+        testing={busy === "test"}
+        syncing={busy === "sync"}
+        operationResult={toastMode ? null : result}
+        locale={locale}
+        formatTimestamp={formatTimestamp}
+        timeZone={timeZone}
+        onChange={(patch) => setValue((current) => (current ? { ...current, ...patch } : current))}
+        onCredentialChange={setCredential}
+        onSave={save}
+        onTest={adapter.testDirectory ? test : undefined}
+        onSync={adapter.syncDirectory ? sync : undefined}
       />
     </div>
   );
