@@ -19,6 +19,7 @@ export { AppErrorState, type AppErrorKind, type AppErrorRetry } from "./app-erro
 export { PanelSurface } from "./panel-surface";
 export { FormGrid, FormSection } from "./form-grid";
 export { ActionRow, DialogFormActions } from "./action-row";
+export { Form } from "./form";
 export { Section } from "./section";
 export { Dialog, DialogHeaderAside } from "./dialog";
 export { SegmentedToggle, type SegmentedToggleOption } from "./segmented-toggle";
