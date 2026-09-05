@@ -38,6 +38,12 @@ export function ActionRow({
  *   `onSubmit` 仍然要传:它是同一个处理函数,交给 `<Form onSubmit={…}>`,这里留着是为了
  *   两种模式的调用点长得一样。用法示例见 `Form` 的文档注释。
  *
+ * `submitFormId` 是给「动作行挂在 Dialog 的 `footer`、表单体在 `children`」这种版式用的:
+ * 页脚渲染在 `<form>` 外面,`type="submit"` 单靠 DOM 层级找不到它要提交的表单,于是
+ * Enter 与点击都落空。把同一个 id 给 `<Form id={…}>` 和这里,按钮就通过原生的
+ * `form` 属性认领那个表单 —— 它同时也重新成为该表单的默认提交按钮,输入框里按 Enter
+ * 才有地方去。表单体与动作行在同一棵 `<form>` 里时不需要这个 prop。
+ *
  * 两种模式下 `blockedReason` 都仍然拦得住:阻断态的 `Button` 会 `preventDefault()`,
  * 原生提交同样走不出去。
  */
@@ -55,6 +61,7 @@ export function DialogFormActions({
   submitButtonProps,
   submitVariant = "primary",
   submitType = "button",
+  submitFormId,
 }: {
   cancelLabel: string;
   submitLabel: string;
@@ -69,6 +76,8 @@ export function DialogFormActions({
   submitButtonProps?: DialogSubmitButtonProps;
   submitVariant?: "primary" | "danger";
   submitType?: "button" | "submit";
+  /** 表单体所在 `<form>` 的 id;仅在 `submitType="submit"` 且动作行渲染在该表单之外时需要。 */
+  submitFormId?: string;
 }) {
   const submitButtonDataTestId = submitDataTestId ?? submitButtonProps?.["data-test-id"];
   const delegatesToForm = submitType === "submit";
@@ -81,6 +90,7 @@ export function DialogFormActions({
       <Button
         {...submitButtonProps}
         type={submitType}
+        form={delegatesToForm ? submitFormId : undefined}
         variant={submitVariant}
         onClick={delegatesToForm ? undefined : onSubmit}
         loading={submitting}
