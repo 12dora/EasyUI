@@ -68,45 +68,6 @@
         19
       ]
     },
-    "src/enterprise/access-settings-surface.tsx": {
-      "file-sloc": [
-        704
-      ],
-      "max-lines": [
-        704
-      ]
-    },
-    "src/enterprise/access-settings-surface.tsx::AuthorizationPanel": {
-      "max-lines-per-function": [
-        152
-      ]
-    },
-    "src/enterprise/access-settings-surface.tsx::DirectoryPanel": {
-      "complexity": [
-        11
-      ],
-      "max-lines-per-function": [
-        137
-      ]
-    },
-    "src/enterprise/access-settings-surface.tsx::discover": {
-      "complexity": [
-        12
-      ]
-    },
-    "src/enterprise/access-settings-surface.tsx::EnterpriseAccessSettingsSurface": {
-      "complexity": [
-        11
-      ]
-    },
-    "src/enterprise/access-settings-surface.tsx::IdentityPanel": {
-      "complexity": [
-        23
-      ],
-      "max-lines-per-function": [
-        205
-      ]
-    },
     "src/enterprise/auth-controller.tsx::EnterpriseLoginController": {
       "complexity": [
         18
