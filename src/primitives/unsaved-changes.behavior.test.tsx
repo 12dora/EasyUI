@@ -7,11 +7,12 @@
  * 反向用例同样重要:干净时弹窗 = 每次点导航都要多点一下,用户很快就会条件反射地点「离开」,
  * 守卫也就失效了。
  */
-import { act } from "react";
+import { act, StrictMode, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // 测试专用:复用 enterprise 层的挂载工具(仅测试期依赖,不构成运行时的层级反向引用)。
 import { click, installReducedMotion, mount, type MountedView } from "../enterprise/behavior-test-utils";
+import { Dialog } from "./dialog";
 import {
   structuralEqual,
   UnsavedChangesProvider,
@@ -68,6 +69,46 @@ function buttonOf(testId: string): HTMLElement {
   const element = document.body.querySelector(`[data-test-id='${testId}']`);
   if (!(element instanceof HTMLElement)) throw new Error(`Missing [data-test-id='${testId}']`);
   return element;
+}
+
+/** 触发导航的那个按钮 —— 焦点用例要断言留下之后焦点回到它身上。 */
+function Trigger() {
+  const { confirmLeave } = useLeaveConfirmation();
+  return (
+    <button type="button" data-test-id="trigger" onClick={() => void confirmLeave()}>
+      go
+    </button>
+  );
+}
+
+/**
+ * README 里那段「承载表单的 Dialog 关闭前先问一句」的宿主接线。两处细节是故意的:
+ * `onClose` 写成内联箭头函数(宿主的真实写法,每次渲染都是新引用),而 `parent-touch`
+ * 模拟表单自身的状态变化 —— 它只重渲染这一层,确认框那层的 effect 不跟着重跑。
+ */
+function GuardedParentDialog() {
+  const [open, setOpen] = useState(true);
+  const [status, setStatus] = useState(0);
+  const { confirmLeave } = useLeaveConfirmation();
+  return (
+    <Dialog
+      open={open}
+      onClose={async () => {
+        if (await confirmLeave()) setOpen(false);
+      }}
+      title={`parent-${status}`}
+    >
+      <button type="button" data-test-id="parent-touch" onClick={() => setStatus((n) => n + 1)}>
+        body
+      </button>
+    </Dialog>
+  );
+}
+
+async function pressEscape(): Promise<void> {
+  await act(async () => {
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  });
 }
 
 /**
@@ -127,9 +168,7 @@ describe("UnsavedChangesProvider 的离开确认", () => {
     view = await mount(tree(<DirtySource dirty />));
     const { result } = await startConfirm();
 
-    await act(async () => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-    });
+    await pressEscape();
 
     await expect(result).resolves.toBe(false);
   });
@@ -187,6 +226,149 @@ describe("UnsavedChangesProvider 的离开确认", () => {
     const { result } = await startConfirm();
     expect(dialogs()).toHaveLength(0);
     await expect(result).resolves.toBe(true);
+  });
+});
+
+describe("Provider 卸载 / StrictMode", () => {
+  it("卸载时把还悬着的确认全部按「留下」结算,而不是让调用方永远挂着", async () => {
+    // User risk:路由把整棵树换掉(或宿主重新挂载布局)时,宿主那句 `await confirmLeave()`
+    // 如果永远不 resolve,导航就静默卡死 —— 没有报错,只有一个再也点不动的界面。
+    const onLeaveConfirmed = vi.fn();
+    view = await mount(tree(<DirtySource dirty />, onLeaveConfirmed));
+
+    let first!: Promise<boolean>;
+    let second!: Promise<boolean>;
+    await act(async () => {
+      first = (gate as LeaveConfirmation).confirmLeave();
+      second = (gate as LeaveConfirmation).confirmLeave();
+    });
+    expect(dialogs()).toHaveLength(1);
+
+    await view.unmount();
+    view = null;
+
+    // 按「留下」结算:没确认过就不算确认,onLeaveConfirmed 不该被打。
+    await expect(Promise.all([first, second])).resolves.toEqual([false, false]);
+    expect(onLeaveConfirmed).not.toHaveBeenCalled();
+  });
+
+  it("StrictMode 的 effect 重放之后,登记与确认仍然照常工作", async () => {
+    view = await mount(
+      <StrictMode>
+        <UnsavedChangesProvider labels={LABELS}>
+          <Gate />
+          <DirtySource dirty />
+        </UnsavedChangesProvider>
+      </StrictMode>,
+    );
+
+    // 重放 = 登记→注销→登记;净结果必须还是「脏」,不能被那次多余的注销抹掉。
+    expect(gate?.hasUnsavedChanges).toBe(true);
+
+    const { result } = await startConfirm();
+    expect(dialogs()).toHaveLength(1);
+    await click(buttonOf("unsaved-changes-stay"));
+    await expect(result).resolves.toBe(false);
+    expect(gate?.hasUnsavedChanges).toBe(true);
+  });
+});
+
+describe("焦点", () => {
+  it("打开时焦点落在安全按钮上,留下之后焦点回到触发导航的按钮", async () => {
+    // User risk:焦点若被还给正在退场的对话框,键盘用户「留下」之后就站在一个已经消失的
+    // 控件上 —— 下一次 Tab 从头开始,读屏也念不出自己在哪。
+    view = await mount(
+      tree(
+        <>
+          <DirtySource dirty />
+          <Trigger />
+        </>,
+      ),
+    );
+    const trigger = buttonOf("trigger");
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    await click(trigger);
+
+    expect(document.activeElement).toBe(buttonOf("unsaved-changes-stay"));
+
+    await click(buttonOf("unsaved-changes-stay"));
+
+    expect(document.activeElement).toBe(trigger);
+  });
+});
+
+describe("嵌套在宿主 Dialog 里", () => {
+  it("父层自己重渲染(内联 onClose 换了引用)之后,Esc 关的仍然是最上面的确认框", async () => {
+    // User risk:父层是承载表单的对话框,表单状态一变就会带来一次重渲染。若层叠栈因此重排,
+    // Esc 关掉的是父层 —— 用户眼前的确认框纹丝不动,草稿却已经开始往外走了。
+    view = await mount(
+      tree(
+        <>
+          <DirtySource dirty />
+          <GuardedParentDialog />
+        </>,
+      ),
+    );
+    expect(dialogs()).toHaveLength(1);
+
+    await pressEscape();
+    expect(dialogs()).toHaveLength(2);
+
+    // 表单状态变了:只有父层这一棵子树重渲染,确认框那层的 effect 不重跑。
+    await click(buttonOf("parent-touch"));
+    expect(document.body.textContent).toContain("parent-1");
+
+    await pressEscape();
+
+    // 只有确认框被关掉,父层照旧开着。
+    expect(document.body.querySelector("[data-test-id='unsaved-changes-stay']")).toBeNull();
+    expect(dialogs()).toHaveLength(1);
+    expect(document.body.textContent).toContain("parent-1");
+
+    // 而且栈没被弄乱:再按一次 Esc,父层仍然能重新问出那一个确认框(说明上一次 Esc 没有
+    // 悄悄往队列里再塞一个等待者)。
+    await pressEscape();
+    expect(dialogs()).toHaveLength(2);
+    await click(buttonOf("unsaved-changes-stay"));
+    expect(dialogs()).toHaveLength(1);
+  });
+});
+
+describe("退场动画期间(正常动效,不做 reduced-motion 短路)", () => {
+  beforeEach(() => {
+    installReducedMotion(false);
+  });
+
+  it("先点「继续编辑」,退场途中再点「放弃改动」不会翻案", async () => {
+    const onLeaveConfirmed = vi.fn();
+    view = await mount(tree(<DirtySource dirty />, onLeaveConfirmed));
+
+    const { result } = await startConfirm();
+    await click(buttonOf("unsaved-changes-stay"));
+    await expect(result).resolves.toBe(false);
+
+    // 结算完了但还挂在 DOM 上播退场:两个动作都已禁用,补点也不会触发离开回调。
+    const leave = buttonOf("unsaved-changes-leave") as HTMLButtonElement;
+    expect(leave.disabled).toBe(true);
+    expect((buttonOf("unsaved-changes-stay") as HTMLButtonElement).disabled).toBe(true);
+
+    await click(leave);
+    expect(onLeaveConfirmed).not.toHaveBeenCalled();
+  });
+
+  it("连点两下「放弃改动」只算一次", async () => {
+    const onLeaveConfirmed = vi.fn();
+    view = await mount(tree(<DirtySource dirty />, onLeaveConfirmed));
+
+    const { result } = await startConfirm();
+    const leave = buttonOf("unsaved-changes-leave");
+    await click(leave);
+    await click(leave);
+
+    await expect(result).resolves.toBe(true);
+    expect(onLeaveConfirmed).toHaveBeenCalledTimes(1);
   });
 });
 

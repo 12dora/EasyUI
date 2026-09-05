@@ -145,12 +145,28 @@ export function UnsavedChangesProvider({ children, labels, onLeaveConfirmed }: U
     });
   }, [sources]);
 
+  // 结算一次就作数。对话框在退场动画期间仍然挂在 DOM 上,没有这道闸的话
+  // 「先点留下、退场途中再点丢弃」或者对丢弃按钮双击,都会把 onLeaveConfirmed 再打一遍 ——
+  // 而那次确认早已 resolve 成 false 了。等待者为空 == 已经结算过。
   const settle = useCallback((leave: boolean) => {
     const waiters = waitersRef.current;
+    if (waiters.length === 0) return;
     waitersRef.current = [];
     setOpen(false);
     for (const resolve of waiters) resolve(leave);
     if (leave) onLeaveConfirmedRef.current?.();
+  }, []);
+
+  // Provider 卸载时把还悬着的确认按「留下」结算(不触发 onLeaveConfirmed):
+  // 否则调用方那句 `await confirmLeave()` 会永远挂着,宿主的导航再也走不下去,
+  // 而且不会有任何报错提示。
+  useEffect(() => {
+    const waiters = waitersRef;
+    return () => {
+      const pending = waiters.current;
+      waiters.current = [];
+      for (const resolve of pending) resolve(false);
+    };
   }, []);
 
   const value = useMemo<UnsavedChangesContextValue>(
@@ -184,6 +200,13 @@ function UnsavedChangesConfirmDialog({
   onStay: () => void;
   onLeave: () => void;
 }) {
+  // 安全动作预选中:走 Dialog 的 initialFocusRef 而不是 React 的 autoFocus ——
+  // autoFocus 会抢在焦点陷阱记录「打开前的焦点」之前移动焦点,结果留下之后
+  // 焦点被还给正在退场的对话框,而不是那个触发导航的按钮/链接。
+  const stayRef = useRef<HTMLButtonElement>(null);
+  // 已结算但还在播退场动画:两个动作都不该再点得动(结算本身也是幂等的,这里只是别让
+  // 按钮看着还能按)。
+  const settled = !open;
   return (
     <Dialog
       open={open}
@@ -192,12 +215,26 @@ function UnsavedChangesConfirmDialog({
       size="sm"
       // 右上角的关闭按钮也是「留下」,所以它的无障碍名就用 stay 的文案,而不是泛泛的「关闭」。
       closeLabel={labels.stay}
+      initialFocusRef={stayRef}
       footer={
         <ActionRow>
-          <Button type="button" variant="ghost-danger" onClick={onLeave} data-test-id="unsaved-changes-leave">
+          <Button
+            type="button"
+            variant="ghost-danger"
+            onClick={onLeave}
+            disabled={settled}
+            data-test-id="unsaved-changes-leave"
+          >
             {labels.leave}
           </Button>
-          <Button type="button" variant="primary" autoFocus onClick={onStay} data-test-id="unsaved-changes-stay">
+          <Button
+            ref={stayRef}
+            type="button"
+            variant="primary"
+            onClick={onStay}
+            disabled={settled}
+            data-test-id="unsaved-changes-stay"
+          >
             {labels.stay}
           </Button>
         </ActionRow>
