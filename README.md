@@ -43,6 +43,11 @@ There is no standalone dev server — you develop this package from inside a hos
 (e.g. EasyFrame's `frontend/`, where `pnpm --dir frontend blank:dev` picks up the sources live)
 and typecheck it through the host (`pnpm --dir frontend blank:typecheck`).
 
+Gates: `pnpm lint` runs the shared code-smell ratchet (`easyui-check-smells`: eslint complexity /
+function-size / file-size rules + a shrink-only JSON baseline). The rule fragment
+(`@easy-enterprise/ui/eslint-smells`) and the bin are both consumed by host repos — thresholds,
+host wiring and the ratchet rule are documented in [`docs/GATES.md`](docs/GATES.md).
+
 Tests run standalone: `pnpm install && pnpm exec vitest run` (root is this package; `happy-dom`
 is a declared devDependency; JSX uses the automatic runtime via `vitest.config.ts`). Two behavior
 suites (`timestamp-consumer`, `overflow`) import EasyCustoms host pages and are excluded here —

@@ -1,0 +1,31 @@
+name: gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: lint (code smells ratchet)
+        run: pnpm lint
+      - name: unit tests
+        run: pnpm vitest run
+      - name: typecheck
+        run: |
+          if [ -f tsconfig.json ]; then
+            pnpm exec tsc --noEmit
+          else
+            echo "no tsconfig.json — 本包由宿主编译,跳过 typecheck"
+          fi

@@ -11,6 +11,8 @@ export default defineConfig({
     globals: false,
     include: [
       resolve(import.meta.dirname, "src/**/*.test.{ts,tsx}"),
+      // 门禁脚本自身的单测(纯 .mjs 逻辑,见 scripts/smells-core.test.mjs)。
+      resolve(import.meta.dirname, "scripts/**/*.test.mjs"),
     ],
     exclude: [
       // 这两个用例 import 宿主仓 EasyCustoms 的页面(../../apps/customs/...),

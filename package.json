@@ -18,7 +18,11 @@
     "./table": "./src/table/index.ts",
     "./table.css": "./src/table/table.css",
     "./enterprise": "./src/enterprise/index.ts",
-    "./enterprise-local-accounts": "./src/enterprise-local-accounts/index.tsx"
+    "./enterprise-local-accounts": "./src/enterprise-local-accounts/index.tsx",
+    "./eslint-smells": "./eslint.smells.config.mjs"
+  },
+  "bin": {
+    "easyui-check-smells": "./scripts/check-smells.mjs"
   },
   "dependencies": {
     "dayjs": "^1.11.11",
@@ -39,12 +43,17 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@typescript-eslint/eslint-plugin": "^8.69.0",
+    "@typescript-eslint/parser": "^8.69.0",
     "antd": "6.5.2",
+    "eslint": "9.39.4",
     "happy-dom": "^20.11.2",
     "typescript": "^5",
+    "typescript-eslint": "^8.69.0",
     "vitest": "^3.2.4"
   },
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "node ./scripts/check-smells.mjs --config eslint.config.mjs --targets src scripts --baseline .code-smells-baseline.json"
   }
 }
