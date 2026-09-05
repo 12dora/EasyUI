@@ -39,7 +39,12 @@
   /* Accents */
   --amber: 37 99 235;            /* #2563EB  blue — primary action */
   --amber-soft: 219 234 254;     /* #DBEAFE  blue tint */
-  --signal: 220 38 38;           /* #DC2626  red — destructive */
+  --signal: 220 38 38;           /* #DC2626  red — destructive (fills, icons, required marks) */
+  /* Red for *text*: #DC2626 measures 4.85:1 on paper / 4.63:1 on paper-deep — technically AA,
+     but it is the whole message in field-level errors, at 12px, often several lines of it.
+     #B91C1C gives 6.54:1 / 6.25:1 while staying the same hue as the destructive fill.
+     Use `--signal` for surfaces, `--signal-ink` whenever red carries the words. */
+  --signal-ink: 185 28 28;       /* #B91C1C  red — error text */
   --bond: 79 70 229;             /* #4F46E5  indigo — secondary */
   --evergreen: 5 150 105;        /* #059669  emerald — success */
 
@@ -82,6 +87,7 @@
   --color-hairline-soft: rgb(var(--hairline-soft));
   --color-amber-ink: rgb(var(--amber));
   --color-signal: rgb(var(--signal));
+  --color-signal-ink: rgb(var(--signal-ink));
   --color-bond: rgb(var(--bond));
   --color-evergreen: rgb(var(--evergreen));
 

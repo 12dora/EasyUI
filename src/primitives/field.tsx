@@ -104,9 +104,16 @@ function isLabelableElement(child: ReactNode): child is ReactElement<LabelableEl
   return (child.type as { __isFieldControl?: boolean } | null)?.__isFieldControl === true;
 }
 
+/**
+ * 字段标签。刻意**不**用 `uppercase` + `tracking`:
+ * - `text-transform` / `letter-spacing` 对 CJK 不产生大写效果,只是把字距拉散、更难扫读,
+ *   而这套件的主力语言是中文;
+ * - 11px 也过小 —— 密集录入界面里标签是要反复扫的,统一抬到 12px。
+ * 视觉节奏靠 `font-medium` + `text-ink-soft` 与控件文本(13px)的层级差维持,不靠字号压缩。
+ */
 export function FieldLabel({ children, required }: { children: ReactNode; required?: boolean }) {
   return (
-    <span className="text-[11px] uppercase tracking-[0.14em] text-ink-soft font-medium">
+    <span className="text-[12px] text-ink-soft font-medium">
       {children}
       {required && <span className="ml-1 text-[rgb(var(--signal))]">*</span>}
     </span>
@@ -142,8 +149,11 @@ export function Field({ label, info, hint, error, required, htmlFor, children, c
         </div>
       )}
       {labelledChildren}
-      {hint && !error && <span id={hintId} className="text-[11px] text-ink-faint">{hint}</span>}
-      {error && <span id={errorId} className="text-[11px] text-[rgb(var(--signal))]">{error}</span>}
+      {/* 提示与错误也从 11px 抬到 12px,并把颜色压深:提示走 ink-soft(7.58:1,原来的
+          ink-faint 在 paper-deep 上只有 4.55:1,压在 11px 上更吃力),错误走 signal-ink
+          (6.54:1)。两者都是 AA 之上,不再是"能看见但费劲"的那一档。 */}
+      {hint && !error && <span id={hintId} className="text-[12px] text-ink-soft">{hint}</span>}
+      {error && <span id={errorId} className="text-[12px] text-[rgb(var(--signal-ink))]">{error}</span>}
     </div>
   );
 }
