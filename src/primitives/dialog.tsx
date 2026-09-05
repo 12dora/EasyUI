@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { DURATION } from "../motion";
 import { useFocusTrap } from "./focus-trap";
@@ -27,6 +27,12 @@ interface Props {
   closeLabel?: string;
   /** 提交进行中置 true:Esc/遮罩/关闭按钮全部禁用,防止请求在途时误关。默认 false,不影响既有调用方。 */
   busy?: boolean;
+  /**
+   * 打开时首个焦点落在哪个控件上;不传就落在对话框容器上(默认行为:不在任何按钮上画焦点环)。
+   * 需要「安全按钮预选中」的确认框走这里,不要在按钮上写 React 的 `autoFocus` ——
+   * 后者会抢在焦点陷阱记录「打开前的焦点」之前移动焦点,关闭时焦点还不回触发者。
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }
 
 const SIZES = {
@@ -52,7 +58,7 @@ function prefersReducedMotion(): boolean {
  * Presence stays mounted through the exit class so the panel can fade out
  * before unmount, matching the previous AnimatePresence behaviour.
  */
-export function Dialog({ open, onClose, title, eyebrow, children, footer, size = "md", closeLabel, busy = false }: Props) {
+export function Dialog({ open, onClose, title, eyebrow, children, footer, size = "md", closeLabel, busy = false, initialFocusRef }: Props) {
   const titleId = useId();
   const [retainPresence, setRetainPresence] = useState(open);
   const present = open || retainPresence;
@@ -99,6 +105,7 @@ export function Dialog({ open, onClose, title, eyebrow, children, footer, size =
       closeLabel={resolvedCloseLabel}
       busy={busy}
       exiting={exit}
+      initialFocusRef={initialFocusRef}
     >
       {children}
     </DialogFrame>,
@@ -112,12 +119,18 @@ const dialogStack: symbol[] = [];
 function useDialogEffects(open: boolean, onClose: () => void, busy: boolean) {
   const idRef = useRef<symbol | null>(null);
   if (idRef.current === null) idRef.current = Symbol("dialog");
-  // 用 ref 读取 busy:提交进行中屏蔽 Esc,而不必在每次 busy 翻转时重挂监听(保持 dialogStack 栈顶判定)。
+  // busy 与 onClose 都走 ref 读取:层叠栈的进出只能由 open 的生命周期决定。
+  // 一旦把它们放进依赖,调用方每次用内联箭头函数重渲染(表单状态一变就会发生),
+  // 本层就会「出栈再入栈」而爬到确认框上面 —— 于是 Esc 关掉的是父层,不是最上面那个。
   // ref 的写入放进 effect(不在渲染期写),满足 react-hooks/refs。
   const busyRef = useRef(busy);
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
   useEffect(() => {
     if (!open) return;
     const id = idRef.current as symbol;
@@ -127,7 +140,7 @@ function useDialogEffects(open: boolean, onClose: () => void, busy: boolean) {
       if (e.key !== "Escape" || e.defaultPrevented) return;
       if (busyRef.current) return; // 提交进行中不允许 Esc 关闭
       if (dialogStack[dialogStack.length - 1] !== id) return;
-      onClose();
+      onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     return () => {
@@ -135,7 +148,7 @@ function useDialogEffects(open: boolean, onClose: () => void, busy: boolean) {
       const index = dialogStack.indexOf(id);
       if (index >= 0) dialogStack.splice(index, 1);
     };
-  }, [open, onClose]);
+  }, [open]);
 }
 
 function DialogFrame({
@@ -149,6 +162,7 @@ function DialogFrame({
   closeLabel,
   busy,
   exiting,
+  initialFocusRef,
 }: Omit<Props, "open" | "closeLabel"> & {
   size: NonNullable<Props["size"]>;
   titleId: string;
@@ -158,7 +172,7 @@ function DialogFrame({
 }) {
   const [panel, setPanel] = useState<HTMLDivElement | null>(null);
   const [headerAside, setHeaderAside] = useState<HTMLElement | null>(null);
-  useFocusTrap(panel, !exiting);
+  useFocusTrap(panel, !exiting, initialFocusRef);
   // 提交进行中禁用一切 dismiss 入口(遮罩 / 关闭按钮)。
   const handleDismiss = busy || exiting ? undefined : onClose;
   // 滚动锁绑定到本组件挂载/卸载:退出动画完成后 present=false 才卸载,期间背景不滚动。
