@@ -10,9 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # 不写 version:action-setup 会读 package.json 的 packageManager 字段,于是 CI 装的
+      # 就是本地开发用的那一版 pnpm(而不是 "11" 里最新的任意补丁版),lockfile 不会因为
+      # 两边版本漂移而对不上。要升级 pnpm 只改 package.json 一处。
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
       - uses: actions/setup-node@v4
         with:
           node-version: 22
