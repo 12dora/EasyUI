@@ -26,7 +26,8 @@ src/
   control-tokens.ts         ← form-control geometry contract (height / radius)
   primitives/               ← Button, Field/Input/Select, Checkbox, Dialog, Badge,
                               PageHeader, EmptyState, InlineNotice, Section, Avatar,
-                              SegmentedToggle, TabList/TabPanel, Toaster, …  (visual, business-free)
+                              SegmentedToggle, TabList/TabPanel, Toaster,
+                              UnsavedChangesProvider, …  (visual, business-free)
   shell/                    ← AppShell, Sidebar (drill-down + mobile drawer), Topbar
   enterprise/               ← complete login, security, Login & Permissions, footer,
                               notification and upstream-health surfaces
@@ -73,6 +74,110 @@ they must not fork the page structure in host code.
    your router's `Link` + active-path as props, so it stays framework-agnostic.
 5. **Toasts (optional).** Mount `<Toaster />` once at your root, then call
    `toast.success("…")` anywhere.
+
+## Unsaved-changes guard
+
+`src/primitives/unsaved-changes.tsx` turns "you have unsaved changes — leave anyway?"
+into four framework-agnostic pieces. The package knows nothing about your router:
+components declare that they are dirty, the provider decides whether to ask, and the
+host wires the answer into its own navigation.
+
+| Export | Purpose |
+| --- | --- |
+| `UnsavedChangesProvider` | Holds the registry of dirty sources, owns the confirmation `Dialog` and the single `beforeunload` listener |
+| `useUnsavedChanges(dirty, { id? })` | Registers a dirty source while `dirty` is true; unregisters on `false` and on unmount |
+| `useLeaveConfirmation()` | `{ hasUnsavedChanges, confirmLeave }` for router / link / dialog-close wrappers |
+| `useDirtyState(initial, current, isEqual?)` | Boolean from two snapshots, using `structuralEqual` by default |
+| `structuralEqual(a, b)` | JSON-safe deep compare — key order ignored, missing key == explicit `undefined` |
+
+`confirmLeave()` resolves `true` immediately when nothing is dirty (no dialog, no extra
+click), otherwise it opens one dialog and resolves with the user's choice. Concurrent
+calls share that dialog and all resolve together. **Escape, the backdrop and the header
+close button all mean "stay"** — discarding a draft always takes an explicit click on the
+destructive button.
+
+Mount the provider once, above everything that can hold a draft, and pass localized
+copy (the built-in `DEFAULT_UNSAVED_CHANGES_LABELS` are English fallbacks only):
+
+```tsx
+<UnsavedChangesProvider
+  labels={{
+    title: t("unsavedTitle"),
+    description: t("unsavedDescription"),
+    stay: t("keepEditing"),
+    leave: t("discardChanges"),
+  }}
+>
+  {children}
+</UnsavedChangesProvider>
+```
+
+Inside a form, declare dirtiness — that is the whole component-side contract:
+
+```tsx
+const [draft, setDraft] = useState(initial);
+useUnsavedChanges(useDirtyState(initial, draft));
+```
+
+### Host wiring
+
+The guard only fires where the host asks it to. There are three places to cover, and
+missing any one of them leaves a hole a user can walk a draft out of.
+
+**1. Router pushes.** Wrap `push` / `replace` once and use the wrapper everywhere:
+
+```tsx
+function useGuardedRouter() {
+  const router = useRouter();               // host-owned (next/navigation, react-router, …)
+  const { confirmLeave } = useLeaveConfirmation();
+  return useMemo(
+    () => ({
+      push: async (href: string) => {
+        if (await confirmLeave()) router.push(href);
+      },
+      replace: async (href: string) => {
+        if (await confirmLeave()) router.replace(href);
+      },
+    }),
+    [router, confirmLeave],
+  );
+}
+```
+
+**2. Links.** A `<Link>` navigates before any promise settles, so intercept the click the
+way a back-link does — `preventDefault()` first, navigate only after the answer, and keep
+the real `href` so middle-click / "open in new tab" / hover preview still work:
+
+```tsx
+<Link
+  href={href}
+  onClick={async (event) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    if (await confirmLeave()) router.push(href);
+  }}
+>
+  {label}
+</Link>
+```
+
+**3. Dialogs that host a form.** Closing the dialog destroys the draft just as surely as
+navigating, so route its `onClose` through the same gate:
+
+```tsx
+<Dialog
+  open={open}
+  onClose={async () => {
+    if (await confirmLeave()) setOpen(false);
+  }}
+>
+  <OrderForm />
+</Dialog>
+```
+
+Full-page unloads (tab close, reload, external links) are already covered: the provider
+installs one `beforeunload` listener while any source is dirty and removes it as soon as
+everything is clean.
 
 ## Design tokens (theme.css)
 

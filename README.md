@@ -12,7 +12,7 @@ sources directly.
 
 ## Layout
 
-- `src/primitives/` — base primitives (Button, inputs, …)
+- `src/primitives/` — base primitives (Button, inputs, Dialog, the unsaved-changes guard, …)
 - `src/shell/` — data-driven app shell (Sidebar / MobileNav / Topbar)
 - `src/enterprise/` — enterprise surfaces (auth controller, security / access / settings workspaces)
 - `src/table/` — antd-backed data table boundary (`DataTableShell`, `useAnimatedExpand`; antd ≥ 6.5 optional peer, own entry `@easy-enterprise/ui/table` + `table.css`)
