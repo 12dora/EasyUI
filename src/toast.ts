@@ -54,6 +54,15 @@
  * Only explicit `dismiss(id)` / `clear()` calls are terminal removals.
  * Unmounting a `<Toaster />` only unsubscribes that renderer; the bus continues
  * to own all visible and queued items for the next mount.
+ *
+ * ## 本模块必须留在 package.json 的 `sideEffects` 名单里
+ *
+ * `toastBus` 是模块级单例:推送方(宿主的 `toast.error(...)`)与渲染方(`<Toaster />`
+ * 订阅的同一个 bus)必须落在同一个模块实例上。宿主往往通过再导出的桶文件间接引用本模块
+ * (EasyTrade 的 `@/lib/toast` 就是 `export * from "@easy-enterprise/ui/toast"`),
+ * 一旦包声明本模块「无副作用」,打包器就可以把它分别内联进两个 chunk —— 于是宿主推送的
+ * toast 进了一个没人渲染的 bus,页面上什么都不出现,也不报错。
+ * 同理适用于任何持有跨模块单例(模块级可变状态、React context)的文件。
  */
 
 export type ToastVariant = "success" | "error" | "info" | "warning";

@@ -5,7 +5,10 @@
   "license": "Apache-2.0",
   "packageManager": "pnpm@11.2.2",
   "sideEffects": [
-    "**/*.css"
+    "**/*.css",
+    "./src/toast.ts",
+    "./src/primitives/dialog.tsx",
+    "./src/primitives/unsaved-changes.tsx"
   ],
   "exports": {
     ".": "./src/index.ts",
