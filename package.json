@@ -40,6 +40,12 @@
   "peerDependenciesMeta": {
     "antd": {
       "optional": true
+    },
+    "eslint": {
+      "optional": true
+    },
+    "typescript": {
+      "optional": true
     }
   },
   "devDependencies": {
