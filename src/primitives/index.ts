@@ -22,6 +22,19 @@ export { ActionRow, DialogFormActions } from "./action-row";
 export { Form } from "./form";
 export { Section } from "./section";
 export { Dialog, DialogHeaderAside } from "./dialog";
+export {
+  UnsavedChangesProvider,
+  useUnsavedChanges,
+  useLeaveConfirmation,
+  useDirtyState,
+  structuralEqual,
+  DEFAULT_UNSAVED_CHANGES_LABELS,
+  type UnsavedChangesLabels,
+  type UnsavedChangesOptions,
+  type UnsavedChangesProviderProps,
+  type UnsavedChangesContextValue,
+  type LeaveConfirmation,
+} from "./unsaved-changes";
 export { SegmentedToggle, type SegmentedToggleOption } from "./segmented-toggle";
 export { TabList, TabPanel, tabPanelId, tabTriggerId, type TabDefinition, type TabListProps, type TabPanelProps } from "./tabs";
 export { Toaster } from "./toaster";
