@@ -96,6 +96,19 @@ calls share that dialog and all resolve together. **Escape, the backdrop and the
 close button all mean "stay"** — discarding a draft always takes an explicit click on the
 destructive button.
 
+Three guarantees the host can rely on, so `await confirmLeave()` is always safe to put in
+front of a navigation:
+
+- **It always settles.** If the provider unmounts while a confirmation is still open, every
+  pending caller resolves `false` (stay) rather than hanging forever; `onLeaveConfirmed`
+  does not fire, because nobody confirmed anything.
+- **One answer per question.** The first choice wins — the dialog stays mounted through its
+  exit animation, but its buttons are disabled from that moment on, and a late or repeated
+  click cannot re-settle a confirmation or fire `onLeaveConfirmed` a second time.
+- **Focus comes back.** The safe button is focused on open (via `Dialog`'s `initialFocusRef`,
+  never React's `autoFocus` — that one moves focus before the focus trap has recorded where
+  it came from), and choosing "stay" returns focus to the button or link the user pressed.
+
 Mount the provider once, above everything that can hold a draft, and pass localized
 copy (the built-in `DEFAULT_UNSAVED_CHANGES_LABELS` are English fallbacks only):
 
@@ -174,6 +187,11 @@ navigating, so route its `onClose` through the same gate:
   <OrderForm />
 </Dialog>
 ```
+
+An inline `onClose` like that one is fine even though it is a new function on every render:
+`Dialog` registers itself in the Escape stack on its open lifecycle only, so a parent that
+re-renders while the confirmation is up does not climb above it — Escape keeps dismissing
+the topmost dialog.
 
 Full-page unloads (tab close, reload, external links) are already covered: the provider
 installs one `beforeunload` listener while any source is dirty and removes it as soon as
