@@ -21,7 +21,9 @@ const TONE_CLASS: Record<InlineNoticeTone, string> = {
   // An inline notice is nothing but words: title + message inherit this colour, so the red
   // one goes `--signal-ink` (6.47:1 on paper) while border/tint stay on the `--signal` fill.
   error: "border-[rgb(var(--signal))]/30 bg-[rgb(var(--signal))]/[0.08] text-[rgb(var(--signal-ink))]",
-  warning: "border-[rgb(var(--status-pending))]/35 bg-[rgb(var(--status-pending))]/[0.12] text-[rgb(var(--status-pending))]",
+  // Same split for amber, and it matters more here: the words land on this tone's own 12%
+  // wash, where `--status-pending` is 2.69:1. `--status-pending-ink` is 5.98:1 on it.
+  warning: "border-[rgb(var(--status-pending))]/35 bg-[rgb(var(--status-pending))]/[0.12] text-[rgb(var(--status-pending-ink))]",
   info: "border-[rgb(var(--bond))]/25 bg-[rgb(var(--bond))]/[0.08] text-[rgb(var(--bond))]",
   success: "border-[rgb(var(--evergreen))]/30 bg-[rgb(var(--evergreen))]/[0.08] text-[rgb(var(--evergreen))]",
 };

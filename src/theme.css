@@ -52,7 +52,18 @@
 
   /* Status tones */
   --status-draft: 148 163 184;
-  --status-pending: 217 119 6;
+  --status-pending: 217 119 6;   /* #D97706  amber — fills, borders, icon glyphs */
+  /* Amber for *text*: #D97706 is 3.19:1 on paper / 3.04:1 on paper-deep — already below AA
+     on a bare surface, and amber words are never printed on a bare surface: the warning
+     notice lays them on its own 12% amber wash, where the same value falls to 2.69:1.
+     One step down the ramp does not fix that either — amber-700 #B45309 reaches 5.02:1 /
+     4.80:1 flat but only 4.24:1 on that wash, so it would pass the token audit and still
+     fail the pixels. #92400E clears AA on every surface it is actually rendered on:
+       7.09:1 on paper (#FFFFFF) / 6.78:1 on paper-deep (#F8FAFC)
+       6.24:1 / 5.98:1 on the 12% amber wash over those two (InlineNotice `warning`)
+     Use `--status-pending` for surfaces (fills, borders, tints, icon glyphs, the `!`/`△`
+     marks), `--status-pending-ink` whenever amber carries the words. */
+  --status-pending-ink: 146 64 14; /* #92400E  amber — warning text */
   --status-active: 5 150 105;
   --status-stop: 220 38 38;
   --status-archive: 71 85 105;

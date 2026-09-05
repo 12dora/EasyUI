@@ -82,7 +82,7 @@ they must not fork the page structure in host code.
 | Text     | `--ink`, `--ink-soft`, `--ink-faint` |
 | Borders  | `--hairline`, `--hairline-strong`, `--hairline-soft` |
 | Accents  | `--amber` (primary/blue) + `--amber-soft`, `--signal` (danger/red fills, icons, required marks) + `--signal-ink` (red **text**: errors, notices, status words), `--bond` (indigo), `--evergreen` (success) |
-| Status   | `--status-draft/pending/active/stop/archive` |
+| Status   | `--status-draft/pending/active/stop/archive` (fills, borders, icon glyphs) + `--status-pending-ink` (amber **text**: warning notices — the fill amber is 3.19:1 and fails AA) |
 | Motion   | `--ease-out-paper`, `--ease-press`, `--ease-pop`; `--duration-fast/base/slow/page/dialog` (mirrored in `motion.ts`) |
 | Type     | `--font-sans`, `--font-mono`, `--font-display` |
 

@@ -24,6 +24,12 @@ interface AppErrorStateProps {
   "data-test-id"?: string;
 }
 
+/**
+ * `toneClass` dresses the badge circle only, and its `text-` half colours the aria-hidden
+ * `!` glyph inside it — a mark, not a message. So the tones stay on the fill tokens
+ * (`--signal`, `--status-pending`) rather than the text ones (`--signal-ink`,
+ * `--status-pending-ink`); the words on this screen are `text-ink` / `text-ink-soft`.
+ */
 const KIND_META: Record<AppErrorKind, { label: string; mark: string; toneClass: string }> = {
   notFound: {
     label: "404",
