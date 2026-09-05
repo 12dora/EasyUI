@@ -18,7 +18,9 @@ interface InlineNoticeProps {
 }
 
 const TONE_CLASS: Record<InlineNoticeTone, string> = {
-  error: "border-[rgb(var(--signal))]/30 bg-[rgb(var(--signal))]/[0.08] text-[rgb(var(--signal))]",
+  // An inline notice is nothing but words: title + message inherit this colour, so the red
+  // one goes `--signal-ink` (6.54:1) while border/tint stay on the `--signal` fill.
+  error: "border-[rgb(var(--signal))]/30 bg-[rgb(var(--signal))]/[0.08] text-[rgb(var(--signal-ink))]",
   warning: "border-[rgb(var(--status-pending))]/35 bg-[rgb(var(--status-pending))]/[0.12] text-[rgb(var(--status-pending))]",
   info: "border-[rgb(var(--bond))]/25 bg-[rgb(var(--bond))]/[0.08] text-[rgb(var(--bond))]",
   success: "border-[rgb(var(--evergreen))]/30 bg-[rgb(var(--evergreen))]/[0.08] text-[rgb(var(--evergreen))]",

@@ -68,12 +68,12 @@ export function EnterpriseNotificationCenter({
                 <div key={item.id} className="flex items-start justify-between gap-4 p-4">
                   <div className="min-w-0">
                     <p className="text-[13px] font-medium text-ink">{item.title}</p>
-                    <p className={`mt-1 text-[12px] ${item.urgent ? "text-[rgb(var(--signal))]" : "text-ink-soft"}`}>{item.detail}</p>
+                    <p className={`mt-1 text-[12px] ${item.urgent ? "text-[rgb(var(--signal-ink))]" : "text-ink-soft"}`}>{item.detail}</p>
                     <RelativeTimestamp
                       value={item.createdAt}
                       absoluteLabel={item.createdAtLabel}
                       locale={locale}
-                      className="mt-1 block text-[11px] text-ink-faint"
+                      className="mt-1 block text-[12px] text-ink-faint"
                       testId="notification-time"
                     />
                   </div>

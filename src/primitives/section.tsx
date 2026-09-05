@@ -51,8 +51,11 @@ export function Section({
     <section className={`easy-section-enter ${spacing} ${className}`.trim()}>
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-ink/10 pb-2">
         <div className="flex items-baseline gap-3">
+          {/* Section ordinal ("01", "2.3"). 12px like every other meaning-carrying label,
+              and no `tracking`: 0.18em pulled the two digits apart until they read as two
+              separate marks. `tabular-nums` keeps a column of indices aligned. */}
           {index && (
-            <span className="font-mono text-[11px] tabular-nums tracking-[0.18em] text-ink-faint">{index}</span>
+            <span className="font-mono text-[12px] tabular-nums text-ink-faint">{index}</span>
           )}
           <h2 className="font-semibold text-[24px] leading-none text-ink">{title}</h2>
           {badge}

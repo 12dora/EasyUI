@@ -70,7 +70,7 @@ export function EnterpriseDeliveryStatusBadge({
 }) {
   return (
     <span data-test-id={testId} data-status={status}>
-      <Badge tone={STATUS_TONE[status]} uppercase={false}>
+      <Badge tone={STATUS_TONE[status]}>
         {labels.statusLabels[status]}
       </Badge>
     </span>
@@ -147,7 +147,7 @@ export function EnterpriseDeliveryStatusDetail({
         />
       </dl>
       {value.lastError ? (
-        <p className="break-all text-[12px] leading-5 text-[rgb(var(--signal))]" data-test-id="delivery-status-error">
+        <p className="break-all text-[12px] leading-5 text-[rgb(var(--signal-ink))]" data-test-id="delivery-status-error">
           {labels.lastError}: {value.lastError}
         </p>
       ) : null}

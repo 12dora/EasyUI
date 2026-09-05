@@ -179,10 +179,16 @@ function ToastCard({ item, onDismiss, dismissLabel }: { item: ToastItem; onDismi
   );
 }
 
+/**
+ * 状态标记:aria-hidden 的纯 ASCII 字形,不是文案 —— 所以颜色仍走 `--signal` 那一档
+ * (填充/图标口径),而不是承载文字的 `--signal-ink`。
+ * 原来靠 `uppercase` 把 info 的 "i" 变成 "I",现在直接写 "I":渲染结果一样,套件里
+ * 就不再有第二处 text-transform 让人误以为标签也该跟着大写。
+ */
 function ToastVariantMark({ variant, className }: { variant: ToastVariant; className: string }) {
-  const text = { success: "OK", error: "!", warning: "△", info: "i" }[variant];
+  const text = { success: "OK", error: "!", warning: "△", info: "I" }[variant];
   return (
-    <div aria-hidden className={`text-[12px] font-medium leading-5 ${className} mt-px shrink-0 uppercase tracking-wide`}>
+    <div aria-hidden className={`text-[12px] font-medium leading-5 ${className} mt-px shrink-0`}>
       {text}
     </div>
   );

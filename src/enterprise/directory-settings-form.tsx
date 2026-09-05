@@ -306,7 +306,7 @@ export function EnterpriseDirectorySyncStatusBlock({
       <header className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[13px] font-medium text-ink">{labels.lastSyncTitle}</p>
         <span data-test-id="directory-last-sync-status" data-status={lastSync.status}>
-          <Badge tone={STATUS_TONE[lastSync.status]} uppercase={false}>
+          <Badge tone={STATUS_TONE[lastSync.status]}>
             {labels.statusLabels[lastSync.status]}
           </Badge>
         </span>
@@ -336,7 +336,7 @@ export function EnterpriseDirectorySyncStatusBlock({
       </dl>
       <p className="text-[12px] leading-5 text-ink-faint" data-test-id="directory-unmapped-hint">{labels.unmappedHint}</p>
       {lastSync.errorDetail ? (
-        <p className="break-all text-[12px] leading-5 text-[rgb(var(--signal))]" data-test-id="directory-last-sync-error">
+        <p className="break-all text-[12px] leading-5 text-[rgb(var(--signal-ink))]" data-test-id="directory-last-sync-error">
           {labels.errorDetail}: {lastSync.errorDetail}
         </p>
       ) : null}

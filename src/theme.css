@@ -41,9 +41,11 @@
   --amber-soft: 219 234 254;     /* #DBEAFE  blue tint */
   --signal: 220 38 38;           /* #DC2626  red — destructive (fills, icons, required marks) */
   /* Red for *text*: #DC2626 measures 4.85:1 on paper / 4.63:1 on paper-deep — technically AA,
-     but it is the whole message in field-level errors, at 12px, often several lines of it.
-     #B91C1C gives 6.54:1 / 6.25:1 while staying the same hue as the destructive fill.
-     Use `--signal` for surfaces, `--signal-ink` whenever red carries the words. */
+     but wherever red carries the message it is the whole message: field errors, inline
+     notices, "load failed" lines, status badges, destructive menu items — several lines of
+     it at 12px. #B91C1C gives 6.54:1 / 6.25:1 while staying the same hue as the fill.
+     Use `--signal` for surfaces (fills, borders, tints, icon glyphs, required asterisks,
+     the notification dot), `--signal-ink` whenever red carries the words. */
   --signal-ink: 185 28 28;       /* #B91C1C  red — error text */
   --bond: 79 70 229;             /* #4F46E5  indigo — secondary */
   --evergreen: 5 150 105;        /* #059669  emerald — success */
@@ -442,13 +444,16 @@ select {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
 }
 
-/* Eyebrow label */
+/* Eyebrow label — the small line above a page / dialog title. Callers pass real,
+   translated copy here ("访问设置", "身份与权限"), so:
+   - no `text-transform: uppercase`: it does nothing to CJK and shouts in Latin;
+   - no `letter-spacing`: spreading the glyphs apart only makes a CJK line harder to scan;
+   - 12px, not 11px: same floor as field labels/hints (see field.tsx).
+   Weight + `--ink-faint` carry the hierarchy against the title below it. */
 .eyebrow {
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 500;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: rgb(var(--ink-faint));
 }
 

@@ -40,8 +40,10 @@ const VARIANTS: Record<Variant, string> = {
     "bg-transparent text-ink border border-ink/30 hover:border-ink/60 hover:bg-ink/[0.04] active:translate-y-px disabled:opacity-40 disabled:cursor-not-allowed",
   ghost:
     "bg-transparent text-ink-soft hover:text-ink hover:bg-ink/[0.04] border border-transparent active:translate-y-px disabled:opacity-40 disabled:cursor-not-allowed",
+  // Ghost danger has no fill to carry the meaning — the red *is* the label, so it goes
+  // `--signal-ink`; the hover tint stays `--signal` like every other destructive surface.
   "ghost-danger":
-    "bg-transparent text-[rgb(var(--signal))] hover:bg-[rgb(var(--signal))]/[0.08] border border-transparent active:translate-y-px disabled:opacity-40 disabled:cursor-not-allowed",
+    "bg-transparent text-[rgb(var(--signal-ink))] hover:bg-[rgb(var(--signal))]/[0.08] border border-transparent active:translate-y-px disabled:opacity-40 disabled:cursor-not-allowed",
   danger:
     "bg-[rgb(var(--signal))] text-paper border border-[rgb(var(--signal))] hover:bg-[rgb(var(--signal))]/90 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed",
 };

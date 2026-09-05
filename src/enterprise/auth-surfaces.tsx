@@ -95,7 +95,7 @@ export function EnterpriseCredentialLoginSurface(props: EnterpriseCredentialLogi
               {oidcButtonLabel}
             </Button>
             {oidcStatusError}
-            <div className="flex items-center gap-3 text-[11px] text-ink-faint" aria-hidden="true">
+            <div className="flex items-center gap-3 text-[12px] text-ink-faint" aria-hidden="true">
               <span className="h-px flex-1 bg-hairline" />
               <span>{labels.oidcDivider}</span>
               <span className="h-px flex-1 bg-hairline" />
@@ -171,7 +171,7 @@ export function EnterpriseCredentialLoginSurface(props: EnterpriseCredentialLogi
                     </Button>
                     {/* FE-FB-04: toast mode drops the red unsupported paragraph; capability stays on the disabled button. */}
                     {!props.passkeySupported && !toastMode ? (
-                      <p className="text-[12px] text-[rgb(var(--signal))]" data-test-id="login-passkey-unsupported">
+                      <p className="text-[12px] text-[rgb(var(--signal-ink))]" data-test-id="login-passkey-unsupported">
                         {labels.passkeyUnsupported}
                       </p>
                     ) : null}
@@ -229,7 +229,7 @@ export function EnterpriseCredentialLoginSurface(props: EnterpriseCredentialLogi
 }
 
 export function SignedOutSurface({ eyebrow, title, description, actionHref, actionLabel, renderLink }: { eyebrow: string; title: string; description: string; actionHref: string; actionLabel: string; renderLink: EnterpriseLinkRenderer }) {
-  return <div className="flex min-h-[70vh] items-center justify-center px-4 py-16" data-test-id="logged-out-page"><div className="w-full max-w-md text-center"><div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">{eyebrow}</div><h1 className="mt-3 text-[28px] font-semibold text-ink">{title}</h1><p className="mt-3 text-[13px] leading-6 text-ink-soft">{description}</p><div className="mt-7 flex justify-center">{renderLink({ href: actionHref, className: "inline-flex h-11 items-center justify-center rounded-[2px] border border-ink bg-ink px-6 text-[14px] font-medium tracking-wide text-paper transition-all hover:bg-ink/90", children: actionLabel })}</div></div></div>;
+  return <div className="flex min-h-[70vh] items-center justify-center px-4 py-16" data-test-id="logged-out-page"><div className="w-full max-w-md text-center"><div className="eyebrow">{eyebrow}</div><h1 className="mt-3 text-[28px] font-semibold text-ink">{title}</h1><p className="mt-3 text-[13px] leading-6 text-ink-soft">{description}</p><div className="mt-7 flex justify-center">{renderLink({ href: actionHref, className: "inline-flex h-11 items-center justify-center rounded-[2px] border border-ink bg-ink px-6 text-[14px] font-medium tracking-wide text-paper transition-all hover:bg-ink/90", children: actionLabel })}</div></div></div>;
 }
 
 export interface ChangePasswordLabels { currentPassword: string; newPassword: string; confirmPassword: string; submit: string; submitting: string; tooShort: string; mismatch: string; failed: string; }

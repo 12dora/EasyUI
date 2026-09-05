@@ -81,7 +81,7 @@ they must not fork the page structure in host code.
 | Surfaces | `--paper`, `--paper-deep`, `--paper-soft` |
 | Text     | `--ink`, `--ink-soft`, `--ink-faint` |
 | Borders  | `--hairline`, `--hairline-strong`, `--hairline-soft` |
-| Accents  | `--amber` (primary/blue) + `--amber-soft`, `--signal` (danger/red), `--bond` (indigo), `--evergreen` (success) |
+| Accents  | `--amber` (primary/blue) + `--amber-soft`, `--signal` (danger/red fills, icons, required marks) + `--signal-ink` (red **text**: errors, notices, status words), `--bond` (indigo), `--evergreen` (success) |
 | Status   | `--status-draft/pending/active/stop/archive` |
 | Motion   | `--ease-out-paper`, `--ease-press`, `--ease-pop`; `--duration-fast/base/slow/page/dialog` (mirrored in `motion.ts`) |
 | Type     | `--font-sans`, `--font-mono`, `--font-display` |

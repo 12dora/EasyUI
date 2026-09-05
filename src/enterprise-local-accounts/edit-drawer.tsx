@@ -64,7 +64,7 @@ function DrawerSection({
     <section data-test-id={testId} className={first ? "" : "border-t border-hairline pt-4"}>
       {title ? (
         <h4
-          className={`mb-2.5 text-[13px] font-semibold ${danger ? "text-[rgb(var(--signal))]" : "text-ink"}`}
+          className={`mb-2.5 text-[13px] font-semibold ${danger ? "text-[rgb(var(--signal-ink))]" : "text-ink"}`}
         >
           {title}
         </h4>
@@ -444,7 +444,7 @@ export function EditAccountDrawer({
                     {labels.clearExpiry}
                   </Button>
                 </div>
-                <p className="mb-0 mt-1.5 text-[11px] text-ink-faint">{labels.expiresAtHint}</p>
+                <p className="mb-0 mt-1.5 text-[12px] text-ink-faint">{labels.expiresAtHint}</p>
               </DrawerSection>
             ) : null}
 

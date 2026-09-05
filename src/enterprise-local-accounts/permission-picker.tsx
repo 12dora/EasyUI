@@ -214,7 +214,7 @@ export function PermissionPicker({
         <span className="inline-flex items-baseline gap-2">
           <span className="text-[13px] font-semibold text-ink">{labels.permissionPickerTitle}</span>
           {hasTree && !adminLocked ? (
-            <span className="font-mono text-[11px] tabular-nums text-ink-faint" data-test-id="local-accounts-perm-count">
+            <span className="font-mono text-[12px] tabular-nums text-ink-faint" data-test-id="local-accounts-perm-count">
               {selectedCount}/{toggleableItems.length}
             </span>
           ) : null}
@@ -407,7 +407,7 @@ function CatalogGroupBlock({
           <span className="text-[13px] font-medium text-ink">{groupLabel}</span>
         </Checkbox>
         {subtreeToggleable.length > 0 ? (
-          <span className="ml-auto pr-1 font-mono text-[11px] tabular-nums text-ink-faint">
+          <span className="ml-auto pr-1 font-mono text-[12px] tabular-nums text-ink-faint">
             {subtreeSelected}/{subtreeToggleable.length}
           </span>
         ) : null}
@@ -488,14 +488,14 @@ function PermissionRow({
   const name = displayNameOf(item, locale);
   const secondaryNote: ReactNode = isBaseline ? (
     <span
-      className="text-[11px] text-ink-faint"
+      className="text-[12px] text-ink-faint"
       data-test-id={`local-accounts-perm-baseline-hint-${item.code}`}
     >
       {labels.permissionPickerBaselineHint}
     </span>
   ) : !grantable ? (
     <span
-      className="text-[11px] text-ink-faint"
+      className="text-[12px] text-ink-faint"
       data-test-id={`local-accounts-perm-not-grantable-${item.code}`}
     >
       {labels.permissionNotGrantable}
@@ -516,7 +516,7 @@ function PermissionRow({
         <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
           <span className="text-[13px] text-ink">{name}</span>
           {name !== item.code ? (
-            <span className="font-mono text-[11px] text-ink-faint">{item.code}</span>
+            <span className="font-mono text-[12px] text-ink-faint">{item.code}</span>
           ) : null}
           {high ? (
             <Tag color="red" className="!mr-0" data-test-id={`local-accounts-perm-high-${item.code}`}>
@@ -528,7 +528,7 @@ function PermissionRow({
       {secondaryNote}
       {showScopeSelect ? (
         <span className="ml-auto inline-flex items-center gap-1.5">
-          <span className="text-[11px] text-ink-faint">{labels.scopeLabel}</span>
+          <span className="text-[12px] text-ink-faint">{labels.scopeLabel}</span>
           <Select
             size="small"
             value={scope && scopes.includes(scope) ? scope : defaultScopeForCode(item) ?? scopes[0]}

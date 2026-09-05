@@ -16,28 +16,35 @@ const TONE: Record<BadgeTone, string> = {
   amber: "border-[rgb(var(--amber))]/40 text-[rgb(var(--amber))] bg-[rgb(var(--amber))]/[0.08]",
   evergreen:
     "border-[rgb(var(--evergreen))]/40 text-[rgb(var(--evergreen))] bg-[rgb(var(--evergreen))]/[0.08]",
+  // Red badge: fill + border keep `--signal`, the label itself goes `--signal-ink` — the
+  // status word is text, and it sits on a red-tinted surface where #DC2626 loses contrast.
   signal:
-    "border-[rgb(var(--signal))]/40 text-[rgb(var(--signal))] bg-[rgb(var(--signal))]/[0.08]",
+    "border-[rgb(var(--signal))]/40 text-[rgb(var(--signal-ink))] bg-[rgb(var(--signal))]/[0.08]",
   bond:
     "border-[rgb(var(--bond))]/40 text-[rgb(var(--bond))] bg-[rgb(var(--bond))]/[0.08]",
 };
 
+/**
+ * Status badge. Content is a translated status word ("已启用", "同步失败"), never a code,
+ * so it follows the kit's label rules: 12px floor, no `uppercase` (a no-op on CJK, shouting
+ * in Latin), no `tracking` (spread glyphs read as separate marks at this size).
+ *
+ * The `uppercase` prop is gone with the styling it controlled; call sites that opted out
+ * with `uppercase={false}` for Chinese labels are now the default and can drop the prop.
+ * `leading-4` + `py-0.5` are unchanged, so the pill keeps its 22px box.
+ */
 export function Badge({
   tone = "neutral",
   children,
   className = "",
-  uppercase = true,
 }: {
   tone?: BadgeTone;
   children: ReactNode;
   className?: string;
-  uppercase?: boolean;
 }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap border rounded-[2px] px-1.5 py-0.5 font-mono text-[10.5px] leading-4 ${
-        uppercase ? "uppercase tracking-[0.14em]" : "tracking-wide"
-      } ${TONE[tone]} ${className}`}
+      className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap border rounded-[2px] px-1.5 py-0.5 font-mono text-[12px] leading-4 ${TONE[tone]} ${className}`}
     >
       {children}
     </span>

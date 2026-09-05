@@ -21,8 +21,9 @@ export function PageHeader({ eyebrow, title, subtitle, meta, actions }: Props) {
           {eyebrow && <div className="eyebrow mb-1.5">{eyebrow}</div>}
           <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-ink sm:text-[26px]">{title}</h1>
           {subtitle && <p className="mt-1.5 max-w-2xl text-[13px] text-ink-soft">{subtitle}</p>}
+          {/* Meta row carries facts (ids, counts, timestamps) — 12px floor, same as labels. */}
           {meta && (
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-ink-faint">{meta}</div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[12px] text-ink-faint">{meta}</div>
           )}
         </div>
         {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}

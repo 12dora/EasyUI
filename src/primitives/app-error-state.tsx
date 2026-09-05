@@ -75,7 +75,10 @@ export function AppErrorState({
       <div className={`mb-5 flex h-14 w-14 items-center justify-center rounded-full border ${meta.toneClass}`} data-test-id="app-error-icon" aria-hidden="true">
         <span className="font-mono text-[22px] font-semibold leading-none">{meta.mark}</span>
       </div>
-      <div className="mb-2 font-mono text-[11px] font-medium uppercase tracking-[0.16em] text-ink-faint">{meta.label}</div>
+      {/* HTTP status stamp ("404", "503"): the one place `tracking` survives — it is a
+          purely numeric monospace code, read digit by digit, not a translated label.
+          `uppercase` is gone because it never did anything to digits. 12px like the rest. */}
+      <div className="mb-2 font-mono text-[12px] font-medium tracking-[0.16em] text-ink-faint">{meta.label}</div>
       <h1 className="max-w-2xl text-[24px] font-semibold leading-tight text-ink sm:text-[28px]">{title}</h1>
       {description && <p className="mt-3 max-w-2xl text-[14px] leading-6 text-ink-soft">{description}</p>}
       {requestId && (
