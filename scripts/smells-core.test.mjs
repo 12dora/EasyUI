@@ -18,6 +18,7 @@ import {
   compareBaseline,
   countSourceSloc,
   fileThreshold,
+  findMissingTargets,
   normalizeViolations,
   ruleViolationValue,
 } from "./smells-core.mjs";
@@ -76,6 +77,36 @@ describe("compareBaseline 棘轮", () => {
     expect(improvements).toEqual([expect.stringContaining("src/a.ts")]);
   });
 
+  it("基线条目的文件已不存在时按死 key 提示收紧,不判失败", () => {
+    const baseline = { "src/gone.ts::render": { complexity: [12] }, "src/gone.ts": { "max-lines": [600] } };
+
+    const { regressions, improvements } = compareBaseline({}, baseline, { fileExists: () => false });
+
+    expect(regressions).toEqual([]);
+    expect(improvements).toEqual([
+      expect.stringContaining("死 key"),
+      expect.stringContaining("死 key"),
+    ]);
+  });
+
+  it("函数被删掉 / 改名不算回退,新出现的超阈值函数才算", () => {
+    const baseline = { "src/a.ts::oldName": { complexity: [12] } };
+
+    expect(compareBaseline({}, baseline).regressions).toEqual([]);
+    expect(compareBaseline({ "src/a.ts::newName": { complexity: [12] } }, baseline).regressions).toEqual([
+      expect.stringContaining("src/a.ts::newName"),
+    ]);
+  });
+
+  it("按符号分桶之后,一个函数变差不会被另一个函数被删掉抵消掉", () => {
+    const baseline = { "src/a.ts::heavy": { complexity: [20] }, "src/a.ts::light": { complexity: [11] } };
+    const found = { "src/a.ts::light": { complexity: [18] } };
+
+    expect(compareBaseline(found, baseline).regressions).toEqual([
+      expect.stringContaining("src/a.ts::light [complexity] 既存违规继续变差:11 -> 18"),
+    ]);
+  });
+
   it("数值书写顺序不影响判定(比对前归一化)", () => {
     const { regressions, improvements } = compareBaseline(
       { "src/a.ts": { complexity: [11, 13] } },
@@ -127,7 +158,45 @@ describe("collectEslintViolations", () => {
     ];
 
     expect(collectEslintViolations(results, cwd)).toEqual({
-      "src/a.tsx": { complexity: [17], "max-lines-per-function": [204], "no-console": [1] },
+      "src/a.tsx::X": { complexity: [17], "max-lines-per-function": [204] },
+      "src/a.tsx": { "no-console": [1] },
+    });
+  });
+
+  it("函数级规则按符号分桶,文件级规则仍按文件", () => {
+    const results = [
+      {
+        filePath: "/repo/src/a.ts",
+        messages: [
+          { ruleId: "complexity", message: "Function 'save' has a complexity of 12. Maximum allowed is 10.", line: 4 },
+          { ruleId: "complexity", message: "Method 'render' has a complexity of 11. Maximum allowed is 10.", line: 20 },
+          { ruleId: "max-lines", message: "File has too many lines (612). Maximum allowed is 500.", line: 501 },
+        ],
+      },
+    ];
+
+    expect(collectEslintViolations(results, cwd)).toEqual({
+      "src/a.ts::save": { complexity: [12] },
+      "src/a.ts::render": { complexity: [11] },
+      "src/a.ts": { "max-lines": [612] },
+    });
+  });
+
+  it("匿名函数按文件内序号编 key,同一行的多条规则落进同一个 key", () => {
+    const results = [
+      {
+        filePath: "/repo/src/a.tsx",
+        messages: [
+          { ruleId: "complexity", message: "Arrow function has a complexity of 12. Maximum allowed is 10.", line: 7 },
+          { ruleId: "max-lines-per-function", message: "Arrow function has too many lines (140). Maximum allowed is 120.", line: 7 },
+          { ruleId: "complexity", message: "Arrow function has a complexity of 11. Maximum allowed is 10.", line: 90 },
+        ],
+      },
+    ];
+
+    expect(collectEslintViolations(results, cwd)).toEqual({
+      "src/a.tsx::<anonymous>#0": { complexity: [12], "max-lines-per-function": [140] },
+      "src/a.tsx::<anonymous>#1": { complexity: [11] },
     });
   });
 
@@ -192,6 +261,21 @@ describe("fileThreshold 分类", () => {
   it("测试文件的档位优先于 Next 路由页(app/ 下的测试不按 250 判)", () => {
     expect(fileThreshold("src/app/[locale]/admin/page.test.tsx").threshold).toBe(SIZE_THRESHOLDS.test);
   });
+
+  it("app/ 与文件名之间可以没有路由段:根路由页 / 根 layout 同样按路由档判", () => {
+    const category = (rel) => fileThreshold(rel).category;
+
+    expect(category("app/page.tsx")).toBe("nextRoutePage");
+    expect(category("src/app/page.tsx")).toBe("nextRoutePage");
+    expect(category("frontend/apps/admin/app/page.tsx")).toBe("nextRoutePage");
+    expect(category("app/layout.tsx")).toBe("wrapperOrFacade");
+    expect(category("src/app/layout.tsx")).toBe("wrapperOrFacade");
+  });
+
+  it("不在 app/ 下的同名文件不吃路由档", () => {
+    expect(fileThreshold("src/components/page.tsx").category).toBe("production");
+    expect(fileThreshold("src/widgets/layout.tsx").category).toBe("production");
+  });
 });
 
 describe("collectSizeIssues", () => {
@@ -210,5 +294,12 @@ describe("collectSizeIssues", () => {
       ["src/app/admin/page.tsx", 251, SIZE_THRESHOLDS.nextRoutePage],
       ["src/index.ts", 185, SIZE_THRESHOLDS.wrapperOrFacade],
     ]);
+  });
+
+  it("目标不存在必须抛错,不能静默扫出 0 个文件", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "easyui-smells-"));
+
+    expect(findMissingTargets(root, ["src", "scripts"])).toEqual(["src", "scripts"]);
+    expect(() => collectSizeIssues(root, ["src"])).toThrow(/扫描目标不存在/);
   });
 });

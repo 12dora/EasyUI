@@ -35,7 +35,8 @@ Update flow for hosts: `git submodule update --remote frontend/packages/easy-ent
 then commit the pointer bump in the host repo.
 
 Peer deps the host must provide: `react` / `react-dom` ≥ 19, [`motion`](https://motion.dev) ≥ 12,
-plus `antd` ^6.5.2 *only* if it imports the table or local-accounts entries (declared optional).
+`eslint` ≥ 9 and `typescript` ≥ 5 for the code-smell gate (see below), plus `antd` ^6.5.2 *only*
+if it imports the table or local-accounts entries (declared optional).
 
 ## Development
 
@@ -47,6 +48,17 @@ Gates: `pnpm lint` runs the shared code-smell ratchet (`easyui-check-smells`: es
 function-size / file-size rules + a shrink-only JSON baseline). The rule fragment
 (`@easy-enterprise/ui/eslint-smells`) and the bin are both consumed by host repos — thresholds,
 host wiring and the ratchet rule are documented in [`docs/GATES.md`](docs/GATES.md).
+
+`easyui-check-smells` judges **only the smell rules it tracks** (complexity, function/file size,
+`no-explicit-any`, `no-console`, `no-warning-comments`). Everything else your eslint config
+reports — `react-hooks/*`, unused vars, import order, a11y — is invisible to it, by design: the
+ratchet must not turn a host's whole lint run into one shrink-only baseline. Hosts therefore keep
+their own `eslint` (or `next lint`) step next to this one; a green ratchet is not a green lint.
+The one thing it never swallows: if eslint fails to parse a file, the CLI exits 2 rather than
+counting the file as clean.
+
+The gate needs `eslint` ≥ 9 (flat config) and `typescript` ≥ 5 from the host — both are declared
+as peer deps, since the rule fragment and the SLOC scanner load them out of the host's tree.
 
 Tests run standalone: `pnpm install && pnpm exec vitest run` (root is this package; `happy-dom`
 is a declared devDependency; JSX uses the automatic runtime via `vitest.config.ts`). Two behavior

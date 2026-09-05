@@ -7,7 +7,7 @@
 // SLOC 口径从 EasyTrade `frontend/tests/helpers/code-size-scanner.ts` 移植:用 TypeScript
 // scanner 逐 token 标记"有代码的行",于是模板字符串里的 `//` 与 `/* */` 仍算代码,而只有
 // `{/* … */}` 的 JSX 行不算。
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 
@@ -73,6 +73,33 @@ export const TRACKED_RULES = [
 const TRACKED_RULE_SET = new Set(TRACKED_RULES);
 
 /**
+ * 函数级规则:基线按**符号**分桶(`文件::函数名`),而不是把整个文件的数值堆成一个数组。
+ *
+ * 为什么:按文件堆数组时,数值只能按大小配对比对 —— 删掉一个复杂函数、同时另一个函数变
+ * 得更复杂,两者会在数组里互相抵消,门禁看不出回退;反过来,只是重命名 / 挪动函数也可能
+ * 被误判成回退。按符号分桶之后,"某个函数变差"与"新出现一个超阈值的函数"才各归各的。
+ *
+ * 其余规则(max-lines / file-sloc 这类文件级指标,以及 no-console 这类按条数棘轮的)
+ * 仍然按文件存值列表。
+ */
+export const FUNCTION_SCOPED_RULES = new Set(["complexity", "max-lines-per-function"]);
+
+/** 匿名函数(箭头函数 / 匿名 function 表达式)在基线 key 里的占位名。 */
+export const ANONYMOUS_SYMBOL = "<anonymous>";
+
+/** 基线 key 里文件与符号的分隔符。 */
+export const SYMBOL_SEPARATOR = "::";
+
+/** eslint 会把函数名放在单引号里(`Function 'save' has …`);箭头函数则完全没有名字。 */
+const NAMED_FUNCTION_PATTERN = /'([^']+)'/;
+
+/** 基线 key -> 它所属的文件相对路径(文件级 key 原样返回)。 */
+export function baselineKeyFile(key) {
+  const index = key.indexOf(SYMBOL_SEPARATOR);
+  return index === -1 ? key : key.slice(0, index);
+}
+
+/**
  * 一条 eslint 违规折算成基线里的数值:能解析出数字的规则用数字(越大越坏),其余
  * (no-console / no-explicit-any / …)一律记 1,靠"条数"来棘轮。
  */
@@ -87,22 +114,39 @@ export function ruleViolationValue(ruleId, message) {
 }
 
 /**
- * eslint 结果数组 -> {文件相对路径: {规则: [违规数值]}}。
+ * eslint 结果数组 -> {基线 key: {规则: [违规数值]}}。
+ *
+ * key 是文件相对路径(文件级规则)或 `文件::符号`(FUNCTION_SCOPED_RULES,见上)。
  * fatal(解析失败)一律抛错:统计失真时必须炸,不能当成零违规。
  */
 export function collectEslintViolations(results, cwd) {
   const files = {};
   for (const result of results) {
     const rel = toPosixRelative(cwd, result.filePath);
+    // 行号 -> 匿名序号。eslint 的消息按行升序,同一个匿名函数的 complexity 与
+    // max-lines-per-function 报在同一行,于是它们会落进同一个 key。
+    const anonymousOrdinals = new Map();
     for (const message of result.messages ?? []) {
       if (message.fatal) {
         throw new Error(`eslint 解析失败: ${rel}:${message.line} ${message.message}`);
       }
       if (!TRACKED_RULE_SET.has(message.ruleId)) continue;
-      addViolation(files, rel, message.ruleId, ruleViolationValue(message.ruleId, message.message));
+      const key = violationKey(rel, message, anonymousOrdinals);
+      addViolation(files, key, message.ruleId, ruleViolationValue(message.ruleId, message.message));
     }
   }
   return files;
+}
+
+function violationKey(rel, message, anonymousOrdinals) {
+  if (!FUNCTION_SCOPED_RULES.has(message.ruleId)) return rel;
+
+  const named = NAMED_FUNCTION_PATTERN.exec(message.message);
+  if (named) return `${rel}${SYMBOL_SEPARATOR}${named[1]}`;
+
+  const line = message.line ?? 0;
+  if (!anonymousOrdinals.has(line)) anonymousOrdinals.set(line, anonymousOrdinals.size);
+  return `${rel}${SYMBOL_SEPARATOR}${ANONYMOUS_SYMBOL}#${anonymousOrdinals.get(line)}`;
 }
 
 function toPosixRelative(cwd, filePath) {
@@ -216,15 +260,17 @@ function isTestFile(rel) {
   return /(?:^|\/)tests?\//.test(rel) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(rel);
 }
 
+// `app/` 与文件名之间的路由段可以一个都没有:`app/page.tsx`、`src/app/page.tsx` 是合法的
+// 根路由,漏掉它们会让根页面掉进 500 行的生产档,等于对最该收紧的文件不设防。
 function isNextRoutePage(rel) {
-  return /(?:^|\/)app\/.*\/page\.tsx$/.test(rel);
+  return /(?:^|\/)app\/(?:.*\/)?page\.tsx$/.test(rel);
 }
 
 function isWrapperOrFacade(rel) {
   return (
     /(?:^|\/)index\.ts$/.test(rel) ||
     /(?:boundary|facade|guard|provider|wrapper)\.(?:ts|tsx)$/.test(rel) ||
-    /(?:^|\/)app\/.*\/layout\.tsx$/.test(rel)
+    /(?:^|\/)app\/(?:.*\/)?layout\.tsx$/.test(rel)
   );
 }
 
@@ -249,10 +295,20 @@ export function fileThreshold(rel) {
   return { category: "production", threshold: SIZE_THRESHOLDS.production, reason: "production source hard cap" };
 }
 
-/** 递归收集受扫描的文件绝对路径。root 可以是目录也可以是单个文件。 */
+/** targets 里在 cwd 下不存在的那些(原样返回,供 CLI 拼报错)。 */
+export function findMissingTargets(cwd, targets) {
+  return targets.filter((target) => !existsSync(path.resolve(cwd, target)));
+}
+
+/**
+ * 递归收集受扫描的文件绝对路径。root 可以是目录也可以是单个文件。
+ *
+ * 不存在就抛错,绝不返回空数组:静默跳过意味着 `--targets` 里一个拼错的路径会扫出 0 个
+ * 文件,比对结果读起来像"存量全修好了",`--update` 还会顺手把基线洗成空的。
+ */
 export function walkFiles(root) {
   const stat = statSync(root, { throwIfNoEntry: false });
-  if (!stat) return [];
+  if (!stat) throw new Error(`扫描目标不存在: ${root}`);
   if (!stat.isDirectory()) return SCANNED_EXTENSIONS.test(root) ? [root] : [];
 
   return readdirSync(root).flatMap((entry) => {
@@ -279,7 +335,7 @@ export function collectSizeIssues(cwd, targets) {
 // ------------------------------------------------------------------ 基线棘轮
 
 /**
- * 把 {文件: {规则: number[]}} 归一化:数值降序、文件与规则名排序、空条目丢掉。
+ * 把 {key: {规则: number[]}} 归一化:数值降序、key 与规则名排序、空条目丢掉。
  * 比对与写盘都走这里,于是基线里数值的书写顺序不影响判定。
  */
 export function normalizeViolations(files) {
@@ -298,42 +354,53 @@ function normalizeFileRules(rules) {
   return Object.fromEntries(entries);
 }
 
-/** 把一条违规累加进 {文件: {规则: number[]}} 结构。 */
-export function addViolation(files, filePath, rule, value) {
-  const rules = (files[filePath] ??= {});
+/** 把一条违规累加进 {key: {规则: number[]}} 结构。 */
+export function addViolation(files, key, rule, value) {
+  const rules = (files[key] ??= {});
   (rules[rule] ??= []).push(value);
   return files;
 }
 
 /**
  * 基线比对(只准变好):
- *   - 某文件某规则的违规条数比基线多 -> 回退
- *   - 既存违规的数值比基线更差       -> 回退
- *   - 基线里没有的文件 / 规则出现违规 -> 回退
- *   - 比基线好                      -> improvement,门禁仍然通过
+ *   - 某 key 某规则的违规条数比基线多 -> 回退
+ *   - 既存违规的数值比基线更差        -> 回退
+ *   - 基线里没有的 key / 规则出现违规  -> 回退(新出现一个超阈值的函数就是这一条)
+ *   - 比基线好                       -> improvement,门禁仍然通过
+ *
+ * 函数被删掉 / 改名 / 修好,对应的符号 key 只会消失,永远算 improvement 而不是回退。
+ *
+ * `fileExists` 可选:传进来之后,基线里那些**文件已经不存在**的 key 会被当作死 key ——
+ * 只提示"可以 --update 收紧",不判失败(文件都没了,谈不上回退)。
  */
-export function compareBaseline(found, baseline) {
+export function compareBaseline(found, baseline, { fileExists } = {}) {
   const current = normalizeViolations(found);
   const frozen = normalizeViolations(baseline);
   const regressions = [];
   const improvements = [];
 
-  for (const filePath of sortedUnion(current, frozen)) {
-    const currentRules = current[filePath] ?? {};
-    const frozenRules = frozen[filePath] ?? {};
-    for (const rule of sortedUnion(currentRules, frozenRules)) {
-      const now = currentRules[rule] ?? [];
-      const was = frozenRules[rule] ?? [];
-      const verdict = compareValues(now, was);
-      if (verdict === "regression") {
-        regressions.push(formatRegression(filePath, rule, now, was));
-      } else if (verdict === "improvement") {
-        improvements.push(`${filePath} [${rule}] ${JSON.stringify(was)} -> ${JSON.stringify(now)}`);
-      }
+  for (const key of sortedUnion(current, frozen)) {
+    if (!(key in current) && fileExists && !fileExists(baselineKeyFile(key))) {
+      improvements.push(`${key} 基线里的文件已不存在(死 key),--update 可以清掉`);
+      continue;
     }
+    collectVerdicts(key, current[key] ?? {}, frozen[key] ?? {}, regressions, improvements);
   }
 
   return { regressions, improvements };
+}
+
+function collectVerdicts(key, currentRules, frozenRules, regressions, improvements) {
+  for (const rule of sortedUnion(currentRules, frozenRules)) {
+    const now = currentRules[rule] ?? [];
+    const was = frozenRules[rule] ?? [];
+    const verdict = compareValues(now, was);
+    if (verdict === "regression") {
+      regressions.push(formatRegression(key, rule, now, was));
+    } else if (verdict === "improvement") {
+      improvements.push(`${key} [${rule}] ${JSON.stringify(was)} -> ${JSON.stringify(now)}`);
+    }
+  }
 }
 
 function compareValues(now, was) {
@@ -343,15 +410,15 @@ function compareValues(now, was) {
   return "same";
 }
 
-function formatRegression(filePath, rule, now, was) {
+function formatRegression(key, rule, now, was) {
   if (now.length > was.length) {
-    return `${filePath} [${rule}] 违规 ${was.length} -> ${now.length} 条;当前数值 ${JSON.stringify(now)}`;
+    return `${key} [${rule}] 违规 ${was.length} -> ${now.length} 条;当前数值 ${JSON.stringify(now)}`;
   }
   const worse = now
     .map((value, index) => [was[index], value])
     .filter(([baselineValue, value]) => value > baselineValue)
     .map(([baselineValue, value]) => `${baselineValue} -> ${value}`);
-  return `${filePath} [${rule}] 既存违规继续变差:${worse.join(", ")}(基线 ${JSON.stringify(was)})`;
+  return `${key} [${rule}] 既存违规继续变差:${worse.join(", ")}(基线 ${JSON.stringify(was)})`;
 }
 
 function sortedUnion(left, right) {

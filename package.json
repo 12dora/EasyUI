@@ -31,9 +31,11 @@
   },
   "peerDependencies": {
     "antd": "^6.5.2",
+    "eslint": ">=9",
     "motion": ">=12",
     "react": ">=19",
-    "react-dom": ">=19"
+    "react-dom": ">=19",
+    "typescript": ">=5"
   },
   "peerDependenciesMeta": {
     "antd": {

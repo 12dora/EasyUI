@@ -1,78 +1,128 @@
 {
-  "_comment": "代码坏味道门禁的存量基线,由 easyui-check-smells --update 生成。阈值见 eslint.smells.config.mjs (eslint 规则)与 scripts/smells-core.mjs(文件规模)。这份文件只应该变小。",
+  "_comment": "代码坏味道门禁的存量基线,由 easyui-check-smells --update 生成。key 是文件路径,函数级规则(complexity / max-lines-per-function)则是 `文件::函数名`(匿名函数为 `文件::<anonymous>#序号`)。阈值见 eslint.smells.config.mjs(eslint 规则)与 scripts/smells-core.mjs(文件规模)。这份文件只应该变小。",
   "files": {
-    "src/enterprise-local-accounts/create-modal.tsx": {
-      "complexity": [
-        16
-      ],
+    "src/enterprise-local-accounts/create-modal.tsx::CreateAccountModal": {
       "max-lines-per-function": [
         190
       ]
     },
-    "src/enterprise-local-accounts/edit-drawer.tsx": {
+    "src/enterprise-local-accounts/create-modal.tsx::handleOk": {
       "complexity": [
-        48,
-        13
-      ],
+        16
+      ]
+    },
+    "src/enterprise-local-accounts/edit-drawer.tsx": {
       "file-sloc": [
         548
       ],
       "max-lines": [
         535
+      ]
+    },
+    "src/enterprise-local-accounts/edit-drawer.tsx::<anonymous>#0": {
+      "complexity": [
+        13
+      ]
+    },
+    "src/enterprise-local-accounts/edit-drawer.tsx::EditAccountDrawer": {
+      "complexity": [
+        48
       ],
       "max-lines-per-function": [
         463
       ]
     },
-    "src/enterprise-local-accounts/index.tsx": {
+    "src/enterprise-local-accounts/index.tsx::LocalAccountsBody": {
       "max-lines-per-function": [
         226
       ]
     },
     "src/enterprise-local-accounts/permission-picker.tsx": {
-      "complexity": [
-        19,
-        19,
-        14,
-        11
-      ],
       "file-sloc": [
         511
       ],
       "max-lines": [
         510
+      ]
+    },
+    "src/enterprise-local-accounts/permission-picker.tsx::CatalogGroupBlock": {
+      "complexity": [
+        11
+      ]
+    },
+    "src/enterprise-local-accounts/permission-picker.tsx::importFrom": {
+      "complexity": [
+        14
+      ]
+    },
+    "src/enterprise-local-accounts/permission-picker.tsx::PermissionPicker": {
+      "complexity": [
+        19
       ],
       "max-lines-per-function": [
         262
       ]
     },
-    "src/enterprise/access-settings-surface.tsx": {
+    "src/enterprise-local-accounts/permission-picker.tsx::PermissionRow": {
       "complexity": [
-        23,
-        12,
-        11,
-        11
-      ],
+        19
+      ]
+    },
+    "src/enterprise/access-settings-surface.tsx": {
       "file-sloc": [
         704
       ],
       "max-lines": [
         704
+      ]
+    },
+    "src/enterprise/access-settings-surface.tsx::AuthorizationPanel": {
+      "max-lines-per-function": [
+        152
+      ]
+    },
+    "src/enterprise/access-settings-surface.tsx::DirectoryPanel": {
+      "complexity": [
+        11
       ],
       "max-lines-per-function": [
-        205,
-        152,
         137
       ]
     },
-    "src/enterprise/auth-controller.tsx": {
+    "src/enterprise/access-settings-surface.tsx::discover": {
       "complexity": [
-        18,
-        15,
+        12
+      ]
+    },
+    "src/enterprise/access-settings-surface.tsx::EnterpriseAccessSettingsSurface": {
+      "complexity": [
+        11
+      ]
+    },
+    "src/enterprise/access-settings-surface.tsx::IdentityPanel": {
+      "complexity": [
+        23
+      ],
+      "max-lines-per-function": [
+        205
+      ]
+    },
+    "src/enterprise/auth-controller.tsx::EnterpriseLoginController": {
+      "complexity": [
+        18
+      ]
+    },
+    "src/enterprise/auth-controller.tsx::loginError": {
+      "complexity": [
         14
       ]
     },
-    "src/enterprise/auth-surfaces.tsx": {
+    "src/enterprise/auth-controller.tsx::secondFactorMethods": {
+      "complexity": [
+        15
+      ]
+    },
+    "src/enterprise/auth-surfaces.tsx::EnterpriseCredentialLoginSurface": {
       "complexity": [
         20
       ],
@@ -81,27 +131,37 @@
       ]
     },
     "src/enterprise/authorization-workspace.tsx": {
-      "complexity": [
-        58,
-        20,
-        12
-      ],
       "file-sloc": [
         523
       ],
       "max-lines": [
         516
+      ]
+    },
+    "src/enterprise/authorization-workspace.tsx::<anonymous>#0": {
+      "complexity": [
+        12
+      ]
+    },
+    "src/enterprise/authorization-workspace.tsx::EnterpriseAuthorizationWorkspace": {
+      "complexity": [
+        58
       ],
       "max-lines-per-function": [
         256
       ]
     },
-    "src/enterprise/directory-settings-form.tsx": {
+    "src/enterprise/authorization-workspace.tsx::normalizeEnterpriseManifest": {
+      "complexity": [
+        20
+      ]
+    },
+    "src/enterprise/directory-settings-form.tsx::EnterpriseDirectorySettingsForm": {
       "max-lines-per-function": [
         123
       ]
     },
-    "src/enterprise/footer-settings-surface.tsx": {
+    "src/enterprise/footer-settings-surface.tsx::EnterpriseFooterSettingsSurface": {
       "complexity": [
         15
       ],
@@ -109,71 +169,95 @@
         129
       ]
     },
-    "src/enterprise/footer.tsx": {
+    "src/enterprise/footer.tsx::isSafeHref": {
       "complexity": [
-        13,
         11
       ]
     },
-    "src/enterprise/integration-configuration-forms.tsx": {
+    "src/enterprise/footer.tsx::sanitizeNode": {
+      "complexity": [
+        13
+      ]
+    },
+    "src/enterprise/integration-configuration-forms.tsx::EnterpriseOidcConfigurationForm": {
       "complexity": [
         16
       ]
     },
-    "src/enterprise/label-catalog.ts": {
+    "src/enterprise/label-catalog.ts::chineseCatalog": {
       "max-lines-per-function": [
-        206,
-        85,
         85
       ]
     },
-    "src/enterprise/passkeys.behavior.test.tsx": {
+    "src/enterprise/label-catalog.ts::englishCatalog": {
+      "max-lines-per-function": [
+        85
+      ]
+    },
+    "src/enterprise/label-catalog.ts::legacyCatalog": {
+      "max-lines-per-function": [
+        206
+      ]
+    },
+    "src/enterprise/passkeys.behavior.test.tsx::<anonymous>#0": {
       "max-lines-per-function": [
         177
       ]
     },
-    "src/enterprise/security-workspace.tsx": {
+    "src/enterprise/security-workspace.tsx::EnterpriseAccountSecuritySurface": {
       "complexity": [
-        23,
-        22,
-        14,
-        11
+        14
+      ]
+    },
+    "src/enterprise/security-workspace.tsx::PasskeyOperations": {
+      "complexity": [
+        22
       ],
       "max-lines-per-function": [
         146
       ]
     },
-    "src/enterprise/settings-surfaces.tsx": {
-      "complexity": [
-        12
-      ]
-    },
-    "src/primitives/app-error-state.tsx": {
-      "complexity": [
-        13
-      ]
-    },
-    "src/primitives/button.tsx": {
-      "complexity": [
-        13
-      ]
-    },
-    "src/primitives/collapse-reveal.tsx": {
+    "src/enterprise/security-workspace.tsx::register": {
       "complexity": [
         11
       ]
     },
-    "src/primitives/dialog.tsx": {
+    "src/enterprise/security-workspace.tsx::TotpOperations": {
+      "complexity": [
+        23
+      ]
+    },
+    "src/enterprise/settings-surfaces.tsx::EnterpriseUpstreamHealth": {
       "complexity": [
         12
       ]
     },
-    "src/primitives/field.tsx": {
+    "src/primitives/app-error-state.tsx::AppErrorState": {
+      "complexity": [
+        13
+      ]
+    },
+    "src/primitives/button.tsx::Button": {
+      "complexity": [
+        13
+      ]
+    },
+    "src/primitives/collapse-reveal.tsx::CollapseReveal": {
+      "complexity": [
+        11
+      ]
+    },
+    "src/primitives/dialog.tsx::DialogFrame": {
+      "complexity": [
+        12
+      ]
+    },
+    "src/primitives/field.tsx::Field": {
       "complexity": [
         22
       ]
     },
-    "src/shell/MobileNav.tsx": {
+    "src/shell/MobileNav.tsx::MobileNav": {
       "complexity": [
         11
       ],
@@ -181,7 +265,7 @@
         162
       ]
     },
-    "src/shell/nav-model.ts": {
+    "src/shell/nav-model.ts::activeNavLabel": {
       "complexity": [
         11
       ]
@@ -192,7 +276,7 @@
         4
       ]
     },
-    "src/toast.ts": {
+    "src/toast.ts::push": {
       "complexity": [
         13
       ]
