@@ -75,6 +75,45 @@ they must not fork the page structure in host code.
 5. **Toasts (optional).** Mount `<Toaster />` once at your root, then call
    `toast.success("…")` anywhere.
 
+## Form actions in a dialog footer
+
+`Form` + `DialogFormActions submitType="submit"` is what makes "type the last field, press
+Enter" work. It relies on the submit button belonging to the `<form>` — and a `Dialog` whose
+`footer` holds the action row renders that row **outside** the `children` where the form
+body lives, so DOM nesting alone cannot connect the two. Give the form an id and hand the
+same id to the action row; the button then claims the form through the native `form`
+attribute, which also makes it the form's default submit button (the one Enter activates):
+
+```tsx
+const FORM_ID = "task-form";
+
+<Dialog
+  open={open}
+  onClose={close}
+  title={t("newTask")}
+  footer={
+    <DialogFormActions
+      submitType="submit"
+      submitFormId={FORM_ID}
+      cancelLabel={t("cancel")}
+      submitLabel={t("save")}
+      onCancel={close}
+      onSubmit={save}
+      submitting={saving}
+      blockedReason={invalid ? t("fillRequired") : undefined}
+    />
+  }
+>
+  <Form id={FORM_ID} onSubmit={save} busy={saving}>
+    …fields…
+  </Form>
+</Dialog>
+```
+
+`submitFormId` is only needed for that split layout — when the action row sits inside the
+`<form>`, `submitType="submit"` is enough on its own. `blockedReason` keeps working either
+way: the blocked button calls `preventDefault()`, so the native submit does not get through.
+
 ## Unsaved-changes guard
 
 `src/primitives/unsaved-changes.tsx` turns "you have unsaved changes — leave anyway?"
