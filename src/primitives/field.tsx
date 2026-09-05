@@ -151,7 +151,7 @@ export function Field({ label, info, hint, error, required, htmlFor, children, c
       {labelledChildren}
       {/* 提示与错误也从 11px 抬到 12px,并把颜色压深:提示走 ink-soft(7.58:1,原来的
           ink-faint 在 paper-deep 上只有 4.55:1,压在 11px 上更吃力),错误走 signal-ink
-          (6.54:1)。两者都是 AA 之上,不再是"能看见但费劲"的那一档。 */}
+          (6.47:1 / paper-deep 上 6.18:1)。两者都是 AA 之上,不再是"能看见但费劲"的那一档。 */}
       {hint && !error && <span id={hintId} className="text-[12px] text-ink-soft">{hint}</span>}
       {error && <span id={errorId} className="text-[12px] text-[rgb(var(--signal-ink))]">{error}</span>}
     </div>

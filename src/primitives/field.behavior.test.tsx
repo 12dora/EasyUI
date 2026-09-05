@@ -46,7 +46,7 @@ describe("Field 提示与错误", () => {
     expect(hint.className).not.toContain("text-ink-faint");
   });
 
-  it("错误 12px + signal-ink(6.54:1),不再用 --signal 直出", async () => {
+  it("错误 12px + signal-ink(6.47:1),不再用 --signal 直出", async () => {
     view = await mount(
       <Field label="名称" error="名称不能为空">
         <Input />
