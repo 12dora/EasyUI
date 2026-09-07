@@ -14,7 +14,7 @@ sources directly.
 
 - `src/primitives/` — base primitives (Button, inputs, Dialog, the unsaved-changes guard, …)
 - `src/shell/` — data-driven app shell (Sidebar / MobileNav / Topbar)
-- `src/enterprise/` — enterprise surfaces (auth controller, security / access / settings workspaces)
+- `src/enterprise/` — enterprise surfaces (auth controller, silent identity re-check, security / access / settings workspaces; host wiring for the re-check: [`docs/IDENTITY-CHECK.md`](docs/IDENTITY-CHECK.md))
 - `src/table/` — antd-backed data table boundary (`DataTableShell`, `useAnimatedExpand`; antd ≥ 6.5 optional peer, own entry `@easy-enterprise/ui/table` + `table.css`)
 - `src/enterprise-local-accounts/` — local-account admin surface (`EnterpriseLocalAccountsSurface`), also antd-backed, own entry `@easy-enterprise/ui/enterprise-local-accounts`
 - `src/theme.css` — design tokens
