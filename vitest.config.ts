@@ -8,6 +8,13 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // identity-check 的行为用例把 happy-dom 的 iframe 页面加载关掉(隐藏 iframe 绝不能真的联网),
+    // 于是每挂一个 iframe,happy-dom 就往 stderr 打一条 "Iframe page loading is disabled"。
+    // 这是环境的既定行为、不是失败,只滤掉这一句;其余日志照常打出来。
+    onConsoleLog(log) {
+      if (log.includes("Iframe page loading is disabled")) return false;
+      return undefined;
+    },
     globals: false,
     include: [
       resolve(import.meta.dirname, "src/**/*.test.{ts,tsx}"),

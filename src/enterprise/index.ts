@@ -4,6 +4,8 @@ export * from "./topbar-actions";
 export * from "./notification-center";
 export * from "./auth-surfaces";
 export * from "./auth-controller";
+export * from "./identity-check";
+export * from "./identity-check-controller";
 export { EnterpriseUpstreamHealth } from "./settings-surfaces";
 export type { UpstreamHealthLabels } from "./settings-surfaces";
 export * from "./upstream-health-controller";

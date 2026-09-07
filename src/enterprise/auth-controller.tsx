@@ -9,6 +9,8 @@ export interface EnterpriseOidcStatus {
   enabled: boolean;
   authorizePath: string;
   endSessionUrl?: string | null;
+  /** 静默身份复查(机制 2)的授权入口,相对 apiBase;后端未启用该机制时为空。 */
+  silentAuthorizePath?: string | null;
 }
 
 export interface EnterpriseLoginResult { mustChangePassword?: boolean; }
