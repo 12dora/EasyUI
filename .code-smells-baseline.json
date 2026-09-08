@@ -159,7 +159,7 @@
     },
     "src/enterprise/security-workspace.tsx::EnterpriseAccountSecuritySurface": {
       "complexity": [
-        14
+        13
       ]
     },
     "src/enterprise/security-workspace.tsx::PasskeyOperations": {

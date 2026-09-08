@@ -35,6 +35,11 @@ const BLANK_SETTINGS: EnterpriseGeneralSettingsValue = {
 // change must not refetch it and three mounted consumers must not race.
 let cachedSettings: EnterpriseGeneralSettingsValue | null = null;
 let inFlight: Promise<EnterpriseGeneralSettingsValue> | null = null;
+// Request generation. A save (prime), a host-dispatched update or a reset makes
+// every request started before it obsolete: without this a GET that was already
+// on the wire when the administrator saved would land afterwards and put the old
+// brand back — or report a load failure on top of a value we already have.
+let generation = 0;
 
 function nonEmpty(value: string | null | undefined): string | null {
   const text = (value ?? "").trim();
@@ -46,10 +51,16 @@ function publish(value: EnterpriseGeneralSettingsValue): void {
   window.dispatchEvent(new CustomEvent(ENTERPRISE_GENERAL_UPDATED_EVENT, { detail: value }));
 }
 
+/** Abandon every request currently on the wire; their results must not be applied. */
+function invalidateInFlight(): void {
+  generation += 1;
+  inFlight = null;
+}
+
 /** Seed (or replace) the shared cache — used by settings pages after a save and by SSR handoff. */
 export function primeEnterpriseGeneralSettings(value: EnterpriseGeneralSettingsValue): void {
   cachedSettings = value;
-  inFlight = null;
+  invalidateInFlight();
   publish(value);
 }
 
@@ -71,6 +82,7 @@ export function useEnterpriseGeneralSettings(
       const detail = (event as CustomEvent<EnterpriseGeneralSettingsValue>).detail;
       if (!detail) return;
       cachedSettings = detail;
+      invalidateInFlight();
       if (!active) return;
       setSettings(detail);
       setError(false);
@@ -80,8 +92,12 @@ export function useEnterpriseGeneralSettings(
       setSettings(cachedSettings);
     } else {
       inFlight ??= load();
+      // Both callbacks are gated on the generation the request was started in:
+      // a primed value wins over anything that was already in flight.
+      const request = generation;
       void inFlight.then(
         (value) => {
+          if (request !== generation) return;
           cachedSettings = value;
           inFlight = null;
           if (!active) return;
@@ -89,6 +105,7 @@ export function useEnterpriseGeneralSettings(
           setError(false);
         },
         () => {
+          if (request !== generation) return;
           inFlight = null;
           if (active) setError(true);
         },
@@ -105,7 +122,7 @@ export function useEnterpriseGeneralSettings(
 /** Test/host seam: drop the module cache so the next consumer refetches. */
 export function resetEnterpriseGeneralSettings(): void {
   cachedSettings = null;
-  inFlight = null;
+  invalidateInFlight();
 }
 
 /**

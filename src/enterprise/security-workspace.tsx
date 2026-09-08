@@ -11,7 +11,7 @@ import { Field, Input } from "../primitives/field";
 import { InlineNotice } from "../primitives/inline-notice";
 import { EnterpriseChangePasswordForm, type ChangePasswordLabels } from "./auth-surfaces";
 import { EnterpriseSecurityMethodRow } from "./shared-settings";
-import { EnterprisePermissionDeniedState } from "./surface-helpers";
+import { EnterprisePermissionDeniedPage } from "./surface-helpers";
 import { isWebAuthnAvailable, isWebAuthnCancelled, parseCreationOptions, serializeCredential } from "./webauthn";
 import type { SecuritySettingsLabels } from "./settings-surfaces";
 import { EnterpriseSecurityWorkspace as SecurityPageFrame } from "./settings-surfaces";
@@ -76,17 +76,20 @@ export function EnterpriseAccountSecuritySurface({
   const canUseTotp = permissions.totpStatus || permissions.createTotp || permissions.disableTotp;
   if (!permissions.password && !canUseTotp && !permissions.viewPasskeys) {
     // FE-FB-02 / DECISIONS ruling 4: page-state EmptyState (title + detail + home), no toast, no redirect.
-    if (feedbackMode === "toast") {
-      return (
-        <EnterprisePermissionDeniedState
-          title={labels.permissionDenied}
-          description={labels.permissionDeniedDetail}
-          actions={permissionDeniedActions}
-          defaultActionLabel={labels.permissionDeniedAction}
-        />
-      );
-    }
-    return <InlineNotice tone="error" message={labels.permissionDenied} data-test-id="permission-denied" />;
+    // The page header stays outside the gate so the route keeps exactly one H1.
+    return (
+      <EnterprisePermissionDeniedPage
+        pageTitle={labels.page.title}
+        pageDescription={labels.page.description}
+        sectionTestId="enterprise-security-settings"
+        surface="security-settings"
+        feedbackMode={feedbackMode}
+        deniedTitle={labels.permissionDenied}
+        deniedDetail={labels.permissionDeniedDetail}
+        actions={permissionDeniedActions}
+        defaultActionLabel={labels.permissionDeniedAction}
+      />
+    );
   }
   return <SecurityPageFrame labels={labels.page} password={permissions.password ? <EnterpriseChangePasswordForm labels={labels.password} onSubmit={adapter.changePassword} onSuccess={onPasswordChanged ?? (() => toast.success(labels.password.success))} feedbackMode={feedbackMode} /> : undefined} twoFactor={canUseTotp || permissions.viewPasskeys ? <div className="divide-y divide-hairline">{canUseTotp ? <TotpOperations adapter={adapter} labels={labels} canLoadStatus={permissions.totpStatus} canCreate={permissions.createTotp} canDisable={permissions.disableTotp} feedbackMode={feedbackMode} /> : null}{permissions.viewPasskeys ? <PasskeyOperations adapter={adapter} labels={labels} canRegister={permissions.canRegisterPasskeys} canDelete={permissions.canDeletePasskeys} feedbackMode={feedbackMode} /> : null}</div> : undefined} />;
 }

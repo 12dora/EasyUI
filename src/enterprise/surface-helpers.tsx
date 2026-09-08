@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 import { EmptyState } from "../primitives/empty-state";
+import { InlineNotice } from "../primitives/inline-notice";
+import { PageHeader } from "../primitives/page-header";
 // Re-export for enterprise consumers that only import surface helpers.
 export { AsyncStateTransition, type AsyncSurfaceState } from "../primitives/async-state-transition";
 
@@ -48,6 +50,56 @@ export function EnterprisePermissionDeniedState({
       actions={safeActions}
       data-test-id={testId}
     />
+  );
+}
+
+/**
+ * A denied settings route is still that route.
+ *
+ * `EnterpriseSettingsPageFrame` no longer paints a parent heading, so the leaf
+ * surface owns the page's only H1 — and it has to own it in every state. Each
+ * surface therefore renders this instead of returning a bare notice: the header
+ * sits outside the permission-dependent body, so a denied page still has exactly
+ * one H1 and still tells the user which page they are looking at.
+ */
+export function EnterprisePermissionDeniedPage({
+  pageTitle,
+  pageDescription,
+  showHeader = true,
+  sectionTestId,
+  surface,
+  feedbackMode = "inline",
+  deniedTitle,
+  deniedDetail,
+  actions,
+  defaultActionLabel,
+}: {
+  pageTitle: ReactNode;
+  pageDescription?: ReactNode;
+  /** Hosts that paint the heading themselves pass `false` (access settings). */
+  showHeader?: boolean;
+  sectionTestId?: string;
+  surface?: string;
+  feedbackMode?: "inline" | "toast";
+  deniedTitle: ReactNode;
+  deniedDetail?: ReactNode;
+  actions?: ReactNode;
+  defaultActionLabel?: ReactNode;
+}) {
+  return (
+    <section data-test-id={sectionTestId} data-enterprise-surface={surface}>
+      {showHeader ? <PageHeader title={pageTitle} subtitle={pageDescription} /> : null}
+      {feedbackMode === "toast" ? (
+        <EnterprisePermissionDeniedState
+          title={deniedTitle}
+          description={deniedDetail}
+          actions={actions}
+          defaultActionLabel={defaultActionLabel}
+        />
+      ) : (
+        <InlineNotice tone="error" className="mt-5" message={deniedTitle} data-test-id="permission-denied" />
+      )}
+    </section>
   );
 }
 

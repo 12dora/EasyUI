@@ -42,6 +42,21 @@ function attachFile(input: HTMLInputElement, file: File): void {
   Object.defineProperty(input, "files", { configurable: true, value: [file] });
 }
 
+/**
+ * happy-dom, like a browser, refuses a scripted `value` write on a file input,
+ * so the selection is modelled with an instance accessor: the test can seed a
+ * fake path and observe whether the surface cleared it.
+ */
+function trackNativeValue(input: HTMLInputElement, initial: string): () => string {
+  let current = initial;
+  Object.defineProperty(input, "value", {
+    configurable: true,
+    get: () => current,
+    set: (next: string) => { current = String(next); },
+  });
+  return () => current;
+}
+
 function pngOfSize(bytes: number): File {
   return new File([new Uint8Array(bytes)], "logo.png", { type: "image/png" });
 }
@@ -171,9 +186,8 @@ describe("EnterpriseGeneralSettingsSurface", () => {
     await settle(20);
     expect(view.host.textContent).toContain(labels.loadFailed);
 
-    const retry = view.host.querySelector("button");
-    expect(retry).not.toBeNull();
-    await click(retry!);
+    // C2 contract: consumers locate the retry by this id, in both feedback modes.
+    await click(byTestId(view.host, "general-settings-refresh"));
     await settle(20);
     expect(byTestId(view.host, "general-title-zh")).toBeTruthy();
   });
@@ -193,5 +207,72 @@ describe("EnterpriseGeneralSettingsSurface", () => {
     resolveLoad(LOADED);
     await settle(30);
     expect(byTestId(view.host, "general-title-zh")).toBeTruthy();
+  });
+});
+
+describe("EnterpriseGeneralSettingsSurface in-flight safety", () => {
+  it("clears the native file selection so the same logo can be picked again", async () => {
+    const adapter = makeAdapter();
+    view = await mount(<EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} />);
+    await settle(20);
+
+    const input = byTestId(view.host, "general-logo-input") as HTMLInputElement;
+    const nativeValue = trackNativeValue(input, "C:\\fakepath\\logo.webp");
+    attachFile(input, new File([new Uint8Array([1, 2, 3, 4])], "logo.webp", { type: "image/webp" }));
+    await change(input);
+    await settle(20);
+    expect(nativeValue()).toBe("");
+
+    // Removing must clear it too, otherwise re-selecting the same file is a no-op.
+    input.value = "C:\\fakepath\\logo.webp";
+    await click(byTestId(view.host, "general-logo-remove"));
+    await settle(10);
+    expect(nativeValue()).toBe("");
+    expect(view.host.querySelector("[data-test-id='general-logo-preview']")).toBeNull();
+
+    await change(input);
+    await settle(20);
+    expect((byTestId(view.host, "general-logo-preview") as HTMLImageElement).getAttribute("src")?.startsWith("data:image/webp;base64,")).toBe(true);
+  });
+
+  it("disables the whole form while saving so an in-flight save cannot discard an edit", async () => {
+    let resolveSave: (value: EnterpriseGeneralSettingsValue) => void = () => undefined;
+    const adapter = {
+      load: vi.fn().mockResolvedValue(LOADED),
+      save: vi.fn().mockImplementation(
+        () => new Promise<EnterpriseGeneralSettingsValue>((resolve) => { resolveSave = resolve; }),
+      ),
+    } as unknown as EnterpriseGeneralSettingsAdapter;
+
+    view = await mount(<EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} feedbackMode="toast" />);
+    await settle(20);
+
+    await click(byTestId(view.host, "app-settings-save"));
+    await settle(10);
+    const locked = [
+      "general-title-zh",
+      "general-subtitle-zh",
+      "footer-html-zh",
+      "general-logo-input",
+      "general-logo-remove",
+      "app-settings-save",
+      "general-settings-refresh",
+    ];
+    for (const testId of locked) {
+      expect([testId, (byTestId(view.host, testId) as HTMLInputElement).disabled]).toEqual([testId, true]);
+    }
+
+    resolveSave(LOADED);
+    await settle(20);
+    expect((byTestId(view.host, "general-title-zh") as HTMLInputElement).disabled).toBe(false);
+  });
+});
+
+describe("general settings copy", () => {
+  it("tells the administrator a blank subtitle falls back to the default, not that it hides it", () => {
+    const zh = createEnterpriseLabelCatalog("zh-CN", { appName: "测试", appDescription: "测试" }, "business").generalSettings;
+    const en = createEnterpriseLabelCatalog("en", { appName: "Test", appDescription: "Test" }, "business").generalSettings;
+    expect(zh.subtitleHint).toBe("留空使用默认副标题。");
+    expect(en.subtitleHint).toBe("Leave blank to use the default subtitle.");
   });
 });

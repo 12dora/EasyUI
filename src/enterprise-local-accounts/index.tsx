@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ANTD_CONTROL_STATE_TOKEN, ANTD_CONTROL_TOKEN, ANTD_NAVY_BUTTON_TOKEN } from "../control-tokens";
 import { InlineNotice } from "../primitives/inline-notice";
 import { PageHeader } from "../primitives/page-header";
+import { EnterprisePermissionDeniedPage } from "../enterprise/surface-helpers";
 import { toast } from "../toast";
 import { CreateAccountModal } from "./create-modal";
 import { EditAccountDrawer } from "./edit-drawer";
@@ -94,7 +95,17 @@ export function EnterpriseLocalAccountsSurface({
   }, [isZh]);
 
   if (!permissions.view) {
-    return <InlineNotice tone="error" message={labels.permissionDenied} data-test-id="permission-denied" />;
+    // The heading belongs to the route, not to the body: a viewer without the
+    // permission still gets exactly one H1 telling them which page this is.
+    return (
+      <EnterprisePermissionDeniedPage
+        pageTitle={labels.title}
+        pageDescription={labels.description}
+        sectionTestId="enterprise-local-accounts"
+        surface="local-accounts"
+        deniedTitle={labels.permissionDenied}
+      />
+    );
   }
 
   return (

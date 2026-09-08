@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { InlineNotice } from "../primitives/inline-notice";
 import type { EnterpriseTimestampFormatter } from "./format-timestamp";
 import type { EnterpriseIntegrationCard } from "./models";
 import { EnterpriseLoginPermissions, type LoginPermissionsLabels } from "./settings-surfaces";
-import { EnterprisePermissionDeniedState } from "./surface-helpers";
+import { EnterprisePermissionDeniedPage } from "./surface-helpers";
 import { AuthorizationPanel } from "./access-settings/authorization-panel";
 import { DirectoryPanel } from "./access-settings/directory-panel";
 import { pickTab, type AccessSettingsTab } from "./access-settings/helpers";
@@ -63,7 +62,7 @@ export function EnterpriseAccessSettingsSurface({
   const visibleTabs = ([permissions.viewIdentity ? "login" : null, permissions.viewAuthorization ? "permissions" : null].filter(Boolean)) as AccessSettingsTab[];
   const [selectedTab, setSelectedTab] = useState<AccessSettingsTab | null>(null);
   const activeTab = pickTab(visibleTabs, selectedTab, preferredTab);
-  if (!activeTab) return renderPermissionDenied(feedbackMode, labels, permissionDeniedActions);
+  if (!activeTab) return renderPermissionDenied(feedbackMode, labels, permissionDeniedActions, showHeader);
   return (
     <div data-test-id="enterprise-access-settings" data-enterprise-surface="login-permissions-settings">
       <EnterpriseLoginPermissions
@@ -108,22 +107,27 @@ export function EnterpriseAccessSettingsSurface({
 }
 
 // FE-FB-02 / DECISIONS ruling 4: page-state EmptyState (title + detail + home), no toast, no redirect.
+// The page keeps its own H1 here too — a denial replaces the body, not the page.
 function renderPermissionDenied(
   feedbackMode: EnterpriseSettingsFeedbackMode,
   labels: EnterpriseAccessSettingsLabels,
   permissionDeniedActions: ReactNode,
+  showHeader: boolean,
 ): ReactNode {
-  if (feedbackMode === "toast") {
-    return (
-      <EnterprisePermissionDeniedState
-        title={labels.permissionDenied}
-        description={labels.permissionDeniedDetail}
-        actions={permissionDeniedActions}
-        defaultActionLabel={labels.permissionDeniedAction}
-      />
-    );
-  }
-  return <InlineNotice tone="error" message={labels.permissionDenied} data-test-id="permission-denied" />;
+  return (
+    <EnterprisePermissionDeniedPage
+      pageTitle={labels.page.title}
+      pageDescription={labels.page.description}
+      showHeader={showHeader}
+      sectionTestId="login-permissions-page"
+      surface="login-permissions-settings"
+      feedbackMode={feedbackMode}
+      deniedTitle={labels.permissionDenied}
+      deniedDetail={labels.permissionDeniedDetail}
+      actions={permissionDeniedActions}
+      defaultActionLabel={labels.permissionDeniedAction}
+    />
+  );
 }
 
 function emptyCard(id: "authentik" | "easyauth", labels: LoginPermissionsLabels): EnterpriseIntegrationCard {

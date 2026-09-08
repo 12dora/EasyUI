@@ -12,6 +12,13 @@ import { mount, type MountedView } from "./behavior-test-utils";
 
 let view: MountedView | null = null;
 
+/** Visible text contribution, minus anything hidden from the accessibility tree. */
+function accessibleName(element: Element): string {
+  const clone = element.cloneNode(true) as Element;
+  for (const hidden of clone.querySelectorAll("[aria-hidden='true']")) hidden.remove();
+  return (clone.textContent ?? "").replace(/\s+/g, " ").trim();
+}
+
 afterEach(async () => {
   await view?.unmount();
   view = null;
@@ -42,6 +49,25 @@ describe("EnterpriseBrandSlot", () => {
     expect(logo?.getAttribute("alt")).toBe("");
     expect(logo?.getAttribute("aria-hidden")).toBe("true");
     expect(view.host.querySelector("[data-test-id='brand-subtitle']")?.textContent).toBe("Enterprise learning");
+  });
+
+  it("names the link with the product name alone", async () => {
+    view = await mount(
+      <EnterpriseBrandSlot
+        href="/app"
+        title="Learning"
+        subtitle="Enterprise learning"
+        logoSrc="data:image/png;base64,AAAA"
+        testId="brand"
+      />,
+    );
+    // Screen readers announce the link once, as "Learning": the logo and the
+    // visible subtitle are decoration, not part of where the link goes.
+    const logo = view.host.querySelector("[data-test-id='brand-logo']");
+    const subtitle = view.host.querySelector("[data-test-id='brand-subtitle']");
+    expect(logo?.getAttribute("aria-hidden")).toBe("true");
+    expect(subtitle?.getAttribute("aria-hidden")).toBe("true");
+    expect(accessibleName(view.host.querySelector("[data-test-id='brand']")!)).toBe("Learning");
   });
 
   it("hands href and class to a host router link", async () => {

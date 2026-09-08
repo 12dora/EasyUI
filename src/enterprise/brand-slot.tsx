@@ -52,7 +52,13 @@ export function EnterpriseBrandSlot({ href, title, subtitle, logoSrc, testId, re
           {title}
         </div>
         {subtitle ? (
-          <p className="hidden text-[12px] text-ink-faint sm:block" data-test-id={testId ? `${testId}-subtitle` : undefined}>
+          /* The link's accessible name is the product name alone; the subtitle is
+             a visible qualifier, not part of "where does this link go". */
+          <p
+            className="hidden text-[12px] text-ink-faint sm:block"
+            aria-hidden="true"
+            data-test-id={testId ? `${testId}-subtitle` : undefined}
+          >
             {subtitle}
           </p>
         ) : null}

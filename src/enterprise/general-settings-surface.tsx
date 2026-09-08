@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ChangeEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { toast } from "../toast";
 import { Button } from "../primitives/button";
 import { Field, Input, Textarea } from "../primitives/field";
@@ -159,8 +159,16 @@ function GeneralLogoControl({
   onChange: (next: string | null) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  // A file input only fires `change` when the selection differs from what it
+  // already holds. Clearing it as soon as the File is captured keeps "remove,
+  // then pick the same file again" — and "retry after a rejected file" — working.
+  function clearNativeSelection() {
+    if (inputRef.current) inputRef.current.value = "";
+  }
   async function pickFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
+    clearNativeSelection();
     if (!file) return;
     if (!ALLOWED_LOGO_TYPES.has(file.type)) {
       setError(labels.logoInvalid);
@@ -190,6 +198,7 @@ function GeneralLogoControl({
           />
         ) : null}
         <input
+          ref={inputRef}
           type="file"
           accept="image/png,image/jpeg,image/webp"
           aria-label={labels.logoUpload}
@@ -205,6 +214,7 @@ function GeneralLogoControl({
             disabled={disabled}
             onClick={() => {
               setError(null);
+              clearNativeSelection();
               onChange(null);
             }}
             data-test-id="general-logo-remove"
@@ -292,7 +302,10 @@ function GeneralSettingsForm({
   onLocaleChange: (locale: EnterpriseGeneralSettingsLocale) => void;
 }) {
   const value = controller.value ?? EMPTY_VALUE;
-  const disabled = !controller.value || controller.loading;
+  // Saving disables every control, logo included: the response replaces the
+  // draft, so an edit typed while the PUT is in flight would be silently
+  // discarded. No editable control during a save means no edit to lose.
+  const disabled = !controller.value || controller.loading || controller.saving;
   return (
     <div className="space-y-5 rounded-md border border-hairline bg-paper p-4" data-test-id="app-settings-section">
       <GeneralLogoControl
@@ -373,6 +386,7 @@ export function EnterpriseGeneralSettingsSurface({
             variant="outline"
             size="sm"
             loading={controller.loading}
+            disabled={controller.saving}
             onClick={() => void controller.refresh()}
             data-test-id="general-settings-refresh"
           >
@@ -418,8 +432,16 @@ function InlineBody({
         className="mt-5"
         tone="error"
         message={labels.loadFailed}
-        actionLabel={labels.retry}
-        onAction={() => void controller.refresh()}
+        action={
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void controller.refresh()}
+            data-test-id="general-settings-refresh"
+          >
+            {labels.retry}
+          </Button>
+        }
       />
     );
   }

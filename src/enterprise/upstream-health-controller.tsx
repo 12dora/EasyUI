@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "../toast";
-import { InlineNotice } from "../primitives/inline-notice";
 import { EnterpriseUpstreamHealth, type UpstreamHealthLabels } from "./settings-surfaces";
 import type { EnterpriseIntegrationCard } from "./models";
 import { relativeTime } from "./relative-time";
-import { EnterprisePermissionDeniedState } from "./surface-helpers";
+import { EnterprisePermissionDeniedPage } from "./surface-helpers";
 
 export interface EnterpriseUpstreamHealthItem { dependency: string; displayName: string; status: string; checkedAt: string | null; summary: string; errorSummary: string; summaryCode?: string; summaryParams?: Record<string, string | number | boolean>; supported?: boolean; }
 export interface EnterpriseUpstreamHealthAdapter { load(): Promise<readonly EnterpriseUpstreamHealthItem[]>; runChecks(): Promise<readonly EnterpriseUpstreamHealthItem[]>; }
@@ -80,17 +79,19 @@ export function EnterpriseUpstreamHealthController({
   const runChecks = useCallback(async () => { if (!canManage || checking.current) return; checking.current = true; const request = ++seq.current; setState((current) => ({ ...current, checking: true })); try { const items = await adapter.runChecks(); toast.success(labels.checkSucceeded); if (request === seq.current) setState((current) => ({ ...current, checking: false, items, loadFailed: false, now: Date.now() })); } catch { toast.error(labels.checkFailed); if (request === seq.current) setState((current) => ({ ...current, checking: false })); } finally { checking.current = false; } }, [adapter, canManage, labels.checkFailed, labels.checkSucceeded]);
   if (!canView) {
     // FE-FB-02 / DECISIONS ruling 4: page-state EmptyState (title + detail + home), no toast, no redirect.
-    if (toastMode) {
-      return (
-        <EnterprisePermissionDeniedState
-          title={labels.permissionDenied}
-          description={labels.permissionDeniedDetail}
-          actions={permissionDeniedActions}
-          defaultActionLabel={labels.permissionDeniedAction}
-        />
-      );
-    }
-    return <InlineNotice tone="error" message={labels.permissionDenied} data-test-id="permission-denied" />;
+    // The page header stays outside the gate so the route keeps exactly one H1.
+    return (
+      <EnterprisePermissionDeniedPage
+        pageTitle={labels.title}
+        pageDescription={labels.description}
+        sectionTestId={testId ?? "upstream-health-page"}
+        feedbackMode={feedbackMode}
+        deniedTitle={labels.permissionDenied}
+        deniedDetail={labels.permissionDeniedDetail}
+        actions={permissionDeniedActions}
+        defaultActionLabel={labels.permissionDeniedAction}
+      />
+    );
   }
   const cards: EnterpriseIntegrationCard[] = state.items.map((item) => {
     const status = normalizeStatus(item.status);

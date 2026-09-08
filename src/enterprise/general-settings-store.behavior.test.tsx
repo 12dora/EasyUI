@@ -108,6 +108,70 @@ describe("useEnterpriseGeneralSettings", () => {
     expect(view.host.textContent).toBe("培训中心培训中心");
   });
 
+  it("keeps a saved value when the GET it raced with resolves afterwards", async () => {
+    let resolveLoad: (value: EnterpriseGeneralSettingsValue) => void = () => undefined;
+    const load = vi.fn(
+      () => new Promise<EnterpriseGeneralSettingsValue>((resolve) => { resolveLoad = resolve; }),
+    );
+    view = await mount(
+      <>
+        <BrandProbe load={load} />
+        <BrandProbe load={load} />
+      </>,
+    );
+    await settle(10);
+
+    await act(async () => primeEnterpriseGeneralSettings({ ...SETTINGS, titleZh: "已保存" }));
+    await settle(10);
+    expect(view.host.textContent).toBe("已保存已保存");
+
+    await act(async () => { resolveLoad({ ...SETTINGS, titleZh: "旧名称" }); });
+    await settle(20);
+    expect(view.host.textContent).toBe("已保存已保存");
+
+    // The shared cache must be primed too, or the next mount re-reads the stale name.
+    const later = vi.fn().mockResolvedValue({ ...SETTINGS, titleZh: "旧名称" });
+    await view.rerender(<BrandProbe load={later} />);
+    await settle(20);
+    expect(later).not.toHaveBeenCalled();
+    expect(view.host.textContent).toBe("已保存");
+  });
+
+  it("does not report an error when the GET a save abandoned rejects afterwards", async () => {
+    let rejectLoad: (reason: unknown) => void = () => undefined;
+    const load = vi.fn(
+      () => new Promise<EnterpriseGeneralSettingsValue>((_resolve, reject) => { rejectLoad = reject; }),
+    );
+    view = await mount(<BrandProbe load={load} />);
+    await settle(10);
+
+    await act(async () => primeEnterpriseGeneralSettings({ ...SETTINGS, titleZh: "已保存" }));
+    await settle(10);
+
+    await act(async () => { rejectLoad(new Error("offline")); });
+    await settle(20);
+    expect(view.host.textContent).toBe("已保存");
+  });
+
+  it("abandons an in-flight request on reset so the next consumer refetches", async () => {
+    let resolveLoad: (value: EnterpriseGeneralSettingsValue) => void = () => undefined;
+    const load = vi.fn(
+      () => new Promise<EnterpriseGeneralSettingsValue>((resolve) => { resolveLoad = resolve; }),
+    );
+    view = await mount(<BrandProbe load={load} />);
+    await settle(10);
+
+    resetEnterpriseGeneralSettings();
+    await act(async () => { resolveLoad({ ...SETTINGS, titleZh: "旧名称" }); });
+    await settle(20);
+
+    const second = vi.fn().mockResolvedValue({ ...SETTINGS, titleZh: "新名称" });
+    await view.rerender(<BrandProbe load={second} />);
+    await settle(20);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(view.host.textContent).toBe("新名称");
+  });
+
   it("reports a load failure instead of caching it", async () => {
     const load = vi.fn().mockRejectedValue(new Error("offline"));
     view = await mount(<BrandProbe load={load} />);
