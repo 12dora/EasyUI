@@ -14,7 +14,11 @@ import {
   type EnterpriseGeneralSettingsAdapter,
   type EnterpriseGeneralSettingsValue,
 } from "./general-settings-surface";
-import { ENTERPRISE_GENERAL_UPDATED_EVENT, resetEnterpriseGeneralSettings } from "./general-settings-store";
+import {
+  ENTERPRISE_GENERAL_UPDATED_EVENT,
+  resetEnterpriseGeneralSettings,
+  resolveEnterpriseBrand,
+} from "./general-settings-store";
 import { byTestId, change, click, fill, installReducedMotion, mount, settle, type MountedView } from "./behavior-test-utils";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -37,6 +41,20 @@ function makeAdapter(value: EnterpriseGeneralSettingsValue = LOADED): Enterprise
     load: vi.fn().mockResolvedValue(value),
     save: vi.fn().mockImplementation((next: EnterpriseGeneralSettingsValue) => Promise.resolve(next)),
   };
+}
+
+const HOST_LOGO = "/assets/brand/jiefa_logo.webp";
+
+const NO_CUSTOM_LOGO: EnterpriseGeneralSettingsValue = { ...LOADED, logoDataUrl: null };
+
+/** Stand-in for a host shell: branding itself is how the package learns the default logo. */
+function HostShellProbe() {
+  const brand = resolveEnterpriseBrand(null, "zh-CN", { title: "学习工作台", logoSrc: HOST_LOGO });
+  return <span data-test-id="host-brand">{brand.title}</span>;
+}
+
+function logoPreview(host: ParentNode): HTMLImageElement {
+  return byTestId(host, "general-logo-preview") as HTMLImageElement;
 }
 
 function attachFile(input: HTMLInputElement, file: File): void {
@@ -357,11 +375,100 @@ describe("EnterpriseGeneralSettingsSurface logo read race", () => {
   });
 });
 
+describe("EnterpriseGeneralSettingsSurface logo preview", () => {
+  it("previews the host default logo, captioned, while no custom logo is stored", async () => {
+    const adapter = makeAdapter(NO_CUSTOM_LOGO);
+    view = await mount(
+      <EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} defaultLogoSrc={HOST_LOGO} />,
+    );
+    await settle(20);
+
+    // Without this the administrator cannot see which logo the application is using.
+    expect(logoPreview(view.host).getAttribute("src")).toBe(HOST_LOGO);
+    expect(logoPreview(view.host).getAttribute("data-logo-source")).toBe("default");
+    expect(byTestId(view.host, "general-logo-caption").textContent).toBe(labels.logoDefaultCaption);
+    // Nothing to remove: the default is not the administrator's to clear.
+    expect(view.host.querySelector("[data-test-id='general-logo-remove']")).toBeNull();
+  });
+
+  it("captions an uploaded logo as custom and returns to the default preview on remove", async () => {
+    const adapter = makeAdapter();
+    view = await mount(
+      <EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} defaultLogoSrc={HOST_LOGO} />,
+    );
+    await settle(20);
+
+    expect(logoPreview(view.host).getAttribute("src")).toBe(LOADED.logoDataUrl);
+    expect(logoPreview(view.host).getAttribute("data-logo-source")).toBe("custom");
+    expect(byTestId(view.host, "general-logo-caption").textContent).toBe(labels.logoCustomCaption);
+
+    await click(byTestId(view.host, "general-logo-remove"));
+    await settle(10);
+
+    // Reset means "back to the default logo", not "back to no preview at all".
+    expect(logoPreview(view.host).getAttribute("src")).toBe(HOST_LOGO);
+    expect(byTestId(view.host, "general-logo-caption").textContent).toBe(labels.logoDefaultCaption);
+
+    await click(byTestId(view.host, "app-settings-save"));
+    await settle(20);
+    expect(adapter.save).toHaveBeenCalledWith({ ...LOADED, logoDataUrl: null });
+  });
+
+  it("learns the default logo from the host shell's brand fallback, without a prop", async () => {
+    const adapter = makeAdapter(NO_CUSTOM_LOGO);
+    view = await mount(
+      <>
+        <HostShellProbe />
+        <EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} />
+      </>,
+    );
+    await settle(20);
+
+    expect(logoPreview(view.host).getAttribute("src")).toBe(HOST_LOGO);
+    expect(byTestId(view.host, "general-logo-caption").textContent).toBe(labels.logoDefaultCaption);
+  });
+
+  it("shows no preview when neither a custom nor a host logo is known", async () => {
+    const adapter = makeAdapter(NO_CUSTOM_LOGO);
+    view = await mount(<EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} />);
+    await settle(20);
+
+    expect(view.host.querySelector("[data-test-id='general-logo-preview']")).toBeNull();
+    expect(view.host.querySelector("[data-test-id='general-logo-caption']")).toBeNull();
+  });
+});
+
+describe("EnterpriseGeneralSettingsSurface locale tabs", () => {
+  it("replays the panel enter animation when the language tab changes", async () => {
+    const adapter = makeAdapter();
+    view = await mount(<EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} />);
+    await settle(20);
+
+    const chinesePanel = view.host.querySelector("[role='tabpanel']");
+    expect(chinesePanel?.className).toContain("easy-tab-panel-enter");
+
+    await click(byTestId(view.host, "general-locale-tab-en"));
+    await settle(10);
+    const englishPanel = view.host.querySelector("[role='tabpanel']");
+    // A keyed panel: the swap remounts it, which is what restarts the animation.
+    expect(englishPanel).not.toBe(chinesePanel);
+    expect(englishPanel?.className).toContain("easy-tab-panel-enter");
+    expect(byTestId(view.host, "general-title-en")).toBeTruthy();
+  });
+});
+
 describe("general settings copy", () => {
   it("tells the administrator a blank subtitle falls back to the default, not that it hides it", () => {
     const zh = createEnterpriseLabelCatalog("zh-CN", { appName: "测试", appDescription: "测试" }, "business").generalSettings;
     const en = createEnterpriseLabelCatalog("en", { appName: "Test", appDescription: "Test" }, "business").generalSettings;
     expect(zh.subtitleHint).toBe("留空使用默认副标题。");
     expect(en.subtitleHint).toBe("Leave blank to use the default subtitle.");
+  });
+
+  it("names the logo currently in use in both languages", () => {
+    const zh = createEnterpriseLabelCatalog("zh-CN", { appName: "测试", appDescription: "测试" }, "business").generalSettings;
+    const en = createEnterpriseLabelCatalog("en", { appName: "Test", appDescription: "Test" }, "business").generalSettings;
+    expect([zh.logoDefaultCaption, zh.logoCustomCaption]).toEqual(["当前使用默认 Logo", "自定义 Logo"]);
+    expect([en.logoDefaultCaption, en.logoCustomCaption]).toEqual(["Using default logo", "Custom logo"]);
   });
 });

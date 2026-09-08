@@ -9,7 +9,7 @@ import { AsyncStateTransition } from "../primitives/async-state-transition";
 import { PageHeader } from "../primitives/page-header";
 import { TabList, TabPanel, type TabDefinition } from "../primitives/tabs";
 import { EnterpriseSettingsFormSkeleton } from "./surface-helpers";
-import { primeEnterpriseGeneralSettings } from "./general-settings-store";
+import { primeEnterpriseGeneralSettings, useEnterpriseDefaultBrandLogo } from "./general-settings-store";
 
 export interface EnterpriseGeneralSettingsValue {
   titleZh: string;
@@ -45,6 +45,10 @@ export interface EnterpriseGeneralSettingsLabels {
   logoHint: string;
   logoUpload: string;
   logoRemove: string;
+  /** Caption under the preview while the host default logo is in use. */
+  logoDefaultCaption: string;
+  /** Caption under the preview while an uploaded logo is in use. */
+  logoCustomCaption: string;
   logoInvalid: string;
   logoTooLarge: string;
   save: string;
@@ -150,12 +154,15 @@ function readDataUrl(file: File): Promise<string> {
 function GeneralLogoControl({
   labels,
   logoDataUrl,
+  defaultLogoSrc,
   disabled,
   onChange,
   onReadPendingChange,
 }: {
   labels: EnterpriseGeneralSettingsLabels;
   logoDataUrl: string | null;
+  /** The host's own logo, previewed while no custom one is stored. */
+  defaultLogoSrc: string | null;
   disabled: boolean;
   onChange: (next: string | null) => void;
   /** Reported up so Save can wait for the file to finish being read. */
@@ -208,17 +215,28 @@ function GeneralLogoControl({
       if (request === readGeneration.current) onReadPendingChange(false);
     }
   }
+  // The control always shows what is live: the uploaded logo when there is one,
+  // otherwise the host default the application is rendering right now. Removing
+  // an uploaded logo therefore returns to the default preview, not to nothing.
+  const custom = logoDataUrl && logoDataUrl.length > 0 ? logoDataUrl : null;
+  const previewSrc = custom ?? defaultLogoSrc;
   return (
     <Field label={labels.logo} hint={labels.logoHint} error={error}>
       <div className="flex flex-wrap items-center gap-3">
-        {logoDataUrl ? (
-          <img
-            src={logoDataUrl}
-            alt=""
-            aria-hidden="true"
-            className="h-9 w-auto max-w-[160px] shrink-0 object-contain"
-            data-test-id="general-logo-preview"
-          />
+        {previewSrc ? (
+          <span className="flex shrink-0 items-center gap-2">
+            <img
+              src={previewSrc}
+              alt=""
+              aria-hidden="true"
+              className="h-9 w-auto max-w-[160px] shrink-0 object-contain"
+              data-test-id="general-logo-preview"
+              data-logo-source={custom ? "custom" : "default"}
+            />
+            <span className="text-[12px] text-ink-faint" data-test-id="general-logo-caption">
+              {custom ? labels.logoCustomCaption : labels.logoDefaultCaption}
+            </span>
+          </span>
         ) : null}
         <input
           ref={inputRef}
@@ -230,7 +248,7 @@ function GeneralLogoControl({
           className="text-[13px] text-ink-soft file:mr-3 file:rounded-[2px] file:border file:border-ink/15 file:bg-paper file:px-3 file:py-1.5 file:text-[13px] file:text-ink"
           data-test-id="general-logo-input"
         />
-        {logoDataUrl ? (
+        {custom ? (
           <Button
             variant="outline"
             size="sm"
@@ -307,7 +325,7 @@ function localeTabs(labels: EnterpriseGeneralSettingsLabels, activeLocale: Enter
   return locales.map((locale) => ({
     key: locale,
     label: labels.localeTabs[locale],
-    className: `shrink-0 border-b-2 px-4 py-2 text-[12px] font-medium ${
+    className: `shrink-0 border-b-2 px-4 py-2 text-[12px] font-medium transition-colors ${
       activeLocale === locale ? "border-ink text-ink" : "border-transparent text-ink-faint hover:text-ink-soft"
     }`,
     dataAttributes: { "data-test-id": `general-locale-tab-${locale}` },
@@ -318,11 +336,13 @@ function GeneralSettingsForm({
   labels,
   controller,
   locale,
+  defaultLogoSrc,
   onLocaleChange,
 }: {
   labels: EnterpriseGeneralSettingsLabels;
   controller: GeneralSettingsController;
   locale: EnterpriseGeneralSettingsLocale;
+  defaultLogoSrc: string | null;
   onLocaleChange: (locale: EnterpriseGeneralSettingsLocale) => void;
 }) {
   const value = controller.value ?? EMPTY_VALUE;
@@ -340,6 +360,7 @@ function GeneralSettingsForm({
       <GeneralLogoControl
         labels={labels}
         logoDataUrl={value.logoDataUrl}
+        defaultLogoSrc={defaultLogoSrc}
         disabled={disabled}
         onChange={(next) => controller.update({ logoDataUrl: next })}
         onReadPendingChange={setLogoReadPending}
@@ -353,7 +374,9 @@ function GeneralSettingsForm({
           onSelect={(key) => onLocaleChange(key as EnterpriseGeneralSettingsLocale)}
           className="flex overflow-x-auto border-b border-ink/10"
         />
-        <TabPanel idBase={LOCALE_TABS_ID} activeKey={locale} className="mt-5">
+        {/* Keyed by the locale so switching tabs remounts the panel and replays the
+            enter animation (`--duration-fast`, neutralised under reduced motion). */}
+        <TabPanel key={locale} idBase={LOCALE_TABS_ID} activeKey={locale} className="mt-5 easy-tab-panel-enter">
           <GeneralLocaleFields
             labels={labels}
             locale={locale}
@@ -382,6 +405,10 @@ function GeneralSettingsForm({
  * Complete "general" application settings page: brand logo, per-language app
  * title / subtitle / footer HTML, one Save.
  *
+ * The Logo control always previews the logo in use: the uploaded one, or the
+ * host default otherwise. That default comes from `defaultLogoSrc`, and failing
+ * that from the brand fallback the host's shell already resolves.
+ *
  * The surface owns its own `PageHeader` and is therefore the page's only H1 —
  * hosts wrap it in `EnterpriseSettingsPageFrame`, which no longer paints a
  * parent "Settings" heading of its own.
@@ -395,16 +422,31 @@ export function EnterpriseGeneralSettingsSurface({
   adapter,
   labels,
   feedbackMode = "inline",
+  defaultLogoSrc,
 }: {
   adapter: EnterpriseGeneralSettingsAdapter;
   labels: EnterpriseGeneralSettingsLabels;
   feedbackMode?: "inline" | "toast";
+  /**
+   * The host's bundled default logo, previewed while no custom logo is stored.
+   * Optional: a host whose shell brands itself through `resolveEnterpriseBrand`
+   * is already known to the package and needs no wiring here.
+   */
+  defaultLogoSrc?: string | null;
 }) {
   const toastMode = feedbackMode === "toast";
   const controller = useGeneralSettingsController(adapter, labels, toastMode);
   const [locale, setLocale] = useState<EnterpriseGeneralSettingsLocale>("zh-CN");
+  const registeredLogo = useEnterpriseDefaultBrandLogo();
+  const hostLogo = defaultLogoSrc ?? registeredLogo;
   const form = (
-    <GeneralSettingsForm labels={labels} controller={controller} locale={locale} onLocaleChange={setLocale} />
+    <GeneralSettingsForm
+      labels={labels}
+      controller={controller}
+      locale={locale}
+      defaultLogoSrc={hostLogo}
+      onLocaleChange={setLocale}
+    />
   );
   const header = (
     <PageHeader

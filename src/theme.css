@@ -262,6 +262,10 @@ select {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes easyTabPanelIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
 .animate-fade-up { animation: fadeUp var(--duration-slow) var(--ease-out-paper) both; }
 .animate-fade-in { animation: fadeIn var(--duration-base) var(--ease-out-paper) both; }
@@ -276,6 +280,12 @@ select {
   );
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* Tab panel swap (in-page tab strips) — MOTION.tab / --duration-fast.
+   The panel is keyed by the active tab, so remounting it replays the enter. */
+.easy-tab-panel-enter {
+  animation: easyTabPanelIn var(--duration-fast) var(--ease-out-paper) both;
 }
 
 /* Nav panel enter (Sidebar / MobileNav drill) — MOTION.list / --duration-fast */
@@ -427,6 +437,7 @@ select {
   .easy-toast-exit,
   .easy-page-header-enter,
   .easy-section-enter,
+  .easy-tab-panel-enter,
   .easy-popover-enter,
   .easy-popover-exit,
   .easy-dialog-overlay-enter,

@@ -137,15 +137,72 @@ export function useEnterpriseGeneralSettings(
   return { settings, error };
 }
 
-/** Test/host seam: drop the module cache so the next consumer refetches. */
+/**
+ * Test/host seam: drop the module cache so the next consumer refetches. The
+ * remembered host default logo goes with it; the next brand resolution — the
+ * topbar renders on every page — registers it again.
+ */
 export function resetEnterpriseGeneralSettings(): void {
   cachedSettings = null;
+  defaultBrandLogo = null;
   invalidateInFlight();
+}
+
+// The host's own default logo, learned from the brand fallback rather than from
+// a second piece of host wiring: every shell already hands its bundled asset to
+// `resolveEnterpriseBrand`. The general settings page reads it back so the Logo
+// control can preview the logo the application is actually rendering while no
+// custom one is stored.
+let defaultBrandLogo: string | null = null;
+const defaultBrandLogoSubscribers = new Set<(src: string | null) => void>();
+
+/**
+ * Remember the host's default logo. Called by `resolveEnterpriseBrand`; hosts
+ * only need this directly when they brand a shell without that resolver.
+ */
+export function registerEnterpriseDefaultBrandLogo(src: string | null | undefined): void {
+  const next = nonEmpty(src);
+  if (next === defaultBrandLogo) return;
+  defaultBrandLogo = next;
+  const listeners = [...defaultBrandLogoSubscribers];
+  // Registration happens while the topbar renders, so a synchronous notification
+  // would update the settings page from inside another component's render pass.
+  queueMicrotask(() => {
+    for (const listener of listeners) listener(next);
+  });
+}
+
+/** The remembered host default logo, or null when nothing has branded a shell yet. */
+export function getEnterpriseDefaultBrandLogo(): string | null {
+  return defaultBrandLogo;
+}
+
+/**
+ * Subscribe to the remembered host default logo.
+ *
+ * The first render always reports `null` so a server-rendered page and its
+ * hydration agree; the value arrives in an effect, and later registrations
+ * (a shell mounted after this consumer) are pushed in.
+ */
+export function useEnterpriseDefaultBrandLogo(): string | null {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    setSrc(defaultBrandLogo);
+    defaultBrandLogoSubscribers.add(setSrc);
+    return () => {
+      defaultBrandLogoSubscribers.delete(setSrc);
+    };
+  }, []);
+  return src;
 }
 
 /**
  * Per-locale brand for the topbar slot. Empty settings strings mean "use the
  * host default", so each field falls back independently.
+ *
+ * The fallback logo is also remembered (`registerEnterpriseDefaultBrandLogo`):
+ * it is the only place the package is told which logo the host ships, and the
+ * general settings page needs it to preview the logo currently in use.
  */
 export function resolveEnterpriseBrand(
   settings: EnterpriseGeneralSettingsValue | null,
@@ -154,6 +211,7 @@ export function resolveEnterpriseBrand(
 ): EnterpriseResolvedBrand {
   const source = settings ?? BLANK_SETTINGS;
   const english = locale === "en";
+  registerEnterpriseDefaultBrandLogo(fallback.logoSrc);
   return {
     title: nonEmpty(english ? source.titleEn : source.titleZh) ?? fallback.title,
     subtitle: nonEmpty(english ? source.subtitleEn : source.subtitleZh) ?? nonEmpty(fallback.subtitle),

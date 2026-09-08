@@ -38,6 +38,11 @@ interface EnterpriseGeneralSettingsValue {
 </EnterpriseSettingsPageFrame>
 ```
 
+`defaultLogoSrc?: string | null`(可选)——宿主自带的默认 Logo,用于「没上传自定义 Logo 时预览
+当前真正在用的那张图」。**通常不用传**:宿主的外壳已经把默认 Logo 作为品牌兜底交给
+`resolveEnterpriseBrand`,本包会记住它(见 §3)。只有当这一页不在带顶栏的外壳里渲染、或者宿主
+想覆盖预览用的图时才传。
+
 ```ts
 interface EnterpriseGeneralSettingsAdapter {
   load(): Promise<EnterpriseGeneralSettingsValue>;
@@ -48,6 +53,16 @@ interface EnterpriseGeneralSettingsAdapter {
 
 页面结构:自己的 `PageHeader`(**本页唯一的 H1**)→ Logo 控件(文件选择 + 预览 + 移除)→
 语言页签 `zh-CN` / `en`,每个页签里是应用名称、副标题、页脚 HTML → 一个保存按钮管全部。
+
+Logo 控件**始终预览当前生效的 Logo**:传了自定义 Logo 就预览它,说明文字为「自定义 Logo」/
+"Custom logo",旁边给「移除」;没有自定义 Logo 时预览宿主默认 Logo,说明文字为
+「当前使用默认 Logo」/ "Using default logo",且不显示「移除」(默认值不归管理员清)。
+点「移除」回到默认 Logo 的预览,而不是变成空白。两条说明文案来自
+`labels.logoCustomCaption` / `labels.logoDefaultCaption`,`createEnterpriseLabelCatalog` 已给出中英文。
+既没有自定义 Logo、宿主默认 Logo 也未知时,不画预览也不画说明。
+
+语言页签切换有一段轻微的淡入上移(`--duration-fast`,`.easy-tab-panel-enter`),
+`prefers-reduced-motion` 下自动关闭。
 
 `feedbackMode`:
 
@@ -70,6 +85,7 @@ interface EnterpriseGeneralSettingsAdapter {
 | 副标题 | `general-subtitle-zh` / `general-subtitle-en` |
 | 页脚 HTML | `footer-html-zh` / `footer-html-en`(沿用旧名) |
 | Logo | `general-logo-input` / `general-logo-preview` / `general-logo-remove` |
+| Logo 说明 | `general-logo-caption`(预览图上带 `data-logo-source="custom" \| "default"`) |
 | 保存 / 刷新 | `app-settings-save`(沿用旧名) / `general-settings-refresh` |
 
 文案来自 `createEnterpriseLabelCatalog(...).generalSettings`(类型 `EnterpriseGeneralSettingsLabels`,
@@ -130,6 +146,13 @@ const footerHtml = resolveEnterpriseFooterHtml(settings, locale);
 - `resetEnterpriseGeneralSettings()` 清缓存,给测试与登出流程用。
 - `resolveEnterpriseBrand` 逐字段回退:该语言的值非空就用它,否则用宿主默认;
   `logoSrc` = `logoDataUrl` 非空则用它,否则 `fallback.logoSrc ?? null`。
+- `resolveEnterpriseBrand` 顺手把 `fallback.logoSrc` 记进模块级的「宿主默认 Logo」
+  (`registerEnterpriseDefaultBrandLogo` / `getEnterpriseDefaultBrandLogo` /
+  `useEnterpriseDefaultBrandLogo`),通用设置页据此预览「当前在用的 Logo」。因为每个宿主的顶栏
+  本来就要解析品牌,所以**不需要新接线**;不走这个解析器的宿主可以自己调
+  `registerEnterpriseDefaultBrandLogo(src)`,或者给设置页传 `defaultLogoSrc`。
+  `useEnterpriseDefaultBrandLogo()` 首帧一律返回 `null`(SSR 与水合一致),值在 effect 里补上。
+- `resetEnterpriseGeneralSettings()` 同时清掉这个默认 Logo;下一次品牌解析会重新登记。
 - `resolveEnterpriseFooterHtml` 没配置时返回 `undefined`,让 `EnterpriseConfiguredFooter` 画回退文案。
   `{year}` 始终是 `EnterpriseConfiguredFooter` 的渲染期替换,不会写进存储值。
 
