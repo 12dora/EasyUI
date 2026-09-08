@@ -1,4 +1,4 @@
-import type { EnterpriseFooterSettingsLabels } from "./footer-settings-surface";
+import type { EnterpriseGeneralSettingsLabels } from "./general-settings-surface";
 import type { EnterpriseLoginControllerLabels, EnterpriseOidcCompleteLabels } from "./auth-controller";
 import type { EnterpriseAccessSettingsLabels } from "./access-settings-surface";
 import type { EnterpriseDeliveryStatusLabels } from "./delivery-status";
@@ -17,7 +17,7 @@ export interface EnterpriseCatalogBrand {
 export interface EnterpriseStaticLabelCatalog {
   locale: EnterpriseCatalogLocale;
   metadata: { title: string; description: string };
-  navigation: { menu: string; close: string; backToMain: string; settings: string; security: string; access: string; upstream: string; footer: string; dashboard: string; backToSecurity: string };
+  navigation: { menu: string; close: string; backToMain: string; settings: string; security: string; access: string; upstream: string; general: string; dashboard: string; backToSecurity: string };
   common: { permissionDenied: string; loading: string; retry: string; notAvailable: string; permissionCount: (count: number) => string };
   shell: EnterpriseShellLabels;
   login: EnterpriseLoginControllerLabels;
@@ -27,7 +27,9 @@ export interface EnterpriseStaticLabelCatalog {
   /** Notification outbox delivery wording, shared by every host that sends through EasyAuth notify. */
   delivery: EnterpriseDeliveryStatusLabels;
   notifications: { title: string; description: string; empty: string; loadFailed: string; retry: string; dismiss: string };
-  footerSettings: EnterpriseFooterSettingsLabels;
+  generalSettings: EnterpriseGeneralSettingsLabels;
+  /** User-menu identity line; see `resolveEnterpriseIdentityLabel`. */
+  identity: { admin: string; user: string; guest: string };
   public: { loginEyebrow: string; loggedOutTitle: string; loggedOutDescription: string; loginAgain: string; footer: string };
   oidcComplete: EnterpriseOidcCompleteLabels;
 }
@@ -57,8 +59,8 @@ export function createEnterpriseLabelCatalog(
         authorizationTitle: locale === "en" ? "Permissions service" : "权限服务",
         authorizationDescription:
           locale === "en"
-            ? "Business permission service connection status."
-            : "业务权限服务连接状态。",
+            ? "Business permissions and subject status."
+            : "业务权限与主体状态。",
         credential: locale === "en" ? "Service credential" : "服务凭据",
       },
     },
@@ -158,7 +160,7 @@ function legacyCatalog(catalog: EnterpriseStaticLabelCatalog): EnterpriseStaticL
           warning: "连接存在警告",
           unhealthy: "连接异常",
           unknown: "状态未知",
-          notChecked: "尚未记录健康快照",
+          notChecked: "尚未检查",
           notSupported: "当前宿主不提供此能力",
         },
       },
@@ -260,7 +262,7 @@ function legacyCatalog(catalog: EnterpriseStaticLabelCatalog): EnterpriseStaticL
         warning: "Connection has warnings",
         unhealthy: "Connection unhealthy",
         unknown: "Status unknown",
-        notChecked: "No health snapshot recorded",
+        notChecked: "Not checked",
         notSupported: "This host does not provide this capability",
       },
     },
@@ -283,7 +285,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
   return {
     locale: "zh-CN",
     metadata: { title: brand.appName, description: brand.appDescription },
-    navigation: { menu: "菜单", close, backToMain: "返回主菜单", settings: "设置", security: "安全", access: "工作账号与访问", upstream: "系统服务", footer: "页脚", dashboard: "工作台", backToSecurity: "返回安全设置" },
+    navigation: { menu: "菜单", close, backToMain: "返回主菜单", settings: "设置", security: "安全", access: "工作账号与访问", upstream: "系统服务", general: "通用", dashboard: "工作台", backToSecurity: "返回安全设置" },
     common: { permissionDenied, loading, retry, notAvailable: "—", permissionCount: (count) => `${count} 项权限` },
     shell: { switchLanguage: "切换语言", notifications: "通知", notificationsEmpty: "暂无通知", notificationsLoadFailed: "通知加载失败", notificationsClearAll: "全部清除", notificationsViewAll: "查看全部", notificationsDismiss: "忽略", userMenu: "用户菜单", securitySettings: "安全设置", logout: "退出登录", loggingOut: "正在退出" },
     login: {
@@ -302,14 +304,14 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
     },
     access: {
       page: { title: "工作账号与访问", tabsAriaLabel: "工作账号与访问", description: "管理工作账号登录与业务权限服务。", loginTab: "工作账号登录", permissionsTab: "业务权限", authentikTitle: "工作账号登录", authentikDescription: "公司统一身份登录服务。", easyAuthTitle: "权限服务", easyAuthDescription: "业务权限、数据范围与菜单授权。", configured: "已配置", notConfigured: "未配置", endpoint: "服务地址", lastChecked: "最近检查" },
-      configuration: { loading: "正在加载配置", loadFailed: "配置加载失败", saveFailed: "配置保存失败", saved: "配置已保存", save: "保存", enabled: "启用工作账号登录", configured: "已配置（不回显）", notConfigured: "未配置", clearSecret: "清除已保存凭据", authorityHint: "留空会保留现有凭据；更改服务地址会清除旧凭据。", oidcTitle: "工作账号登录配置", oidcDescription: "配置工作账号登录与回调地址。", issuer: "登录服务地址", clientId: "应用标识", clientSecret: "应用密钥", scopes: "授权范围", authorizationEndpoint: "授权地址", tokenEndpoint: "令牌地址", jwksUri: "密钥集地址", userinfoEndpoint: "用户信息地址", redirectBaseUrl: "回调站点地址", redirectUri: "回调地址", frontendBaseUrl: "前端地址", serverBaseUrl: "服务端地址", easyAuthTitle: "权限服务配置", easyAuthDescription: "配置权限服务地址、应用凭据与权限申请入口。", baseUrl: "权限服务地址", appKey: "应用标识", credential: "应用凭据", webhookSecret: "Webhook 密钥", webhookSecretHint: "与 EasyAuth 应用 webhook 密钥一致，用于校验授权事件签名。", permissionRequestUrl: "权限申请地址", discover: "自动发现", connectionTest: "连接测试", advancedTitle: "高级管理员配置", advancedDescription: "协议端点等高级项，仅管理员需要。", advancedShow: "展开", advancedHide: "收起", operationSucceeded: "操作成功", operationFailed: "操作失败", guideAriaLabel: "查看 {field} 说明", guides: {} },
-      authorization: { ...authorizationChinese(close, loading), capabilities: "能力" },
+      configuration: { loading: "正在加载配置", loadFailed: "配置加载失败", saveFailed: "配置保存失败", saved: "配置已保存", save: "保存", enabled: "启用工作账号登录", configured: "已配置（不回显）", notConfigured: "未配置", clearSecret: "清除已保存凭据", authorityHint: "留空会保留现有凭据；更改服务地址会清除旧凭据。", oidcTitle: "工作账号登录配置", oidcDescription: "配置工作账号登录与回调地址。", issuer: "登录服务地址", clientId: "应用标识", clientSecret: "应用密钥", scopes: "授权范围", authorizationEndpoint: "授权地址", tokenEndpoint: "令牌地址", jwksUri: "密钥集地址", userinfoEndpoint: "用户信息地址", redirectBaseUrl: "回调站点地址", redirectUri: "回调地址", frontendBaseUrl: "前端地址", serverBaseUrl: "服务端地址", easyAuthTitle: "权限服务配置", easyAuthDescription: "配置权限服务地址、应用凭据与权限申请入口。", baseUrl: "权限服务地址", appKey: "应用标识", credential: "应用凭据", webhookSecret: "Webhook 密钥", webhookSecretHint: "须与权限服务的事件密钥一致。", permissionRequestUrl: "权限申请地址", discover: "自动发现", connectionTest: "连接测试", advancedTitle: "高级管理员配置", advancedDescription: "协议端点等高级项，仅管理员需要。", advancedShow: "展开", advancedHide: "收起", operationSucceeded: "操作成功", operationFailed: "操作失败", guideAriaLabel: "查看 {field} 说明", guides: {} },
+      authorization: authorizationChinese(close, loading),
       directory: {
-        title: "用户目录同步", description: "从 EasyAuth 用户目录同步花名册，作为本系统人员名单的唯一事实来源。",
+        title: "用户目录同步", description: "从用户目录同步花名册。",
         save: "保存", enabled: "启用用户目录同步", baseUrl: "目录服务地址", appKey: "应用标识",
         credential: "目录凭据", credentialHint: "留空会保留现有凭据；目录凭据必须与权限凭据分开申请。",
         configured: "已配置（不回显）", notConfigured: "未配置", clearSecret: "清除已保存凭据",
-        authMode: "认证方式", authModes: { static_app_token: "应用静态令牌", oauth_client_credentials: "OAuth 客户端凭据" },
+        authMode: "认证方式", authModes: { static_app_token: "应用静态凭据", oauth_client_credentials: "OAuth 客户端凭据" },
         syncInterval: "同步间隔（分钟）", connectionTest: "测试连接", syncNow: "立即同步",
         operationSucceeded: "操作成功", operationFailed: "操作失败",
         lastSyncTitle: "最近一次同步", lastSyncNever: "尚未同步过。", lastSyncAt: "同步时间",
@@ -326,7 +328,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
         trustUnchanged: "本次同步没有完成，本地名单未改动，也没有停用任何人。",
         trustNotConfigured: "尚未读取目录，本地名单未做任何改动。",
         incomplete: "没有读完整份花名册（分页未取完，或部分来源不可用）。",
-        stale: "上游快照已过期，数据可能不是最新的。",
+        stale: "目录数据已过期。",
         counts: { upstreamTotal: "目录人数", created: "新增", updated: "更新", deactivated: "停用", unmapped: "无登录账号" },
         unmappedHint: "“无登录账号”指目录里没有对应登录身份的人：他们会被建档，可以作为负责人或审批人，但无法登录本系统。",
         errorDetail: "错误详情", notAvailable: "—",
@@ -335,7 +337,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       permissionDeniedDetail,
       permissionDeniedAction,
     },
-    upstream: { title: "系统服务", description: "查看登录与权限等系统服务的运行状态。", refresh: "立即刷新", refreshing: "正在刷新", empty: "暂无服务", lastChecked: "最近检查", endpoint: "地址", loadFailed: "系统服务状态加载失败", checkSucceeded: "状态检查完成", checkFailed: "状态检查失败", permissionDenied: "当前账号没有访问系统服务状态的权限。", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `检查于 ${relative}`, checkedAtNever: "尚未检查", status: { healthy: "正常", warning: "警告", unhealthy: "异常", unknown: "未知" }, dependencyNames: { database: "数据库", easyauth: "权限服务", authentik: "工作账号登录", authentik_directory: "用户目录", scheduler: "定时任务" }, summaries: { healthy: "运行正常", warning: "需要关注", unhealthy: "服务异常", unknown: "状态未知", notChecked: "尚未检查", notSupported: "当前环境不支持此服务" } },
+    upstream: { title: "系统服务", description: "查看登录与权限等系统服务的运行状态。", refresh: "立即刷新", refreshing: "正在刷新", empty: "暂无服务", lastChecked: "最近检查", endpoint: "地址", loadFailed: "系统服务状态加载失败", checkSucceeded: "状态检查完成", checkFailed: "状态检查失败", permissionDenied: "当前账号没有访问系统服务状态的权限。", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `检查于 ${relative}`, checkedAtNever: "尚未检查", status: { healthy: "正常", warning: "警告", unhealthy: "异常", unknown: "尚未检查" }, dependencyNames: { database: "数据库", easyauth: "权限服务", authentik: "工作账号登录", authentik_directory: "用户目录", scheduler: "定时任务" }, summaries: { healthy: "运行正常", warning: "需要关注", unhealthy: "服务异常", unknown: "状态未知", notChecked: "尚未检查", notSupported: "当前环境不支持此服务" } },
     delivery: {
       title: "发送状态",
       statusLabels: { queued: "排队中", accepted: "已受理(待发送)", sent: "已发送", delivered: "已投递(不代表已读)", failed: "失败", superseded: "已作废" },
@@ -353,7 +355,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "通知中心", description: "查看并处理当前账号的企业通知。", empty: "暂无通知", loadFailed: "通知加载失败", retry, dismiss: "忽略" },
-    footerSettings: { title: "页脚设置", loading: "正在加载页脚设置", loadFailed: "页脚设置加载失败", retry, chineseHtml: "中文页脚 HTML", englishHtml: "英文页脚 HTML", save: "保存", saving: "正在保存", saved: "页脚设置已保存", saveFailed: "页脚设置保存失败" },
+    generalSettings: generalSettingsChinese(retry), identity: { admin: "管理员", user: "用户", guest: "游客" },
     public: { loginEyebrow: "企业账号", loggedOutTitle: "已退出登录", loggedOutDescription: "当前会话已结束。", loginAgain: "重新登录", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "正在完成工作账号登录…", missingTitle: "登录未完成", missingDescription: "工作账号登录未完成，请重新登录。", back: "返回登录" },
   };
@@ -370,7 +372,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
   return {
     locale: "en",
     metadata: { title: brand.appName, description: brand.appDescription },
-    navigation: { menu: "Menu", close, backToMain: "Back to main menu", settings: "Settings", security: "Security", access: "Work account & access", upstream: "System services", footer: "Footer", dashboard: "Workbench", backToSecurity: "Back to security settings" },
+    navigation: { menu: "Menu", close, backToMain: "Back to main menu", settings: "Settings", security: "Security", access: "Work account & access", upstream: "System services", general: "General", dashboard: "Workbench", backToSecurity: "Back to security settings" },
     common: { permissionDenied, loading, retry, notAvailable: "—", permissionCount: (count) => `${count} permissions` },
     shell: { switchLanguage: "Switch language", notifications: "Notifications", notificationsEmpty: "No notifications", notificationsLoadFailed: "Failed to load notifications", notificationsClearAll: "Clear all", notificationsViewAll: "View all", notificationsDismiss: "Dismiss", userMenu: "User menu", securitySettings: "Security settings", logout: "Log out", loggingOut: "Logging out" },
     login: {
@@ -389,14 +391,14 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
     },
     access: {
       page: { title: "Work account & access", tabsAriaLabel: "Work account & access", description: "Manage work-account sign-in and business permissions.", loginTab: "Work-account sign-in", permissionsTab: "Permissions", authentikTitle: "Work-account sign-in", authentikDescription: "Company single sign-on for work accounts.", easyAuthTitle: "Permissions service", easyAuthDescription: "Business permissions, data scopes and navigation grants.", configured: "Configured", notConfigured: "Not configured", endpoint: "Service URL", lastChecked: "Last checked" },
-      configuration: { loading: "Loading configuration", loadFailed: "Failed to load configuration", saveFailed: "Failed to save configuration", saved: "Configuration saved", save: "Save", enabled: "Enable work-account sign-in", configured: "Configured (never displayed)", notConfigured: "Not configured", clearSecret: "Clear saved credential", authorityHint: "Leave blank to keep the current credential. Changing the service URL clears the old credential on the server.", oidcTitle: "Work-account sign-in configuration", oidcDescription: "Configure work-account sign-in and callback URLs.", issuer: "Sign-in service URL", clientId: "Application ID", clientSecret: "Application secret", scopes: "Scopes", authorizationEndpoint: "Authorization URL", tokenEndpoint: "Token URL", jwksUri: "Key set URL", userinfoEndpoint: "User info URL", redirectBaseUrl: "Callback site URL", redirectUri: "Redirect URI", frontendBaseUrl: "Frontend URL", serverBaseUrl: "Server URL", easyAuthTitle: "Permissions service configuration", easyAuthDescription: "Configure the permissions service URL, app credential and permission-request entry.", baseUrl: "Permissions service URL", appKey: "App key", credential: "App credential", webhookSecret: "Webhook secret", webhookSecretHint: "Must match the app's webhook secret in EasyAuth; used to verify grant event signatures.", permissionRequestUrl: "Permission request URL", discover: "Discover", connectionTest: "Test connection", advancedTitle: "Advanced administrator configuration", advancedDescription: "Protocol endpoints — for administrators only.", advancedShow: "Show", advancedHide: "Hide", operationSucceeded: "Operation succeeded", operationFailed: "Operation failed", guideAriaLabel: "View {field} guidance", guides: {} },
+      configuration: { loading: "Loading configuration", loadFailed: "Failed to load configuration", saveFailed: "Failed to save configuration", saved: "Configuration saved", save: "Save", enabled: "Enable work-account sign-in", configured: "Configured (never displayed)", notConfigured: "Not configured", clearSecret: "Clear saved credential", authorityHint: "Leave blank to keep the current credential. Changing the service URL clears the old credential on the server.", oidcTitle: "Work-account sign-in configuration", oidcDescription: "Configure work-account sign-in and callback URLs.", issuer: "Sign-in service URL", clientId: "Application ID", clientSecret: "Application secret", scopes: "Scopes", authorizationEndpoint: "Authorization URL", tokenEndpoint: "Token URL", jwksUri: "Key set URL", userinfoEndpoint: "User info URL", redirectBaseUrl: "Callback site URL", redirectUri: "Redirect URI", frontendBaseUrl: "Frontend URL", serverBaseUrl: "Server URL", easyAuthTitle: "Permissions service configuration", easyAuthDescription: "Configure the permissions service URL, app credential and permission-request entry.", baseUrl: "Permissions service URL", appKey: "App key", credential: "App credential", webhookSecret: "Webhook secret", webhookSecretHint: "Must match the permissions service event secret.", permissionRequestUrl: "Permission request URL", discover: "Discover", connectionTest: "Test connection", advancedTitle: "Advanced administrator configuration", advancedDescription: "Protocol endpoints — for administrators only.", advancedShow: "Show", advancedHide: "Hide", operationSucceeded: "Operation succeeded", operationFailed: "Operation failed", guideAriaLabel: "View {field} guidance", guides: {} },
       authorization: authorizationEnglish(close, loading),
       directory: {
-        title: "User directory sync", description: "Sync the staff roster from the EasyAuth user directory — the single source of truth for who exists in this system.",
+        title: "User directory sync", description: "Sync the staff roster from the user directory.",
         save: "Save", enabled: "Enable user directory sync", baseUrl: "Directory service URL", appKey: "App key",
         credential: "Directory credential", credentialHint: "Leave blank to keep the current credential. The directory credential must be issued separately from the permissions credential.",
         configured: "Configured (never displayed)", notConfigured: "Not configured", clearSecret: "Clear saved credential",
-        authMode: "Authentication mode", authModes: { static_app_token: "Static app token", oauth_client_credentials: "OAuth client credentials" },
+        authMode: "Authentication mode", authModes: { static_app_token: "Static app credential", oauth_client_credentials: "OAuth client credentials" },
         syncInterval: "Sync interval (minutes)", connectionTest: "Test connection", syncNow: "Sync now",
         operationSucceeded: "Operation succeeded", operationFailed: "Operation failed",
         lastSyncTitle: "Last sync", lastSyncNever: "Never synced.", lastSyncAt: "Synced at",
@@ -413,7 +415,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
         trustUnchanged: "This sync did not finish. The local list is unchanged and nobody was deactivated.",
         trustNotConfigured: "The directory has not been read yet, so the local list is unchanged.",
         incomplete: "The roster was not read in full (pages missing, or a source was unavailable).",
-        stale: "The upstream snapshot is out of date, so the data may not be current.",
+        stale: "Directory data is out of date.",
         counts: { upstreamTotal: "People in directory", created: "Created", updated: "Updated", deactivated: "Deactivated", unmapped: "No sign-in account" },
         unmappedHint: "\u201cNo sign-in account\u201d means directory people with no matching sign-in identity: they are recorded and can own or approve work, but cannot sign in here.",
         errorDetail: "Error detail", notAvailable: "—",
@@ -422,7 +424,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       permissionDeniedDetail,
       permissionDeniedAction,
     },
-    upstream: { title: "System services", description: "Check the status of sign-in and permissions services.", refresh: "Refresh now", refreshing: "Refreshing", empty: "No services", lastChecked: "Last checked", endpoint: "URL", loadFailed: "Failed to load system service status", checkSucceeded: "Status check completed", checkFailed: "Status check failed", permissionDenied: "This account cannot view system service status.", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `Checked ${relative}`, checkedAtNever: "Not checked yet", status: { healthy: "Healthy", warning: "Warning", unhealthy: "Unhealthy", unknown: "Unknown" }, dependencyNames: { database: "Database", easyauth: "Permissions service", authentik: "Work-account sign-in", authentik_directory: "User directory", scheduler: "Task scheduler" }, summaries: { healthy: "Running normally", warning: "Needs attention", unhealthy: "Service issue", unknown: "Status unknown", notChecked: "Not checked yet", notSupported: "Not available in this environment" } },
+    upstream: { title: "System services", description: "Check the status of sign-in and permissions services.", refresh: "Refresh now", refreshing: "Refreshing", empty: "No services", lastChecked: "Last checked", endpoint: "URL", loadFailed: "Failed to load system service status", checkSucceeded: "Status check completed", checkFailed: "Status check failed", permissionDenied: "This account cannot view system service status.", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `Checked ${relative}`, checkedAtNever: "Not checked yet", status: { healthy: "Healthy", warning: "Warning", unhealthy: "Unhealthy", unknown: "Not checked" }, dependencyNames: { database: "Database", easyauth: "Permissions service", authentik: "Work-account sign-in", authentik_directory: "User directory", scheduler: "Task scheduler" }, summaries: { healthy: "Running normally", warning: "Needs attention", unhealthy: "Service issue", unknown: "Status unknown", notChecked: "Not checked", notSupported: "Not available in this environment" } },
     delivery: {
       title: "Delivery status",
       statusLabels: { queued: "Queued", accepted: "Accepted (not sent yet)", sent: "Sent", delivered: "Delivered (not a read receipt)", failed: "Failed", superseded: "Superseded" },
@@ -440,16 +442,24 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "Notification center", description: "Review and dismiss notifications for this account.", empty: "No notifications", loadFailed: "Failed to load notifications", retry, dismiss: "Dismiss" },
-    footerSettings: { title: "Footer settings", loading: "Loading footer settings", loadFailed: "Failed to load footer settings", retry, chineseHtml: "Chinese footer HTML", englishHtml: "English footer HTML", save: "Save", saving: "Saving", saved: "Footer settings saved", saveFailed: "Failed to save footer settings" },
+    generalSettings: generalSettingsEnglish(retry), identity: { admin: "Administrator", user: "User", guest: "Guest" },
     public: { loginEyebrow: "Enterprise account", loggedOutTitle: "You’re signed out", loggedOutDescription: "The current session has ended.", loginAgain: "Sign in again", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "Completing work-account sign-in…", missingTitle: "Sign-in didn’t finish", missingDescription: "Work-account sign-in didn’t finish. Please try again.", back: "Back to sign in" },
   };
 }
 
+function generalSettingsChinese(retry: string): EnterpriseGeneralSettingsLabels {
+  return { title: "通用", description: "应用名称、副标题、Logo 与页脚。", loading: "正在加载通用设置", loadFailed: "通用设置加载失败", retry, localeTabs: { "zh-CN": "中文", en: "English" }, appTitle: "应用名称", appTitleHint: "留空使用默认名称。", subtitle: "副标题", subtitleHint: "留空则不显示副标题。", footerHtml: "页脚", footerHtmlHint: "支持少量文本标签与链接；{year} 会替换为当前年份。", logo: "Logo", logoHint: "PNG、JPEG 或 WebP，不超过 128 KB。", logoUpload: "上传 Logo", logoRemove: "移除", logoInvalid: "仅支持 PNG、JPEG 或 WebP 图片。", logoTooLarge: "图片超过 128 KB，请更换更小的文件。", save: "保存", saving: "正在保存", saved: "通用设置已保存", saveFailed: "通用设置保存失败" };
+}
+
+function generalSettingsEnglish(retry: string): EnterpriseGeneralSettingsLabels {
+  return { title: "General", description: "Application name, subtitle, logo and footer.", loading: "Loading general settings", loadFailed: "Failed to load general settings", retry, localeTabs: { "zh-CN": "中文", en: "English" }, appTitle: "Application name", appTitleHint: "Leave blank to use the default name.", subtitle: "Subtitle", subtitleHint: "Leave blank to hide the subtitle.", footerHtml: "Footer", footerHtmlHint: "A few text tags and links are allowed; {year} is replaced with the current year.", logo: "Logo", logoHint: "PNG, JPEG or WebP, up to 128 KB.", logoUpload: "Upload logo", logoRemove: "Remove", logoInvalid: "Only PNG, JPEG or WebP images are supported.", logoTooLarge: "The image is larger than 128 KB. Choose a smaller file.", save: "Save", saving: "Saving", saved: "General settings saved", saveFailed: "Failed to save general settings" };
+}
+
 function authorizationChinese(close: string, loading: string): EnterpriseAccessSettingsLabels["authorization"] {
-  return { identityTitle: "Authentik 登录", identityDescription: "可信身份、OIDC 客户端与用户同步状态。", authorizationTitle: "EasyAuth 授权", authorizationDescription: "业务权限快照与 principal 契约状态。", enabled: "已启用", disabled: "未启用", configured: "已配置", notConfigured: "未配置", credential: "应用凭据", clientSecret: "OIDC 客户端密钥", issuer: "Issuer", clientId: "Client ID", redirectUri: "回调地址", endpoint: "服务地址", appKey: "App Key", principalMode: "Principal 模式", connectionTest: "连接测试", testing: "正在测试", connectionOk: "连接正常", connectionFailed: "连接失败", catalogTitle: "权限目录", catalogDescription: "EasyAuth 可授权的权限点与数据范围。", permissionCode: "权限代码", permissionName: "名称", scopes: "范围", risk: "风险", status: "状态", snapshotsTitle: "用户快照", snapshotsDescription: "用户的 EasyAuth 授权快照，可按用户强制刷新。", user: "用户", grants: "授权数", roles: "授权组", fetchedAt: "获取时间", refresh: "刷新", refreshing: "正在刷新", expired: "已过期", manifestTitle: "Manifest 概览", manifestDescription: "应用向 EasyAuth 声明的 capability 与权限目录。", version: "版本", capabilities: "Capabilities", permissions: "权限数", loading, loadFailed: "集成信息加载失败", empty: "暂无数据", myGrantsTitle: "我的授权", myGrantsDescription: "EasyAuth 为当前账号下发的权限与数据范围。", scopeSelf: "仅本人", scopeManagedUsers: "指定成员", scopeAll: "全部可用数据", manifestExport: "导出 Manifest", descriptorKeysTitle: "Descriptor 密钥", descriptorKeysDescription: "管理读取应用 descriptor 的凭据。", create: "创建", cancel: "取消", close, delete: "删除", disable: "停用", name: "名称", confirm: "确认", baseUrlGuide: "EasyAuth authority 地址。", guideAriaLabel: "查看 EasyAuth 地址说明", roleGroupSeparator: "、", notAvailable: "—", manifestFileName: "easyauth-manifest.json" };
+  return { identityTitle: "工作账号登录", identityDescription: "工作账号身份与用户同步状态。", authorizationTitle: "权限服务授权", authorizationDescription: "业务权限与主体状态。", enabled: "已启用", disabled: "未启用", configured: "已配置", notConfigured: "未配置", credential: "应用凭据", clientSecret: "OIDC 客户端密钥", issuer: "Issuer", clientId: "Client ID", redirectUri: "回调地址", endpoint: "服务地址", appKey: "App Key", principalMode: "主体模式", connectionTest: "连接测试", testing: "正在测试", connectionOk: "连接正常", connectionFailed: "连接失败", catalogTitle: "权限目录", catalogDescription: "可授权的权限点与数据范围。", permissionCode: "权限代码", permissionName: "名称", scopes: "范围", risk: "风险", status: "状态", snapshotsTitle: "用户授权", snapshotsDescription: "用户当前授权，可按用户刷新。", user: "用户", grants: "授权数", roles: "授权组", fetchedAt: "获取时间", refresh: "刷新", refreshing: "正在刷新", expired: "已过期", manifestTitle: "应用声明", manifestDescription: "应用声明的能力与权限目录。", version: "版本", capabilities: "能力", permissions: "权限数", loading, loadFailed: "集成信息加载失败", empty: "暂无数据", myGrantsTitle: "我的授权", myGrantsDescription: "当前账号已获授的权限与数据范围。", scopeSelf: "仅本人", scopeManagedUsers: "指定成员", scopeAll: "全部可用数据", manifestExport: "导出应用声明", descriptorKeysTitle: "应用信息密钥", descriptorKeysDescription: "管理读取应用信息的凭据。", create: "创建", cancel: "取消", close, delete: "删除", disable: "停用", name: "名称", confirm: "确认", baseUrlGuide: "权限服务地址。", guideAriaLabel: "查看权限服务地址说明", roleGroupSeparator: "、", notAvailable: "—", manifestFileName: "easyauth-manifest.json" };
 }
 
 function authorizationEnglish(close: string, loading: string): EnterpriseAccessSettingsLabels["authorization"] {
-  return { identityTitle: "Authentik login", identityDescription: "Trusted identity, OIDC client and user-sync status.", authorizationTitle: "EasyAuth authorization", authorizationDescription: "Business grant snapshots and principal contract status.", enabled: "Enabled", disabled: "Disabled", configured: "Configured", notConfigured: "Not configured", credential: "App credential", clientSecret: "OIDC client secret", issuer: "Issuer", clientId: "Client ID", redirectUri: "Redirect URI", endpoint: "Endpoint", appKey: "App Key", principalMode: "Principal mode", connectionTest: "Test connection", testing: "Testing", connectionOk: "Connection healthy", connectionFailed: "Connection failed", catalogTitle: "Permission catalog", catalogDescription: "EasyAuth permissions and supported data scopes.", permissionCode: "Permission code", permissionName: "Name", scopes: "Scopes", risk: "Risk", status: "Status", snapshotsTitle: "User snapshots", snapshotsDescription: "EasyAuth grant snapshots with per-user forced refresh.", user: "User", grants: "Grants", roles: "Role groups", fetchedAt: "Fetched at", refresh: "Refresh", refreshing: "Refreshing", expired: "Expired", manifestTitle: "Manifest overview", manifestDescription: "Capabilities and permissions declared to EasyAuth.", version: "Version", capabilities: "Capabilities", permissions: "Permissions", loading, loadFailed: "Failed to load integration data", empty: "No data", myGrantsTitle: "My grants", myGrantsDescription: "Permissions and data scopes issued to this account by EasyAuth.", scopeSelf: "Self", scopeManagedUsers: "Managed users", scopeAll: "All permitted data", manifestExport: "Export Manifest", descriptorKeysTitle: "Descriptor keys", descriptorKeysDescription: "Manage credentials used to read the application descriptor.", create: "Create", cancel: "Cancel", close, delete: "Delete", disable: "Disable", name: "Name", confirm: "Confirm", baseUrlGuide: "The EasyAuth authority URL.", guideAriaLabel: "View EasyAuth URL guidance", roleGroupSeparator: ", ", notAvailable: "—", manifestFileName: "easyauth-manifest.json" };
+  return { identityTitle: "Work-account sign-in", identityDescription: "Work-account identity and user-sync status.", authorizationTitle: "Permissions service authorization", authorizationDescription: "Business permissions and subject status.", enabled: "Enabled", disabled: "Disabled", configured: "Configured", notConfigured: "Not configured", credential: "App credential", clientSecret: "OIDC client secret", issuer: "Issuer", clientId: "Client ID", redirectUri: "Redirect URI", endpoint: "Endpoint", appKey: "App Key", principalMode: "Subject mode", connectionTest: "Test connection", testing: "Testing", connectionOk: "Connection healthy", connectionFailed: "Connection failed", catalogTitle: "Permission catalog", catalogDescription: "Permissions and supported data scopes.", permissionCode: "Permission code", permissionName: "Name", scopes: "Scopes", risk: "Risk", status: "Status", snapshotsTitle: "User grants", snapshotsDescription: "Current grants, refreshable per user.", user: "User", grants: "Grants", roles: "Role groups", fetchedAt: "Fetched at", refresh: "Refresh", refreshing: "Refreshing", expired: "Expired", manifestTitle: "Application declaration", manifestDescription: "Capabilities and permissions declared by this application.", version: "Version", capabilities: "Capabilities", permissions: "Permissions", loading, loadFailed: "Failed to load integration data", empty: "No data", myGrantsTitle: "My grants", myGrantsDescription: "Permissions and data scopes issued to this account.", scopeSelf: "Self", scopeManagedUsers: "Managed users", scopeAll: "All permitted data", manifestExport: "Export declaration", descriptorKeysTitle: "Application info keys", descriptorKeysDescription: "Manage credentials used to read the application information.", create: "Create", cancel: "Cancel", close, delete: "Delete", disable: "Disable", name: "Name", confirm: "Confirm", baseUrlGuide: "Permissions service URL.", guideAriaLabel: "View permissions service URL guidance", roleGroupSeparator: ", ", notAvailable: "—", manifestFileName: "easyauth-manifest.json" };
 }

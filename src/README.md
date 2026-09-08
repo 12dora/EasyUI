@@ -29,7 +29,8 @@ src/
                               SegmentedToggle, TabList/TabPanel, Toaster,
                               UnsavedChangesProvider, …  (visual, business-free)
   shell/                    ← AppShell, Sidebar (drill-down + mobile drawer), Topbar
-  enterprise/               ← complete login, security, Login & Permissions, footer,
+  enterprise/               ← complete login, security, Login & Permissions, general
+                              settings (brand / logo / footer), brand slot, app frame,
                               notification and upstream-health surfaces
   table/                    ← antd Table boundary (DataTableShell, useAnimatedExpand,
                               table.css) — separate entry, antd ≥ 6.5 optional peer

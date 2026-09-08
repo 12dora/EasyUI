@@ -46,6 +46,23 @@ export async function input(element: HTMLInputElement, value: string): Promise<v
   });
 }
 
+/** Sets a controlled input/textarea value through the native setter React listens to. */
+export async function fill(element: HTMLInputElement | HTMLTextAreaElement, value: string): Promise<void> {
+  const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
+  setter?.call(element, value);
+  await act(async () => {
+    element.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+/** Dispatches the `change` event React uses for file inputs, checkboxes and selects. */
+export async function change(element: Element): Promise<void> {
+  await act(async () => {
+    element.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+}
+
 export function byTestId(host: ParentNode, testId: string): HTMLElement {
   const element = host.querySelector(`[data-test-id='${testId}']`);
   if (!(element instanceof HTMLElement)) throw new Error(`Missing [data-test-id='${testId}']`);

@@ -92,17 +92,22 @@ export function EnterprisePasswordRecoverySurface({
 }
 
 export interface EnterpriseSettingsPageFrameProps {
-  title: string;
   children: ReactNode;
-  description?: string;
-  backAction?: ReactNode;
 }
 
-/** Shared settings page hierarchy: product-level Settings heading, then feature surface. */
-export function EnterpriseSettingsPageFrame({ title, description, backAction, children }: EnterpriseSettingsPageFrameProps) {
+/**
+ * Settings page wrapper — width and centering only, deliberately headless.
+ *
+ * It used to paint a product-level "设置 / Settings" `PageHeader` above every
+ * feature surface, which stacked two H1s and a divider on every settings route
+ * ("设置" over "本地账户"). The page heading now belongs to the innermost
+ * surface, which is the only one that knows the leaf label, so this frame
+ * renders no heading at all and every settings surface owns exactly one
+ * `PageHeader`.
+ */
+export function EnterpriseSettingsPageFrame({ children }: EnterpriseSettingsPageFrameProps) {
   return (
     <div className="mx-auto max-w-6xl" data-test-id="enterprise-settings-page">
-      <PageHeader title={title} subtitle={description} actions={backAction} />
       {children}
     </div>
   );

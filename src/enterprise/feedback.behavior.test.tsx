@@ -11,7 +11,7 @@ import { EnterpriseAccessSettingsSurface, type EnterpriseAccessSettingsAdapter }
 import { EnterpriseLoginController, type EnterpriseLoginAdapter } from "./auth-controller";
 import { EnterpriseAuthorizationWorkspace, type EnterpriseAuthorizationAdapter, type EnterpriseAuthzStatus } from "./authorization-workspace";
 import { createEnterpriseLabelCatalog } from "./label-catalog";
-import { EnterpriseFooterSettingsSurface, type EnterpriseFooterSettingsAdapter } from "./footer-settings-surface";
+import { EnterpriseGeneralSettingsSurface, type EnterpriseGeneralSettingsAdapter, type EnterpriseGeneralSettingsValue } from "./general-settings-surface";
 import { EnterprisePasswordRecoverySurface } from "./page-frames";
 import { EnterpriseAccountSecuritySurface, type EnterpriseSecurityAdapter } from "./security-workspace";
 import { EnterpriseUpstreamHealthController, type EnterpriseUpstreamHealthAdapter } from "./upstream-health-controller";
@@ -289,37 +289,44 @@ describe("FE-FB-01 retained data and neutral recovery", () => {
     expect(adapter.loadTotpStatus).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps a successfully loaded footer form enabled and unchanged after a rejected refresh", async () => {
+  it("keeps a successfully loaded general form enabled and unchanged after a rejected refresh", async () => {
     const failure = vi.spyOn(toast, "error");
-    const known = { footerHtmlZh: "<strong>已知页脚</strong>", footerHtmlEn: "<strong>Known footer</strong>" };
+    const known: EnterpriseGeneralSettingsValue = {
+      titleZh: "学习工作台",
+      titleEn: "EasyLearning",
+      subtitleZh: "企业学习",
+      subtitleEn: "Enterprise learning",
+      footerHtmlZh: "<strong>已知页脚</strong>",
+      footerHtmlEn: "<strong>Known footer</strong>",
+      logoDataUrl: null,
+    };
     const adapter = {
       load: vi.fn()
         .mockResolvedValueOnce(known)
         .mockRejectedValueOnce(new Error("offline")),
       save: vi.fn(),
-    } as unknown as EnterpriseFooterSettingsAdapter;
+    } as unknown as EnterpriseGeneralSettingsAdapter;
 
     view = await mount(
-      <EnterpriseFooterSettingsSurface adapter={adapter} labels={labels.footerSettings} feedbackMode="toast" />,
+      <EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels.generalSettings} feedbackMode="toast" />,
     );
     await settle(20);
+    const title = byTestId(view.host, "general-title-zh") as HTMLInputElement;
     const chinese = byTestId(view.host, "footer-html-zh") as HTMLTextAreaElement;
-    const english = byTestId(view.host, "footer-html-en") as HTMLTextAreaElement;
     const save = byTestId(view.host, "app-settings-save") as HTMLButtonElement;
 
-    await click(byTestId(view.host, "footer-settings-refresh"));
+    await click(byTestId(view.host, "general-settings-refresh"));
     await settle(20);
 
+    expect(byTestId(view.host, "general-title-zh")).toBe(title);
     expect(byTestId(view.host, "footer-html-zh")).toBe(chinese);
-    expect(byTestId(view.host, "footer-html-en")).toBe(english);
+    expect(title.value).toBe(known.titleZh);
     expect(chinese.value).toBe(known.footerHtmlZh);
-    expect(english.value).toBe(known.footerHtmlEn);
+    expect(title.disabled).toBe(false);
     expect(chinese.disabled).toBe(false);
-    expect(english.disabled).toBe(false);
     expect(save.disabled).toBe(false);
-    expect(view.host.querySelector("[data-test-id='footer-settings-missing']")).toBeNull();
-    expect(view.host.textContent).not.toContain(labels.footerSettings.loadFailed);
-    expect(failure).toHaveBeenCalledWith(labels.footerSettings.loadFailed);
+    expect(view.host.textContent).not.toContain(labels.generalSettings.loadFailed);
+    expect(failure).toHaveBeenCalledWith(labels.generalSettings.loadFailed);
   });
 });
 

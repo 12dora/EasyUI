@@ -122,14 +122,6 @@
         123
       ]
     },
-    "src/enterprise/footer-settings-surface.tsx::EnterpriseFooterSettingsSurface": {
-      "complexity": [
-        15
-      ],
-      "max-lines-per-function": [
-        129
-      ]
-    },
     "src/enterprise/footer.tsx::isSafeHref": {
       "complexity": [
         11
