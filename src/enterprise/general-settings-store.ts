@@ -40,10 +40,20 @@ let inFlight: Promise<EnterpriseGeneralSettingsValue> | null = null;
 // on the wire when the administrator saved would land afterwards and put the old
 // brand back — or report a load failure on top of a value we already have.
 let generation = 0;
+// Every mounted consumer, not only the ones attached to the request that happens
+// to be on the wire. One shared GET means one shared result: a consumer whose own
+// request failed earlier must still pick up the value a later retry brought in,
+// otherwise it stays stuck on `error: true` until it remounts.
+const subscribers = new Set<(value: EnterpriseGeneralSettingsValue) => void>();
 
 function nonEmpty(value: string | null | undefined): string | null {
   const text = (value ?? "").trim();
   return text.length > 0 ? value ?? null : null;
+}
+
+/** Hand a freshly known value to every mounted consumer. */
+function announce(value: EnterpriseGeneralSettingsValue): void {
+  for (const subscriber of [...subscribers]) subscriber(value);
 }
 
 function publish(value: EnterpriseGeneralSettingsValue): void {
@@ -69,7 +79,9 @@ export function primeEnterpriseGeneralSettings(value: EnterpriseGeneralSettingsV
  *
  * The first caller triggers `load()`; later callers reuse the cache or attach to
  * the in-flight promise. A failure is reported as `error: true` and never cached,
- * so a retry (a remount or a later save event) can still succeed.
+ * so a retry can still succeed — and because a successful result is broadcast to
+ * every mounted consumer, that retry may just as well come from a different one:
+ * the topbar recovers when the footer's later request succeeds, without a reload.
  */
 export function useEnterpriseGeneralSettings(
   load: () => Promise<EnterpriseGeneralSettingsValue>,
@@ -78,18 +90,23 @@ export function useEnterpriseGeneralSettings(
   const [error, setError] = useState(false);
   useEffect(() => {
     let active = true;
+    const apply = (value: EnterpriseGeneralSettingsValue) => {
+      setSettings(value);
+      setError(false);
+    };
+    // Subscribing before the request starts is what makes the result shared:
+    // whichever consumer's `load()` wins, everybody gets the answer.
+    subscribers.add(apply);
     const onUpdated = (event: Event) => {
       const detail = (event as CustomEvent<EnterpriseGeneralSettingsValue>).detail;
       if (!detail) return;
       cachedSettings = detail;
       invalidateInFlight();
-      if (!active) return;
-      setSettings(detail);
-      setError(false);
+      apply(detail);
     };
     window.addEventListener(ENTERPRISE_GENERAL_UPDATED_EVENT, onUpdated);
     if (cachedSettings) {
-      setSettings(cachedSettings);
+      apply(cachedSettings);
     } else {
       inFlight ??= load();
       // Both callbacks are gated on the generation the request was started in:
@@ -100,19 +117,20 @@ export function useEnterpriseGeneralSettings(
           if (request !== generation) return;
           cachedSettings = value;
           inFlight = null;
-          if (!active) return;
-          setSettings(value);
-          setError(false);
+          announce(value);
         },
         () => {
           if (request !== generation) return;
           inFlight = null;
+          // A failure belongs to the consumer that asked: it is never cached and
+          // never broadcast, so a later successful retry can clear it.
           if (active) setError(true);
         },
       );
     }
     return () => {
       active = false;
+      subscribers.delete(apply);
       window.removeEventListener(ENTERPRISE_GENERAL_UPDATED_EVENT, onUpdated);
     };
   }, [load]);

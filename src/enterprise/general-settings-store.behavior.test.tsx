@@ -172,6 +172,31 @@ describe("useEnterpriseGeneralSettings", () => {
     expect(view.host.textContent).toBe("新名称");
   });
 
+  it("hands a later successful GET to a consumer whose own request failed", async () => {
+    // The topbar and the footer read the same settings. When the topbar mounts
+    // during an outage and the footer's later request succeeds, the topbar must
+    // re-brand too — otherwise half the shell stays on the fallback name until
+    // the user reloads the page.
+    const failing = vi.fn().mockRejectedValue(new Error("offline"));
+    view = await mount(<BrandProbe load={failing} />);
+    await settle(20);
+    expect(view.host.textContent).toBe("error");
+
+    // The first probe keeps the same `load`, so its effect does not re-run: the
+    // only thing that can rescue it is the second probe's result.
+    const succeeding = vi.fn().mockResolvedValue(SETTINGS);
+    await view.rerender(
+      <>
+        <BrandProbe load={failing} />
+        <BrandProbe load={succeeding} />
+      </>,
+    );
+    await settle(20);
+    expect(failing).toHaveBeenCalledTimes(1);
+    expect(succeeding).toHaveBeenCalledTimes(1);
+    expect(view.host.textContent).toBe("学习工作台学习工作台");
+  });
+
   it("reports a load failure instead of caching it", async () => {
     const load = vi.fn().mockRejectedValue(new Error("offline"));
     view = await mount(<BrandProbe load={load} />);

@@ -157,11 +157,6 @@
         177
       ]
     },
-    "src/enterprise/security-workspace.tsx::EnterpriseAccountSecuritySurface": {
-      "complexity": [
-        13
-      ]
-    },
     "src/enterprise/security-workspace.tsx::PasskeyOperations": {
       "complexity": [
         22

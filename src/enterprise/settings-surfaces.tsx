@@ -32,6 +32,8 @@ interface EnterpriseSecurityWorkspaceProps {
   password?: ReactNode;
   twoFactor?: ReactNode;
   footer?: ReactNode;
+  /** Hosts that paint the route heading themselves pass `false`. */
+  showHeader?: boolean;
 }
 
 /**
@@ -41,12 +43,12 @@ interface EnterpriseSecurityWorkspaceProps {
  * this component remains the sole owner of the page header and password/second-
  * factor section hierarchy.
  */
-export function EnterpriseSecurityWorkspace({ labels, password, twoFactor, footer }: EnterpriseSecurityWorkspaceProps) {
+export function EnterpriseSecurityWorkspace({ labels, password, twoFactor, footer, showHeader = true }: EnterpriseSecurityWorkspaceProps) {
   if (!password && !twoFactor && !footer) return null;
   return (
     <section data-test-id="enterprise-security-settings" data-enterprise-surface="security-settings">
-      <PageHeader title={labels.title} subtitle={labels.description} />
-      <div className="mt-6 space-y-4">
+      {showHeader ? <PageHeader title={labels.title} subtitle={labels.description} /> : null}
+      <div className={`${showHeader ? "mt-6 " : ""}space-y-4`}>
         {password ? (
           <div className="rounded-md border border-hairline bg-paper p-4" data-test-id="password-card">
             <p className="text-[14px] font-semibold text-ink" data-test-id="password-card-title">{labels.passwordTitle}</p>

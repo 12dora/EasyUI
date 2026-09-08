@@ -9,6 +9,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { EnterpriseAccessSettingsSurface, type EnterpriseAccessSettingsAdapter } from "./access-settings-surface";
+import { EnterprisePermissionDeniedPage } from "./surface-helpers";
 import { createEnterpriseLabelCatalog } from "./label-catalog";
 import { EnterpriseAccountSecuritySurface, type EnterpriseSecurityAdapter } from "./security-workspace";
 import { EnterpriseUpstreamHealthController, type EnterpriseUpstreamHealthAdapter } from "./upstream-health-controller";
@@ -104,6 +105,78 @@ describe("settings surfaces keep exactly one H1 when permission is denied", () =
     await settle(10);
     expect(headings(view.host)).toEqual([localAccountLabels.title]);
     expect(byTestId(view.host, "permission-denied")).toBeTruthy();
+  });
+});
+
+describe("hosts can paint a denied page for a route this package does not own", () => {
+  it("gives the general settings route its heading and its reason", async () => {
+    installReducedMotion(true);
+    view = await mount(
+      <EnterprisePermissionDeniedPage
+        title={labels.generalSettings.title}
+        description={labels.generalSettings.description}
+        message="当前账号无法查看通用设置。"
+        testId="general-settings-page"
+      />,
+    );
+    await settle(10);
+    expect(headings(view.host)).toEqual([labels.generalSettings.title]);
+    expect(byTestId(view.host, "general-settings-page")).toBeTruthy();
+    expect(view.host.textContent).toContain("当前账号无法查看通用设置。");
+  });
+});
+
+describe("account security lets a host page own the heading", () => {
+  const permissions = {
+    password: true,
+    totpStatus: true,
+    createTotp: true,
+    disableTotp: true,
+    viewPasskeys: false,
+    canRegisterPasskeys: false,
+    canDeletePasskeys: false,
+  };
+  const adapter = {
+    changePassword: () => Promise.resolve(),
+    loadTotpStatus: () => Promise.resolve({ enabled: false }),
+  } as unknown as EnterpriseSecurityAdapter;
+
+  it("renders no heading of its own when showHeader is false", async () => {
+    installReducedMotion(true);
+    view = await mount(
+      <EnterpriseAccountSecuritySurface adapter={adapter} labels={labels.security} permissions={permissions} showHeader={false} />,
+    );
+    await settle(20);
+    // The host page painted the H1; a second one here would read as two pages.
+    expect(headings(view.host)).toEqual([]);
+    expect(byTestId(view.host, "password-card")).toBeTruthy();
+  });
+
+  it("keeps painting its own heading by default", async () => {
+    installReducedMotion(true);
+    view = await mount(
+      <EnterpriseAccountSecuritySurface adapter={adapter} labels={labels.security} permissions={permissions} />,
+    );
+    await settle(20);
+    expect(headings(view.host)).toEqual([labels.security.page.title]);
+  });
+
+  it.each(modes)("keeps the denial notice heading-less when showHeader is false (%s)", async (feedbackMode) => {
+    installReducedMotion(true);
+    view = await mount(
+      <EnterpriseAccountSecuritySurface
+        adapter={{} as EnterpriseSecurityAdapter}
+        labels={labels.security}
+        permissions={{ password: false, totpStatus: false, createTotp: false, disableTotp: false, viewPasskeys: false, canRegisterPasskeys: false, canDeletePasskeys: false }}
+        feedbackMode={feedbackMode}
+        showHeader={false}
+      />,
+    );
+    await settle(10);
+    expect(headings(view.host)).toEqual([]);
+    // The user must still be told why the page is empty.
+    expect(byTestId(view.host, "permission-denied")).toBeTruthy();
+    expect(view.host.textContent).toContain(labels.security.permissionDenied);
   });
 });
 

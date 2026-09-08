@@ -4,6 +4,7 @@
  * rebrand the application, so a save must carry BOTH languages plus the logo,
  * and a rejected logo must say why instead of silently doing nothing.
  */
+import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { toastBus } from "../toast";
@@ -265,6 +266,94 @@ describe("EnterpriseGeneralSettingsSurface in-flight safety", () => {
     resolveSave(LOADED);
     await settle(20);
     expect((byTestId(view.host, "general-title-zh") as HTMLInputElement).disabled).toBe(false);
+  });
+});
+
+/**
+ * Reading a file is asynchronous in the browser too, but happy-dom resolves it
+ * on its own schedule. This stand-in hands the test the moment the result lands,
+ * which is the only way to act *between* the selection and the `load` event.
+ */
+class ManualFileReader {
+  static pending: ManualFileReader[] = [];
+  result: string | null = null;
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  readAsDataURL(file: File): void {
+    this.file = file;
+    ManualFileReader.pending.push(this);
+  }
+  private file: File | null = null;
+  async finish(dataUrl: string): Promise<void> {
+    this.result = dataUrl;
+    await act(async () => { this.onload?.(); });
+  }
+  static last(): ManualFileReader {
+    const reader = ManualFileReader.pending.at(-1);
+    if (!reader) throw new Error("No file read was started");
+    return reader;
+  }
+}
+
+describe("EnterpriseGeneralSettingsSurface logo read race", () => {
+  beforeEach(() => {
+    ManualFileReader.pending = [];
+    vi.stubGlobal("FileReader", ManualFileReader);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("holds Save until the picked logo has been read, then saves the new logo", async () => {
+    const adapter = makeAdapter();
+    view = await mount(<EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} />);
+    await settle(20);
+
+    const input = byTestId(view.host, "general-logo-input") as HTMLInputElement;
+    attachFile(input, new File([new Uint8Array([1, 2, 3, 4])], "logo.webp", { type: "image/webp" }));
+    await change(input);
+    await settle(10);
+
+    // Saving now would send the previous logo and look like the upload was lost.
+    const save = byTestId(view.host, "app-settings-save") as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    await click(save);
+    await settle(10);
+    expect(adapter.save).not.toHaveBeenCalled();
+
+    await ManualFileReader.last().finish("data:image/webp;base64,BBBB");
+    await settle(10);
+    expect((byTestId(view.host, "app-settings-save") as HTMLButtonElement).disabled).toBe(false);
+
+    await click(byTestId(view.host, "app-settings-save"));
+    await settle(20);
+    expect(adapter.save).toHaveBeenCalledWith({ ...LOADED, logoDataUrl: "data:image/webp;base64,BBBB" });
+  });
+
+  it("ignores a read that lands after the logo was removed", async () => {
+    const adapter = makeAdapter();
+    view = await mount(<EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} />);
+    await settle(20);
+
+    const input = byTestId(view.host, "general-logo-input") as HTMLInputElement;
+    attachFile(input, new File([new Uint8Array([1, 2, 3, 4])], "logo.webp", { type: "image/webp" }));
+    await change(input);
+    await settle(10);
+
+    await click(byTestId(view.host, "general-logo-remove"));
+    await settle(10);
+    expect(view.host.querySelector("[data-test-id='general-logo-preview']")).toBeNull();
+
+    // The abandoned read must neither restore a preview nor re-lock Save.
+    await ManualFileReader.last().finish("data:image/webp;base64,BBBB");
+    await settle(10);
+    expect(view.host.querySelector("[data-test-id='general-logo-preview']")).toBeNull();
+    expect((byTestId(view.host, "app-settings-save") as HTMLButtonElement).disabled).toBe(false);
+
+    await click(byTestId(view.host, "app-settings-save"));
+    await settle(20);
+    expect(adapter.save).toHaveBeenCalledWith({ ...LOADED, logoDataUrl: null });
   });
 });
 

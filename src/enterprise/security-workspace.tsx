@@ -63,6 +63,7 @@ export function EnterpriseAccountSecuritySurface({
   onPasswordChanged,
   feedbackMode = "inline",
   permissionDeniedActions,
+  showHeader = true,
 }: {
   adapter: EnterpriseSecurityAdapter;
   labels: EnterpriseSecurityOperationsLabels;
@@ -72,6 +73,12 @@ export function EnterpriseAccountSecuritySurface({
   feedbackMode?: "inline" | "toast";
   /** Optional route-specific action; omission falls back to safe root navigation. */
   permissionDeniedActions?: ReactNode;
+  /**
+   * `false` when the host page already paints the route's H1 — the surface then
+   * renders no `PageHeader` at all, in the granted *and* the denied state, so the
+   * page never ends up with two headings or with a heading-less denial notice.
+   */
+  showHeader?: boolean;
 }) {
   const canUseTotp = permissions.totpStatus || permissions.createTotp || permissions.disableTotp;
   if (!permissions.password && !canUseTotp && !permissions.viewPasskeys) {
@@ -79,19 +86,37 @@ export function EnterpriseAccountSecuritySurface({
     // The page header stays outside the gate so the route keeps exactly one H1.
     return (
       <EnterprisePermissionDeniedPage
-        pageTitle={labels.page.title}
-        pageDescription={labels.page.description}
-        sectionTestId="enterprise-security-settings"
+        title={labels.page.title}
+        description={labels.page.description}
+        testId="enterprise-security-settings"
         surface="security-settings"
+        showHeader={showHeader}
         feedbackMode={feedbackMode}
-        deniedTitle={labels.permissionDenied}
-        deniedDetail={labels.permissionDeniedDetail}
+        message={labels.permissionDenied}
+        messageDetail={labels.permissionDeniedDetail}
         actions={permissionDeniedActions}
         defaultActionLabel={labels.permissionDeniedAction}
       />
     );
   }
-  return <SecurityPageFrame labels={labels.page} password={permissions.password ? <EnterpriseChangePasswordForm labels={labels.password} onSubmit={adapter.changePassword} onSuccess={onPasswordChanged ?? (() => toast.success(labels.password.success))} feedbackMode={feedbackMode} /> : undefined} twoFactor={canUseTotp || permissions.viewPasskeys ? <div className="divide-y divide-hairline">{canUseTotp ? <TotpOperations adapter={adapter} labels={labels} canLoadStatus={permissions.totpStatus} canCreate={permissions.createTotp} canDisable={permissions.disableTotp} feedbackMode={feedbackMode} /> : null}{permissions.viewPasskeys ? <PasskeyOperations adapter={adapter} labels={labels} canRegister={permissions.canRegisterPasskeys} canDelete={permissions.canDeletePasskeys} feedbackMode={feedbackMode} /> : null}</div> : undefined} />;
+  return <SecurityPageFrame labels={labels.page} showHeader={showHeader} password={permissions.password ? <EnterpriseChangePasswordForm labels={labels.password} onSubmit={adapter.changePassword} onSuccess={onPasswordChanged ?? (() => toast.success(labels.password.success))} feedbackMode={feedbackMode} /> : undefined} twoFactor={renderTwoFactor({ adapter, labels, permissions, canUseTotp, feedbackMode })} />;
+}
+
+/**
+ * Authenticator and passkeys share the second-factor card, in that order.
+ *
+ * Called as a function rather than mounted as a component so that "the user may
+ * use neither" stays `undefined`: `SecurityPageFrame` drops the whole card on a
+ * falsy value, and an element wrapping nothing would leave an empty box behind.
+ */
+function renderTwoFactor({ adapter, labels, permissions, canUseTotp, feedbackMode }: { adapter: EnterpriseSecurityAdapter; labels: EnterpriseSecurityOperationsLabels; permissions: EnterpriseSecurityPermissions; canUseTotp: boolean; feedbackMode: "inline" | "toast" }): ReactNode {
+  if (!canUseTotp && !permissions.viewPasskeys) return undefined;
+  return (
+    <div className="divide-y divide-hairline">
+      {canUseTotp ? <TotpOperations adapter={adapter} labels={labels} canLoadStatus={permissions.totpStatus} canCreate={permissions.createTotp} canDisable={permissions.disableTotp} feedbackMode={feedbackMode} /> : null}
+      {permissions.viewPasskeys ? <PasskeyOperations adapter={adapter} labels={labels} canRegister={permissions.canRegisterPasskeys} canDelete={permissions.canDeletePasskeys} feedbackMode={feedbackMode} /> : null}
+    </div>
+  );
 }
 
 function TotpOperations({ adapter, labels, canLoadStatus, canCreate, canDisable, feedbackMode = "inline" }: { adapter: EnterpriseSecurityAdapter; labels: EnterpriseSecurityOperationsLabels; canLoadStatus: boolean; canCreate: boolean; canDisable: boolean; feedbackMode?: "inline" | "toast" }) {

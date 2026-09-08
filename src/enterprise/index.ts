@@ -29,8 +29,10 @@ export * from "./label-builders";
 export * from "./label-catalog";
 export {
   EnterprisePermissionDeniedState,
+  EnterprisePermissionDeniedPage,
   EnterpriseNotificationListSkeleton,
   EnterpriseSettingsFormSkeleton,
   EnterpriseAuthorizationWorkspaceSkeleton,
   EnterpriseLoginSurfaceSkeleton,
 } from "./surface-helpers";
+export type { EnterprisePermissionDeniedPageProps } from "./surface-helpers";

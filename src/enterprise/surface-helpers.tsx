@@ -61,43 +61,66 @@ export function EnterprisePermissionDeniedState({
  * surface therefore renders this instead of returning a bare notice: the header
  * sits outside the permission-dependent body, so a denied page still has exactly
  * one H1 and still tells the user which page they are looking at.
+ *
+ * Hosts that own a settings route themselves (the general settings page, for
+ * example) render it directly:
+ *
+ * ```tsx
+ * <EnterprisePermissionDeniedPage
+ *   title={t.generalSettings.title}
+ *   description={t.generalSettings.description}
+ *   message={t.common.permissionDenied}
+ *   testId="general-settings-page"
+ * />
+ * ```
  */
-export function EnterprisePermissionDeniedPage({
-  pageTitle,
-  pageDescription,
-  showHeader = true,
-  sectionTestId,
-  surface,
-  feedbackMode = "inline",
-  deniedTitle,
-  deniedDetail,
-  actions,
-  defaultActionLabel,
-}: {
-  pageTitle: ReactNode;
-  pageDescription?: ReactNode;
+export interface EnterprisePermissionDeniedPageProps {
+  /** Page heading — kept outside the gate so the route always has exactly one H1. */
+  title: ReactNode;
+  /** Optional sub-heading under the title. */
+  description?: ReactNode;
+  /** Why the page is unavailable, in the user's own words. */
+  message: ReactNode;
+  /** `inline` (default) paints an `InlineNotice`; `toast` paints a page-sized empty state. */
+  feedbackMode?: "inline" | "toast";
+  /** `data-test-id` of the section wrapper. */
+  testId?: string;
   /** Hosts that paint the heading themselves pass `false` (access settings). */
   showHeader?: boolean;
-  sectionTestId?: string;
-  surface?: string;
-  feedbackMode?: "inline" | "toast";
-  deniedTitle: ReactNode;
-  deniedDetail?: ReactNode;
+  /** Longer explanation shown under `message` in `toast` mode. */
+  messageDetail?: ReactNode;
+  /** Route-specific action; omitted, a safe navigation fallback is rendered. */
   actions?: ReactNode;
+  /** Label of that navigation fallback. */
   defaultActionLabel?: ReactNode;
-}) {
+  /** `data-enterprise-surface` marker, for host-side styling and end-to-end tests. */
+  surface?: string;
+}
+
+export function EnterprisePermissionDeniedPage({
+  title,
+  description,
+  message,
+  feedbackMode = "inline",
+  testId,
+  showHeader = true,
+  messageDetail,
+  actions,
+  defaultActionLabel,
+  surface,
+}: EnterprisePermissionDeniedPageProps) {
   return (
-    <section data-test-id={sectionTestId} data-enterprise-surface={surface}>
-      {showHeader ? <PageHeader title={pageTitle} subtitle={pageDescription} /> : null}
+    <section data-test-id={testId} data-enterprise-surface={surface}>
+      {showHeader ? <PageHeader title={title} subtitle={description} /> : null}
       {feedbackMode === "toast" ? (
         <EnterprisePermissionDeniedState
-          title={deniedTitle}
-          description={deniedDetail}
+          title={message}
+          description={messageDetail}
           actions={actions}
           defaultActionLabel={defaultActionLabel}
         />
       ) : (
-        <InlineNotice tone="error" className="mt-5" message={deniedTitle} data-test-id="permission-denied" />
+        <InlineNotice tone="error" className="mt-5" message={message} data-test-id="permission-denied" />
       )}
     </section>
   );

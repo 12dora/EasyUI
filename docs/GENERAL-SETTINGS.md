@@ -27,6 +27,8 @@ interface EnterpriseGeneralSettingsValue {
   清洗,前端渲染时再清洗一次。
 - Logo 只接受 `data:image/(png|jpeg|webp);base64,…`,解码后 ≤ 128 KiB;`null` / `""` 表示清除。
   表单在上传前就按 MIME 类型与文件大小拦一次(`logoInvalid` / `logoTooLarge`),后端仍然是权威。
+  读取文件是异步的:读取期间**保存按钮不可用**,读完自动恢复;期间换一张图或点「移除」,先前那次
+  读取的结果会被丢弃,不会把已经换掉或清空的 logo 又装回去。
 
 ## 2. 设置页:`EnterpriseGeneralSettingsSurface`
 
@@ -74,6 +76,44 @@ interface EnterpriseGeneralSettingsAdapter {
 next-intl 宿主可用 `defineEnterpriseGeneralSettingsLabels` 对齐)。导航项从
 `navigation.footer` 改成了 `navigation.general`(通用 / General)。
 
+## 2.1 无权限时的页面:`EnterprisePermissionDeniedPage`
+
+通用设置页由宿主自己拥有路由,所以「没有 `settings.app_setting.update`」这一状态也得由宿主画。
+直接用本包导出的这个组件,它保证页面**仍然只有一个 H1**,并且用一句人话说明为什么是空的:
+
+```tsx
+if (!canManageAppSettings) {
+  return (
+    <EnterpriseSettingsPageFrame>
+      <EnterprisePermissionDeniedPage
+        title={t.generalSettings.title}
+        description={t.generalSettings.description}
+        message={t.common.permissionDenied}
+        testId="general-settings-page"
+      />
+    </EnterpriseSettingsPageFrame>
+  );
+}
+```
+
+```ts
+interface EnterprisePermissionDeniedPageProps {
+  title: ReactNode;                       // 页面标题,本页唯一的 H1
+  description?: ReactNode;                // 标题下的副标题
+  message: ReactNode;                     // 为什么这一页不可用
+  feedbackMode?: "inline" | "toast";      // 默认 inline
+  testId?: string;                        // section 的 data-test-id
+  showHeader?: boolean;                   // 宿主自己画标题时传 false,默认 true
+  messageDetail?: ReactNode;              // toast 模式下 message 之下的补充说明
+  actions?: ReactNode;                    // 路由级动作;不传则给一个安全的返回入口
+  defaultActionLabel?: ReactNode;         // 那个返回入口的文案
+  surface?: string;                       // data-enterprise-surface 标记
+}
+```
+
+`inline`(默认)画一条 `InlineNotice`(`data-test-id="permission-denied"`);`toast` 画整页的空状态
+(标题 + 说明 + 返回按钮),两种模式都**不弹 toast、不跳转**。文案由宿主提供,不要写成技术口径。
+
 ## 3. 共享读取:`useEnterpriseGeneralSettings` 与两个解析函数
 
 ```ts
@@ -84,7 +124,8 @@ const footerHtml = resolveEnterpriseFooterHtml(settings, locale);
 
 - 模块级缓存 + 单飞:顶栏、页脚、登录页共用同一次 GET,路由切换不重复请求,多个消费者不会打架。
 - 订阅 `enterprise-starter:general-updated`,所以设置页保存后当前页立刻重新品牌化。
-- 失败**不进缓存**(`error: true`),下一次挂载还能重试。
+- 失败**不进缓存**(`error: true`),下一次挂载还能重试;而且成功的那一次 GET 会广播给**所有**已挂载
+  的消费者 —— 顶栏在断网时挂载失败,只要页脚稍后那次请求成功,顶栏也会跟着恢复,不用刷新页面。
 - `primeEnterpriseGeneralSettings(value)` 用于 SSR 交接或保存后写回,同时派发事件。
 - `resetEnterpriseGeneralSettings()` 清缓存,给测试与登出流程用。
 - `resolveEnterpriseBrand` 逐字段回退:该语言的值非空就用它,否则用宿主默认;
@@ -143,6 +184,11 @@ function EnterpriseSettingsPageFrame(props: { children: ReactNode }): JSX.Elemen
 规则:**每个设置面板自己拥有唯一的 `PageHeader`,标题取最内层的叶子名**(「本地账户」,而不是
 「设置」)。本包内的本地账户、安全、工作账号与访问、系统服务与新的通用设置都已符合。
 侧边栏的返回按钮与移动端标题栏本来就取叶子名,不受影响。
+
+反过来,宿主页面自己已经画了这一页的 H1 时,传 `showHeader={false}` 让面板闭嘴:
+`EnterpriseAccessSettingsSurface`、`EnterpriseAccountSecuritySurface` 与
+`EnterprisePermissionDeniedPage` 都支持,并且**无权限状态同样不画标题**——
+不会出现「有权限时没标题、没权限时冒出一个标题」这种前后不一致。
 
 ## 7. 身份行:`resolveEnterpriseIdentityLabel`
 

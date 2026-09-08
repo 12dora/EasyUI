@@ -99,11 +99,11 @@ export function EnterpriseLocalAccountsSurface({
     // permission still gets exactly one H1 telling them which page this is.
     return (
       <EnterprisePermissionDeniedPage
-        pageTitle={labels.title}
-        pageDescription={labels.description}
-        sectionTestId="enterprise-local-accounts"
+        title={labels.title}
+        description={labels.description}
+        testId="enterprise-local-accounts"
         surface="local-accounts"
-        deniedTitle={labels.permissionDenied}
+        message={labels.permissionDenied}
       />
     );
   }

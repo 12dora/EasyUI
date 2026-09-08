@@ -152,14 +152,28 @@ function GeneralLogoControl({
   logoDataUrl,
   disabled,
   onChange,
+  onReadPendingChange,
 }: {
   labels: EnterpriseGeneralSettingsLabels;
   logoDataUrl: string | null;
   disabled: boolean;
   onChange: (next: string | null) => void;
+  /** Reported up so Save can wait for the file to finish being read. */
+  onReadPendingChange: (pending: boolean) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Reading a file is asynchronous, so its result can land after the
+  // administrator has already moved on. Every read carries the generation it
+  // started in; picking another file or pressing Remove bumps the counter, and a
+  // result from an older generation is dropped instead of resurrecting a logo
+  // that was replaced or cleared in the meantime.
+  const readGeneration = useRef(0);
+  function abandonPendingRead(): number {
+    readGeneration.current += 1;
+    onReadPendingChange(false);
+    return readGeneration.current;
+  }
   // A file input only fires `change` when the selection differs from what it
   // already holds. Clearing it as soon as the File is captured keeps "remove,
   // then pick the same file again" — and "retry after a rejected file" — working.
@@ -169,6 +183,7 @@ function GeneralLogoControl({
   async function pickFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;
     clearNativeSelection();
+    const request = abandonPendingRead();
     if (!file) return;
     if (!ALLOWED_LOGO_TYPES.has(file.type)) {
       setError(labels.logoInvalid);
@@ -178,11 +193,19 @@ function GeneralLogoControl({
       setError(labels.logoTooLarge);
       return;
     }
+    onReadPendingChange(true);
     try {
-      onChange(await readDataUrl(file));
+      const dataUrl = await readDataUrl(file);
+      if (request !== readGeneration.current) return;
+      onChange(dataUrl);
       setError(null);
     } catch {
+      if (request !== readGeneration.current) return;
       setError(labels.logoInvalid);
+    } finally {
+      // Only the newest read owns the pending flag: an abandoned one already
+      // handed it over when its successor bumped the generation.
+      if (request === readGeneration.current) onReadPendingChange(false);
     }
   }
   return (
@@ -215,6 +238,7 @@ function GeneralLogoControl({
             onClick={() => {
               setError(null);
               clearNativeSelection();
+              abandonPendingRead();
               onChange(null);
             }}
             data-test-id="general-logo-remove"
@@ -302,6 +326,11 @@ function GeneralSettingsForm({
   onLocaleChange: (locale: EnterpriseGeneralSettingsLocale) => void;
 }) {
   const value = controller.value ?? EMPTY_VALUE;
+  // A picked file is not part of the draft until the browser has finished
+  // reading it. Saving in that window would send the previous logo and then look
+  // like the upload was lost, so Save waits for the read; the fields stay
+  // editable because they are unaffected by it.
+  const [logoReadPending, setLogoReadPending] = useState(false);
   // Saving disables every control, logo included: the response replaces the
   // draft, so an edit typed while the PUT is in flight would be silently
   // discarded. No editable control during a save means no edit to lose.
@@ -313,6 +342,7 @@ function GeneralSettingsForm({
         logoDataUrl={value.logoDataUrl}
         disabled={disabled}
         onChange={(next) => controller.update({ logoDataUrl: next })}
+        onReadPendingChange={setLogoReadPending}
       />
       <div>
         <TabList
@@ -337,7 +367,7 @@ function GeneralSettingsForm({
         <Button
           variant="primary"
           loading={controller.saving}
-          disabled={disabled}
+          disabled={disabled || logoReadPending}
           onClick={() => void controller.save(value)}
           data-test-id="app-settings-save"
         >

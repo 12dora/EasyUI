@@ -82,12 +82,12 @@ export function EnterpriseUpstreamHealthController({
     // The page header stays outside the gate so the route keeps exactly one H1.
     return (
       <EnterprisePermissionDeniedPage
-        pageTitle={labels.title}
-        pageDescription={labels.description}
-        sectionTestId={testId ?? "upstream-health-page"}
+        title={labels.title}
+        description={labels.description}
+        testId={testId ?? "upstream-health-page"}
         feedbackMode={feedbackMode}
-        deniedTitle={labels.permissionDenied}
-        deniedDetail={labels.permissionDeniedDetail}
+        message={labels.permissionDenied}
+        messageDetail={labels.permissionDeniedDetail}
         actions={permissionDeniedActions}
         defaultActionLabel={labels.permissionDeniedAction}
       />

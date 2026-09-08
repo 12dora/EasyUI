@@ -116,14 +116,14 @@ function renderPermissionDenied(
 ): ReactNode {
   return (
     <EnterprisePermissionDeniedPage
-      pageTitle={labels.page.title}
-      pageDescription={labels.page.description}
+      title={labels.page.title}
+      description={labels.page.description}
       showHeader={showHeader}
-      sectionTestId="login-permissions-page"
+      testId="login-permissions-page"
       surface="login-permissions-settings"
       feedbackMode={feedbackMode}
-      deniedTitle={labels.permissionDenied}
-      deniedDetail={labels.permissionDeniedDetail}
+      message={labels.permissionDenied}
+      messageDetail={labels.permissionDeniedDetail}
       actions={permissionDeniedActions}
       defaultActionLabel={labels.permissionDeniedAction}
     />
