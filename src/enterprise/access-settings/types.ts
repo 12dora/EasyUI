@@ -29,12 +29,19 @@ export interface EnterpriseIdentityOperationResult {
 }
 
 export interface EnterpriseAccessSettingsAdapter extends EnterpriseAuthorizationAdapter {
-  /** Whether this host persists EasyAuth base URL, app key and credential from the UI. */
+  /** Whether this host persists EasyAuth base URL, app key and the two secrets from the UI. */
   easyAuthConnectionEditable: boolean;
   loadOidcSettings(): Promise<EnterpriseOidcConfigurationValue | EnterpriseOidcStatusSummary>;
   saveOidcSettings(value: EnterpriseOidcConfigurationValue, secrets: { clientSecret?: string }): Promise<EnterpriseOidcConfigurationValue>;
   loadEasyAuthSettings(): Promise<EnterpriseEasyAuthConfigurationValue>;
-  saveEasyAuthSettings(value: EnterpriseEasyAuthConfigurationValue, credential?: string): Promise<EnterpriseEasyAuthConfigurationValue>;
+  /**
+   * Both secrets are write-only: an omitted key keeps the stored value, `""`
+   * drops it. The read model only ever reports `hasCredential` / `hasWebhookSecret`.
+   */
+  saveEasyAuthSettings(
+    value: EnterpriseEasyAuthConfigurationValue,
+    secrets: { credential?: string; webhookSecret?: string },
+  ): Promise<EnterpriseEasyAuthConfigurationValue>;
   discoverIdentity?(issuer: string): Promise<EnterpriseIdentityDiscoveryResult>;
   testIdentityConnection?(): Promise<EnterpriseIdentityOperationResult>;
   /**

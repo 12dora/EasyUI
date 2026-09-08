@@ -52,7 +52,7 @@ const directory: EnterpriseDirectorySettingsValue = {
   lastSync: null,
 };
 
-const easyAuth = { baseUrl: "https://auth.example.com", appKey: "easytrade", hasCredential: true, permissionRequestUrl: "" };
+const easyAuth = { baseUrl: "https://auth.example.com", appKey: "easytrade", hasCredential: true, hasWebhookSecret: false, permissionRequestUrl: "" };
 
 function makeAdapter(overrides: Partial<EnterpriseAccessSettingsAdapter> = {}): EnterpriseAccessSettingsAdapter {
   return {
@@ -335,7 +335,7 @@ describe("useEasyAuthSettings", () => {
 
     await run(() => state.current.save());
 
-    expect(adapter.saveEasyAuthSettings).toHaveBeenCalledWith(easyAuth, undefined);
+    expect(adapter.saveEasyAuthSettings).toHaveBeenCalledWith(easyAuth, { credential: undefined, webhookSecret: undefined });
     expect(state.current.notice).toEqual({ ok: true, message: labels.saved });
     expect(state.current.revision).toBe(1);
   });
@@ -357,6 +357,40 @@ describe("useEasyAuthSettings", () => {
     expect(adapter.loadEasyAuthSettings).not.toHaveBeenCalled();
     expect(state.current.loading).toBe(false);
     expect(state.current.value).toBeNull();
+  });
+
+  it("sends each secret only when it was typed, and empties both boxes after the save", async () => {
+    const adapter = makeAdapter();
+    const state = await mountEasyAuth(adapter);
+
+    await run(() => state.current.setWebhookSecret({ value: "whsec-1", clear: false }));
+    await run(() => state.current.save());
+
+    // The credential box stayed blank, so the stored credential must survive untouched.
+    expect(adapter.saveEasyAuthSettings).toHaveBeenCalledWith(easyAuth, { credential: undefined, webhookSecret: "whsec-1" });
+    expect(state.current.webhookSecret).toEqual({ value: "", clear: false });
+    expect(state.current.credential).toEqual({ value: "", clear: false });
+  });
+
+  it("sends an empty webhook secret only when the user explicitly cleared it", async () => {
+    const adapter = makeAdapter();
+    const state = await mountEasyAuth(adapter);
+
+    await run(() => state.current.setWebhookSecret({ value: "", clear: true }));
+    await run(() => state.current.setCredential({ value: "app-token", clear: false }));
+    await run(() => state.current.save());
+
+    expect(adapter.saveEasyAuthSettings).toHaveBeenCalledWith(easyAuth, { credential: "app-token", webhookSecret: "" });
+  });
+
+  it("keeps a typed webhook secret in the box when the save fails, so nothing has to be retyped", async () => {
+    const adapter = makeAdapter({ saveEasyAuthSettings: vi.fn().mockRejectedValue(new Error("403")) });
+    const state = await mountEasyAuth(adapter);
+
+    await run(() => state.current.setWebhookSecret({ value: "whsec-1", clear: false }));
+    await run(() => state.current.save());
+
+    expect(state.current.webhookSecret).toEqual({ value: "whsec-1", clear: false });
   });
 
   it("keeps the previously loaded value when a retry fails", async () => {

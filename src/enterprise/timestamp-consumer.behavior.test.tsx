@@ -33,7 +33,7 @@ const consumerMocks = vi.hoisted(() => {
       refreshSnapshot: vi.fn().mockResolvedValue(snapshot),
       loadOidcSettings: vi.fn(),
       saveOidcSettings: vi.fn(),
-      loadEasyAuthSettings: vi.fn().mockResolvedValue({ baseUrl: "https://auth.example", appKey: "customs", hasCredential: true, permissionRequestUrl: "" }),
+      loadEasyAuthSettings: vi.fn().mockResolvedValue({ baseUrl: "https://auth.example", appKey: "customs", hasCredential: true, hasWebhookSecret: false, permissionRequestUrl: "" }),
       saveEasyAuthSettings: vi.fn(),
     },
   };
@@ -74,7 +74,7 @@ function configureAdapter(): void {
     expiresAt: "2027-01-01T18:30:00.000Z",
     expired: false,
   }]);
-  consumerMocks.adapter.loadEasyAuthSettings.mockResolvedValue({ baseUrl: "https://auth.example", appKey: "customs", hasCredential: true, permissionRequestUrl: "" });
+  consumerMocks.adapter.loadEasyAuthSettings.mockResolvedValue({ baseUrl: "https://auth.example", appKey: "customs", hasCredential: true, hasWebhookSecret: false, permissionRequestUrl: "" });
 }
 
 beforeEach(() => {

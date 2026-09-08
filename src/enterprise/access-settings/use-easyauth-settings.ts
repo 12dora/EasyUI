@@ -18,12 +18,14 @@ import type {
 export interface EasyAuthSettings {
   value: EnterpriseEasyAuthConfigurationValue | null;
   credential: EnterpriseWriteOnlySecret;
+  webhookSecret: EnterpriseWriteOnlySecret;
   loading: boolean;
   saving: boolean;
   notice: SettingsOutcome | null;
   /** Bumped after every successful save so the authorization workspace refetches. */
   revision: number;
   setCredential: (next: EnterpriseWriteOnlySecret) => void;
+  setWebhookSecret: (next: EnterpriseWriteOnlySecret) => void;
   patchValue: (patch: Partial<EnterpriseEasyAuthConfigurationValue>) => void;
   reload: () => void;
   save: () => Promise<void>;
@@ -34,8 +36,10 @@ interface EasyAuthOperationContext {
   labels: EnterpriseSettingsConfigurationLabels;
   value: EnterpriseEasyAuthConfigurationValue | null;
   credential: EnterpriseWriteOnlySecret;
+  webhookSecret: EnterpriseWriteOnlySecret;
   setValue: (next: EnterpriseEasyAuthConfigurationValue) => void;
   setCredential: (next: EnterpriseWriteOnlySecret) => void;
+  setWebhookSecret: (next: EnterpriseWriteOnlySecret) => void;
   begin: () => void;
   finish: () => void;
   bumpRevision: () => void;
@@ -57,6 +61,7 @@ export function useEasyAuthSettings({
   const toastMode = feedbackMode === "toast";
   const [value, setValue] = useState<EnterpriseEasyAuthConfigurationValue | null>(null);
   const [credential, setCredential] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
+  const [webhookSecret, setWebhookSecret] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<SettingsOutcome | null>(null);
@@ -89,8 +94,10 @@ export function useEasyAuthSettings({
     labels,
     value,
     credential,
+    webhookSecret,
     setValue,
     setCredential,
+    setWebhookSecret,
     begin: () => {
       setSaving(true);
       if (!toastMode) setNotice(null);
@@ -103,11 +110,13 @@ export function useEasyAuthSettings({
   return {
     value,
     credential,
+    webhookSecret,
     loading,
     saving,
     notice,
     revision,
     setCredential,
+    setWebhookSecret,
     patchValue: (patch) => setValue((current) => (current ? { ...current, ...patch } : current)),
     reload,
     save: () => saveEasyAuth(context),
@@ -119,9 +128,13 @@ async function saveEasyAuth(context: EasyAuthOperationContext): Promise<void> {
   if (!value) return;
   context.begin();
   try {
-    const next = await adapter.saveEasyAuthSettings(value, writeOnlyCredential(context.credential));
+    const next = await adapter.saveEasyAuthSettings(value, {
+      credential: writeOnlyCredential(context.credential),
+      webhookSecret: writeOnlyCredential(context.webhookSecret),
+    });
     context.setValue(next);
     context.setCredential({ value: "", clear: false });
+    context.setWebhookSecret({ value: "", clear: false });
     context.report({ ok: true, message: labels.saved });
     context.bumpRevision();
   } catch {

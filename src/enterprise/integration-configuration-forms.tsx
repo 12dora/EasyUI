@@ -31,6 +31,8 @@ export interface EnterpriseEasyAuthConfigurationValue {
   baseUrl: string;
   appKey: string;
   hasCredential: boolean;
+  /** Whether the host already stores a webhook secret. The secret itself is never sent back. */
+  hasWebhookSecret: boolean;
   permissionRequestUrl: string;
 }
 
@@ -60,6 +62,8 @@ export interface EnterpriseIntegrationConfigurationLabels {
   baseUrl: string;
   appKey: string;
   credential: string;
+  webhookSecret: string;
+  webhookSecretHint: string;
   permissionRequestUrl: string;
   discover: string;
   connectionTest: string;
@@ -148,9 +152,38 @@ export function EnterpriseOidcConfigurationForm(props: OidcFormProps) {
   );
 }
 
-export function EnterpriseEasyAuthConfigurationForm({ labels, value, credential, disabled, connectionDisabled, saving, onChange, onCredentialChange, onSave }: { labels: EnterpriseIntegrationConfigurationLabels; value: EnterpriseEasyAuthConfigurationValue; credential: EnterpriseWriteOnlySecret; disabled?: boolean; connectionDisabled?: boolean; saving?: boolean; onChange: (patch: Partial<EnterpriseEasyAuthConfigurationValue>) => void; onCredentialChange: (next: EnterpriseWriteOnlySecret) => void; onSave: () => void | Promise<void> }) {
+interface EasyAuthFormProps {
+  labels: EnterpriseIntegrationConfigurationLabels;
+  value: EnterpriseEasyAuthConfigurationValue;
+  credential: EnterpriseWriteOnlySecret;
+  /** Write-only webhook secret, shaped exactly like `credential`. */
+  webhookSecret: EnterpriseWriteOnlySecret;
+  disabled?: boolean;
+  connectionDisabled?: boolean;
+  saving?: boolean;
+  onChange: (patch: Partial<EnterpriseEasyAuthConfigurationValue>) => void;
+  onCredentialChange: (next: EnterpriseWriteOnlySecret) => void;
+  onWebhookSecretChange: (next: EnterpriseWriteOnlySecret) => void;
+  onSave: () => void | Promise<void>;
+}
+
+export function EnterpriseEasyAuthConfigurationForm({ labels, value, credential, webhookSecret, disabled, connectionDisabled, saving, onChange, onCredentialChange, onWebhookSecretChange, onSave }: EasyAuthFormProps) {
   const connectionReadOnly = disabled || connectionDisabled;
-  return <Section title={labels.easyAuthTitle} description={labels.easyAuthDescription} actions={!disabled ? <Button variant="primary" size="sm" loading={saving} onClick={() => void onSave()} data-test-id="enterprise-easyauth-save">{labels.save}</Button> : null}><EnterpriseConfigurationFieldGrid><TextField id="enterprise-easyauth-base-url" label={labels.baseUrl} value={value.baseUrl} disabled={connectionReadOnly} onChange={(baseUrl) => onChange({ baseUrl })}/><TextField id="enterprise-easyauth-app-key" label={labels.appKey} value={value.appKey} disabled={connectionReadOnly} onChange={(appKey) => onChange({ appKey })}/><EnterpriseSecretField id="enterprise-easyauth-credential" label={labels.credential} keepHint={labels.authorityHint} clearLabel={labels.clearSecret} configuredHint={value.hasCredential ? labels.configured : labels.notConfigured} value={credential.value} clear={credential.clear} disabled={connectionReadOnly} onValueChange={(secret) => onCredentialChange({ value: secret, clear: false })} onClearChange={(clear) => onCredentialChange({ value: clear ? "" : credential.value, clear })}/><TextField id="enterprise-easyauth-request-url" label={labels.permissionRequestUrl} value={value.permissionRequestUrl} disabled={disabled} onChange={(permissionRequestUrl) => onChange({ permissionRequestUrl })}/></EnterpriseConfigurationFieldGrid></Section>;
+  return (
+    <Section
+      title={labels.easyAuthTitle}
+      description={labels.easyAuthDescription}
+      actions={!disabled ? <Button variant="primary" size="sm" loading={saving} onClick={() => void onSave()} data-test-id="enterprise-easyauth-save">{labels.save}</Button> : null}
+    >
+      <EnterpriseConfigurationFieldGrid>
+        <TextField id="enterprise-easyauth-base-url" label={labels.baseUrl} value={value.baseUrl} disabled={connectionReadOnly} onChange={(baseUrl) => onChange({ baseUrl })}/>
+        <TextField id="enterprise-easyauth-app-key" label={labels.appKey} value={value.appKey} disabled={connectionReadOnly} onChange={(appKey) => onChange({ appKey })}/>
+        <EnterpriseSecretField id="enterprise-easyauth-credential" label={labels.credential} keepHint={labels.authorityHint} clearLabel={labels.clearSecret} configuredHint={value.hasCredential ? labels.configured : labels.notConfigured} value={credential.value} clear={credential.clear} disabled={connectionReadOnly} onValueChange={(secret) => onCredentialChange({ value: secret, clear: false })} onClearChange={(clear) => onCredentialChange({ value: clear ? "" : credential.value, clear })} testId="easyauth-credential"/>
+        <EnterpriseSecretField id="enterprise-easyauth-webhook-secret" label={labels.webhookSecret} keepHint={labels.webhookSecretHint} clearLabel={labels.clearSecret} configuredHint={value.hasWebhookSecret ? labels.configured : labels.notConfigured} value={webhookSecret.value} clear={webhookSecret.clear} disabled={connectionReadOnly} onValueChange={(secret) => onWebhookSecretChange({ value: secret, clear: false })} onClearChange={(clear) => onWebhookSecretChange({ value: clear ? "" : webhookSecret.value, clear })} testId="easyauth-webhook-secret"/>
+        <TextField id="enterprise-easyauth-request-url" label={labels.permissionRequestUrl} value={value.permissionRequestUrl} disabled={disabled} onChange={(permissionRequestUrl) => onChange({ permissionRequestUrl })}/>
+      </EnterpriseConfigurationFieldGrid>
+    </Section>
+  );
 }
 
 function GuidedLabel({ label, guide, ariaLabel, testId }: { label: string; guide?: string; ariaLabel: string; testId: string }) {

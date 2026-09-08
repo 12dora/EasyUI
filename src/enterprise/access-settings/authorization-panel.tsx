@@ -133,11 +133,13 @@ function renderForm({ adapter, labels, easyAuth, canManage }: EasyAuthRenderCont
       labels={labels}
       value={easyAuth.value as EnterpriseEasyAuthConfigurationValue}
       credential={easyAuth.credential}
+      webhookSecret={easyAuth.webhookSecret}
       disabled={!canManage}
       connectionDisabled={!adapter.easyAuthConnectionEditable}
       saving={easyAuth.saving}
       onChange={easyAuth.patchValue}
       onCredentialChange={easyAuth.setCredential}
+      onWebhookSecretChange={easyAuth.setWebhookSecret}
       onSave={easyAuth.save}
     />
   );
