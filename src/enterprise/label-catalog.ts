@@ -5,6 +5,7 @@ import type { EnterpriseDeliveryStatusLabels } from "./delivery-status";
 import type { EnterpriseSecurityOperationsLabels } from "./security-workspace";
 import type { EnterpriseUpstreamHealthControllerLabels } from "./upstream-health-controller";
 import type { EnterpriseShellLabels } from "./models";
+import type { EnterprisePermissionOnboardingLabels } from "./permission-onboarding";
 
 export type EnterpriseCatalogLocale = "zh-CN" | "en";
 
@@ -30,6 +31,8 @@ export interface EnterpriseStaticLabelCatalog {
   generalSettings: EnterpriseGeneralSettingsLabels;
   /** User-menu identity line; see `resolveEnterpriseIdentityLabel`. */
   identity: { admin: string; user: string; guest: string };
+  /** Full-page zero-grant landing; see `EnterprisePermissionOnboarding`. */
+  permissionOnboarding: EnterprisePermissionOnboardingLabels;
   public: { loginEyebrow: string; loggedOutTitle: string; loggedOutDescription: string; loginAgain: string; footer: string };
   oidcComplete: EnterpriseOidcCompleteLabels;
 }
@@ -355,7 +358,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "通知中心", description: "查看并处理当前账号的企业通知。", empty: "暂无通知", loadFailed: "通知加载失败", retry, dismiss: "忽略" },
-    generalSettings: generalSettingsChinese(retry), identity: { admin: "管理员", user: "用户", guest: "游客" },
+    generalSettings: generalSettingsChinese(retry), ...identityAndOnboardingChinese(),
     public: { loginEyebrow: "企业账号", loggedOutTitle: "已退出登录", loggedOutDescription: "当前会话已结束。", loginAgain: "重新登录", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "正在完成工作账号登录…", missingTitle: "登录未完成", missingDescription: "工作账号登录未完成，请重新登录。", back: "返回登录" },
   };
@@ -442,9 +445,43 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "Notification center", description: "Review and dismiss notifications for this account.", empty: "No notifications", loadFailed: "Failed to load notifications", retry, dismiss: "Dismiss" },
-    generalSettings: generalSettingsEnglish(retry), identity: { admin: "Administrator", user: "User", guest: "Guest" },
+    generalSettings: generalSettingsEnglish(retry), ...identityAndOnboardingEnglish(),
     public: { loginEyebrow: "Enterprise account", loggedOutTitle: "You’re signed out", loggedOutDescription: "The current session has ended.", loginAgain: "Sign in again", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "Completing work-account sign-in…", missingTitle: "Sign-in didn’t finish", missingDescription: "Work-account sign-in didn’t finish. Please try again.", back: "Back to sign in" },
+  };
+}
+
+function identityAndOnboardingChinese(): Pick<EnterpriseStaticLabelCatalog, "identity" | "permissionOnboarding"> {
+  return {
+    identity: { admin: "管理员", user: "用户", guest: "游客" },
+    permissionOnboarding: permissionOnboardingChinese(),
+  };
+}
+
+function identityAndOnboardingEnglish(): Pick<EnterpriseStaticLabelCatalog, "identity" | "permissionOnboarding"> {
+  return {
+    identity: { admin: "Administrator", user: "User", guest: "Guest" },
+    permissionOnboarding: permissionOnboardingEnglish(),
+  };
+}
+
+function permissionOnboardingChinese(): EnterprisePermissionOnboardingLabels {
+  return {
+    title: "尚无可用权限",
+    body: "当前账号已登录，但尚未获得本应用的任何可用权限。请申请权限，或稍后重新检查。",
+    requestAccess: "申请权限",
+    recheck: "重新检查",
+    logout: "退出登录",
+  };
+}
+
+function permissionOnboardingEnglish(): EnterprisePermissionOnboardingLabels {
+  return {
+    title: "No permissions yet",
+    body: "This account is signed in, but it has no permission for this application yet. Request access, or recheck later.",
+    requestAccess: "Request permission",
+    recheck: "Recheck",
+    logout: "Log out",
   };
 }
 

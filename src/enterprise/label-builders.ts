@@ -7,6 +7,7 @@ import type { EnterpriseUpstreamHealthControllerLabels } from "./upstream-health
 import type { EnterpriseShellLabels } from "./models";
 import type { EnterpriseIdentityLabels } from "./identity-label";
 import type { EnterpriseGeneralSettingsLabels } from "./general-settings-surface";
+import type { EnterprisePermissionOnboardingLabels } from "./permission-onboarding";
 
 /** Typed identity builders let next-intl hosts and static-catalog hosts share one exact contract. */
 export const defineEnterpriseLoginLabels = (labels: EnterpriseLoginControllerLabels) => labels;
@@ -18,3 +19,4 @@ export const defineEnterpriseUpstreamLabels = (labels: EnterpriseUpstreamHealthC
 export const defineEnterpriseShellLabels = (labels: EnterpriseShellLabels) => labels;
 export const defineEnterpriseGeneralSettingsLabels = (labels: EnterpriseGeneralSettingsLabels) => labels;
 export const defineEnterpriseIdentityLabels = (labels: EnterpriseIdentityLabels) => labels;
+export const defineEnterprisePermissionOnboardingLabels = (labels: EnterprisePermissionOnboardingLabels) => labels;

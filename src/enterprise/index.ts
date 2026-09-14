@@ -15,6 +15,8 @@ export * from "./general-settings-store";
 export * from "./brand-slot";
 export * from "./app-frame";
 export * from "./identity-label";
+export * from "./permission-onboarding";
+export * from "./business-access";
 export * from "./authorization-workspace";
 export * from "./format-timestamp";
 export * from "./access-settings-surface";

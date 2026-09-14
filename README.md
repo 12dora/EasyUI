@@ -14,7 +14,7 @@ sources directly.
 
 - `src/primitives/` — base primitives (Button, inputs, Dialog, the unsaved-changes guard, …)
 - `src/shell/` — data-driven app shell (Sidebar / MobileNav / Topbar)
-- `src/enterprise/` — enterprise surfaces (auth controller, silent identity re-check, security / access / settings workspaces, the general-settings page + brand slot + app frame; host wiring: EasyAuth settings adapter + its two write-only secrets in [`docs/ACCESS-SETTINGS.md`](docs/ACCESS-SETTINGS.md), silent identity re-check in [`docs/IDENTITY-CHECK.md`](docs/IDENTITY-CHECK.md), general settings / brand / app frame / identity label in [`docs/GENERAL-SETTINGS.md`](docs/GENERAL-SETTINGS.md))
+- `src/enterprise/` — enterprise surfaces (auth controller, silent identity re-check, security / access / settings workspaces, the general-settings page + brand slot + app frame, zero-grant permission onboarding; host wiring: EasyAuth settings adapter + its two write-only secrets in [`docs/ACCESS-SETTINGS.md`](docs/ACCESS-SETTINGS.md), silent identity re-check in [`docs/IDENTITY-CHECK.md`](docs/IDENTITY-CHECK.md), general settings / brand / app frame / identity label in [`docs/GENERAL-SETTINGS.md`](docs/GENERAL-SETTINGS.md), zero-grant landing in [`docs/PERMISSION-ONBOARDING.md`](docs/PERMISSION-ONBOARDING.md))
 - `src/table/` — antd-backed data table boundary (`DataTableShell`, `useAnimatedExpand`; antd ≥ 6.5 optional peer, own entry `@easy-enterprise/ui/table` + `table.css`)
 - `src/enterprise-local-accounts/` — local-account admin surface (`EnterpriseLocalAccountsSurface`), also antd-backed, own entry `@easy-enterprise/ui/enterprise-local-accounts`
 - `src/theme.css` — design tokens
