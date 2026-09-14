@@ -54,12 +54,18 @@ describe("hasEnterpriseBusinessAccess", () => {
     ).toBe(true);
   });
 
-  it("ignores permission codes when the host passes none", () => {
-    expect(hasEnterpriseBusinessAccess({ permissions: new Set(["learning.course.view"]) })).toBe(false);
+  it("does not count held permissions when the host passes an empty code list", () => {
+    expect(
+      hasEnterpriseBusinessAccess({
+        permissions: new Set(["learning.course.view"]),
+        businessPermissionCodes: [],
+      }),
+    ).toBe(false);
     expect(
       hasEnterpriseBusinessAccess({
         permissions: new Set(["learning.course.view"]),
         securityCapabilities: { passwordChange: true },
+        businessPermissionCodes: [],
       }),
     ).toBe(true);
   });

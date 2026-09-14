@@ -41,29 +41,38 @@ afterEach(async () => {
 });
 
 describe("EnterprisePermissionOnboarding", () => {
-  it("renders enterprise copy, the signed-in identity, and the request link", async () => {
+  it("renders a single page heading, the signed-in identity, and a styled request link", async () => {
     const props = render();
     view = await mount(<EnterprisePermissionOnboarding {...props} />);
-    expect(byTestId(view.host, "permission-onboarding").getAttribute("data-empty-state-kind")).toBeNull();
-    expect(view.host.querySelector("[data-empty-state-kind='prerequisite']")).not.toBeNull();
-    expect(view.host.textContent).toContain("尚无可用权限");
+    const headings = view.host.querySelectorAll("h1");
+    expect(headings).toHaveLength(1);
+    expect(headings[0]?.textContent).toBe("尚无可用权限");
     expect(view.host.textContent).toContain("当前账号已登录");
     expect(byTestId(view.host, "permission-onboarding-name").textContent).toBe("张三");
     expect(byTestId(view.host, "permission-onboarding-secondary").textContent).toBe("zhangsan@example.com");
-    expect(byTestId(view.host, "permission-onboarding-request").getAttribute("href")).toBe(
-      "https://easyauth.example.test/request",
-    );
-    expect(byTestId(view.host, "permission-onboarding-request").getAttribute("target")).toBe("_blank");
+    const request = byTestId(view.host, "permission-onboarding-request");
+    expect(request.tagName).toBe("A");
+    expect(request.querySelector("button")).toBeNull();
+    expect(request.getAttribute("href")).toBe("https://easyauth.example.test/request");
+    expect(request.getAttribute("target")).toBe("_blank");
+    expect(request.getAttribute("rel")).toBe("noreferrer noopener");
+    expect(request.className).toContain("inline-flex");
     expect(byTestId(view.host, "permission-onboarding-recheck").textContent).toContain("重新检查");
     expect(byTestId(view.host, "permission-onboarding-logout").textContent).toContain("退出登录");
   });
 
-  it("omits the request link when permissionRequestUrl is null or blank", async () => {
+  it("omits the request link when permissionRequestUrl is null, blank, or not http(s)/path", async () => {
     view = await mount(<EnterprisePermissionOnboarding {...render({ permissionRequestUrl: null })} />);
     expect(view.host.querySelector("[data-test-id='permission-onboarding-request']")).toBeNull();
     await view.unmount();
     view = await mount(<EnterprisePermissionOnboarding {...render({ permissionRequestUrl: "  " })} />);
     expect(view.host.querySelector("[data-test-id='permission-onboarding-request']")).toBeNull();
+    await view.unmount();
+    view = await mount(<EnterprisePermissionOnboarding {...render({ permissionRequestUrl: "javascript:alert(1)" })} />);
+    expect(view.host.querySelector("[data-test-id='permission-onboarding-request']")).toBeNull();
+    await view.unmount();
+    view = await mount(<EnterprisePermissionOnboarding {...render({ permissionRequestUrl: " /portal/request " })} />);
+    expect(byTestId(view.host, "permission-onboarding-request").getAttribute("href")).toBe("/portal/request");
   });
 
   it("calls onLogout from the tertiary action", async () => {
@@ -78,6 +87,27 @@ describe("EnterprisePermissionOnboarding", () => {
     view = await mount(<EnterprisePermissionOnboarding {...props} />);
     await click(byTestId(view.host, "permission-onboarding-recheck"));
     expect(props.onRecheck).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves the recheck button idle when onRecheck rejects, without an unhandled rejection", async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (event: PromiseRejectionEvent) => {
+      unhandled.push(event.reason);
+      event.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", onUnhandled);
+    let rejectRecheck!: (reason?: unknown) => void;
+    const onRecheck = vi.fn(() => new Promise<void>((_, reject) => { rejectRecheck = reject; }));
+    view = await mount(<EnterprisePermissionOnboarding {...render({ onRecheck })} />);
+    const button = byTestId(view.host, "permission-onboarding-recheck") as HTMLButtonElement;
+    await click(button);
+    expect(button.disabled).toBe(true);
+    await act(async () => {
+      rejectRecheck(new Error("me failed"));
+    });
+    expect(button.disabled).toBe(false);
+    expect(unhandled).toEqual([]);
+    window.removeEventListener("unhandledrejection", onUnhandled);
   });
 
   it("rechecks on focus and visibilitychange, throttled to 10s", async () => {
@@ -101,6 +131,19 @@ describe("EnterprisePermissionOnboarding", () => {
       window.dispatchEvent(new Event("focus"));
     });
     expect(onRecheck).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not recheck on focus while a manual recheck is in flight, even after the throttle window", async () => {
+    vi.useFakeTimers({ now: 1_000_000 });
+    const onRecheck = vi.fn(() => new Promise<void>(() => undefined));
+    view = await mount(<EnterprisePermissionOnboarding {...render({ onRecheck })} />);
+    await click(byTestId(view.host, "permission-onboarding-recheck"));
+    expect(onRecheck).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(1_000_000 + PERMISSION_ONBOARDING_RECHECK_THROTTLE_MS);
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(onRecheck).toHaveBeenCalledTimes(1);
   });
 
   it("does not recheck while the document is hidden", async () => {
