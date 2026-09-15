@@ -19,6 +19,10 @@
  * 撤销本地会话。navigate 走隐藏表单 POST 而不是 GET —— 带钉钉声明的 id_token 很长,GET 会被
  * 网关按 414 截断。任何一步失败都回落到今天的行为(`/status.endSessionUrl` 顶层 GET),没有
  * `endSessionUrl` 就留在 `/<locale>/logged-out`,绝不把用户卡在半截流程里。
+ *
+ * 宿主前置条件:CSP 的 `form-action` 必须放行 Authentik 源(见 docs/LOGOUT.md 的宿主清单)。
+ * 没放行时表单提交会被浏览器静默拦掉 —— 不抛异常、不发事件、页面停在原地,所以提交之后还要
+ * 等一个短窗口(`ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS`),没开始离开本页就继续回落。
  */
 
 import { safeInternalTarget, type EnterpriseOidcStatus } from "./auth-controller";
@@ -28,14 +32,18 @@ import { abortEnterpriseIdentityChecks } from "./identity-check-controller";
 export const ENTERPRISE_LOGOUT_LOCALES = ["zh-CN", "en"] as const;
 /** 隐藏 end-session 表单的 data-test-id;宿主不要依赖它,只给测试用。 */
 export const ENTERPRISE_END_SESSION_FORM_TEST_ID = "enterprise-end-session-form";
+/** `/status` / end-session / `revoke` 每一步的上限:网络挂住也不能让用户「点了登出没反应」。 */
+export const ENTERPRISE_LOGOUT_TIMEOUT_MS = 3000;
+/** 表单提交后等导航开始的上限;到点还在原地(典型是 CSP 拦了 form-action)就走 GET 回落。 */
+export const ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS = 1500;
 
 /** 后端 `POST /auth/oidc/end-session` 的 200 响应:一份待自动提交的表单。 */
 export interface EnterpriseEndSessionForm {
   /** 上游 end-session 端点,必须是 https。 */
   url: string;
-  /** 默认 POST;后端显式给 GET 时才用 GET。 */
+  /** 只认 POST;后端显式给别的动词一律当「拿不到表单」回落。 */
   method?: string | null;
-  /** 隐藏域:`id_token_hint`、可选的 `post_logout_redirect_uri`。 */
+  /** 隐藏域:必须含 `id_token_hint`,外加可选的 `post_logout_redirect_uri`。 */
   fields?: Record<string, string> | null;
 }
 
@@ -48,7 +56,7 @@ export interface EnterpriseLogoutAdapter {
   markLoggedOut?(): void;
   /** 可选:把后端相对路径拼成绝对 URL(宿主已有的 API base)。不给就跳过 end-session,回落今天的 GET。 */
   apiUrl?(path: string): string;
-  /** 可选:当前会话的 bearer token。end-session 要在本地会话还活着时带上它。 */
+  /** 可选:当前会话的 bearer token。end-session 要在本地会话还活着时带上它;缺了就跳过,不发注定 401 的请求。 */
   authToken?(): string | null;
 }
 
@@ -84,14 +92,24 @@ function readEndSessionFields(raw: unknown): Record<string, string> {
   return fields;
 }
 
+function isPostMethod(method: string | null | undefined): boolean {
+  return (method ?? "POST").trim().toUpperCase() === "POST";
+}
+
 function readEndSessionForm(body: unknown): EnterpriseEndSessionForm | null {
   if (!body || typeof body !== "object") return null;
   const record = body as { url?: unknown; method?: unknown; fields?: unknown };
   const url = typeof record.url === "string" ? record.url.trim() : "";
   // 上游 URL 来自后端,但它最终会被顶层导航用掉:https 之外一律不认(与今天的 endSessionUrl 同一把尺)。
   if (!url || !isSafeHttpsUrl(url)) return null;
-  const method = typeof record.method === "string" && record.method.trim().toUpperCase() === "GET" ? "GET" : "POST";
-  return { url, method, fields: readEndSessionFields(record.fields) };
+  // 后端说 GET 就当这份表单没法用:`id_token_hint` 是整个 JWT,放 query 会被网关按 414 截断。
+  if (typeof record.method === "string" && !isPostMethod(record.method)) return null;
+  const fields = readEndSessionFields(record.fields);
+  // 没有 hint 的表单在 Authentik 那边等于白发:它会忽略 post_logout_redirect_uri,把用户留在
+  // 自己的 session-end 页 —— 正是这条链要修的病。宁可回落今天的 GET。
+  const hint = fields.id_token_hint;
+  if (!hint || !hint.trim()) return null;
+  return { url, method: "POST", fields };
 }
 
 /**
@@ -101,12 +119,13 @@ function readEndSessionForm(body: unknown): EnterpriseEndSessionForm | null {
  */
 export async function requestEnterpriseEndSession(adapter: EnterpriseLogoutAdapter, status: EnterpriseOidcStatus, returnTo: string): Promise<EnterpriseEndSessionForm | null> {
   const path = enterpriseEndSessionPath(status);
-  if (!path || !adapter.apiUrl) return null;
-  const token = adapter.authToken?.();
+  const token = adapter.authToken?.()?.trim();
+  // 没有 api base 或没有 bearer 就发不出有效请求(后端只会回 401),直接按回落处理。
+  if (!path || !adapter.apiUrl || !token) return null;
   const response = await fetch(adapter.apiUrl(path), {
     method: "POST",
     credentials: "include",
-    headers: { "content-type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ returnTo }),
   });
   if (!response.ok) return null;
@@ -117,31 +136,39 @@ export async function requestEnterpriseEndSession(adapter: EnterpriseLogoutAdapt
  * 隐藏表单自动提交到上游 end-session 端点。
  *
  * 用表单 POST 而不是 `location.assign` 的唯一原因是长度:`id_token_hint` 是一整个 JWT。
+ * 任何一步失败(body 已经没了、字段名遮住了 `submit`、动词不是 POST)都返回 `false`,让
+ * 调用方接着往下回落 —— 这时本地会话已经清掉了,绝不能把用户扔在原地。
  */
 export function submitEnterpriseEndSessionForm(form: EnterpriseEndSessionForm): boolean {
-  if (!isSafeHttpsUrl(form.url)) return false;
+  if (!isSafeHttpsUrl(form.url) || !isPostMethod(form.method)) return false;
   const element = document.createElement("form");
-  element.setAttribute("method", (form.method ?? "POST").toUpperCase() === "GET" ? "GET" : "POST");
-  element.setAttribute("action", form.url);
-  element.setAttribute("data-test-id", ENTERPRISE_END_SESSION_FORM_TEST_ID);
-  element.hidden = true;
-  element.style.display = "none";
-  for (const [name, value] of Object.entries(form.fields ?? {})) {
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = name;
-    input.value = value;
-    element.appendChild(input);
+  try {
+    element.setAttribute("method", "POST");
+    element.setAttribute("action", form.url);
+    element.setAttribute("data-test-id", ENTERPRISE_END_SESSION_FORM_TEST_ID);
+    element.hidden = true;
+    element.style.display = "none";
+    for (const [name, value] of Object.entries(form.fields ?? {})) {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      input.value = value;
+      element.appendChild(input);
+    }
+    // 卸载中的文档没有 body;`element.submit` 可能被同名隐藏域遮住 —— 走原型上的那个。
+    (document.body ?? document.documentElement).appendChild(element);
+    HTMLFormElement.prototype.submit.call(element);
+    return true;
+  } catch {
+    element.remove();
+    return false;
   }
-  document.body.appendChild(element);
-  element.submit();
-  return true;
 }
 
 async function prepareEndSession(adapter: EnterpriseLogoutAdapter, status: EnterpriseOidcStatus, returnTo: string | null | undefined): Promise<EnterpriseEndSessionForm | null> {
   const target = safeInternalTarget(returnTo ?? null, enterpriseLogoutReturnTo(window.location.pathname));
   try {
-    return await requestEnterpriseEndSession(adapter, status, target);
+    return await withTimeout(requestEnterpriseEndSession(adapter, status, target), ENTERPRISE_LOGOUT_TIMEOUT_MS);
   } catch {
     return null;
   }
@@ -150,24 +177,50 @@ async function prepareEndSession(adapter: EnterpriseLogoutAdapter, status: Enter
 /**
  * 退出登录。OIDC 会话按 end-session 表单 → 今天的 `endSessionUrl` GET → 留在 logged-out
  * 三级回落;本地会话只清本地。`options.returnTo` 让宿主指定回哪个页面(默认 `/<locale>/login`)。
+ *
+ * 撤销之前的两个网络调用都有 3 s 上限:上游挂住时按「拿不到表单」继续走,本地会话照样清掉 ——
+ * 卡在一半(本地还登着、页面不动)比退不干净更糟。
  */
 export async function performEnterpriseLogout(adapter: EnterpriseLogoutAdapter, redirectToLoggedOut: () => void, options?: EnterpriseLogoutOptions): Promise<void> {
   const method = adapter.authMethod();
-  const status = method === "oidc" ? await adapter.loadOidcStatus().catch(() => null) : null;
+  const status = method === "oidc" ? await withTimeout(adapter.loadOidcStatus(), ENTERPRISE_LOGOUT_TIMEOUT_MS).catch(() => null) : null;
   const form = status ? await prepareEndSession(adapter, status, options?.returnTo) : null;
   // 在飞的静默复查会在本地会话清掉之后拿回一个新 token 写进 localStorage —— 先把它掐掉再撤销。
   abortEnterpriseIdentityChecks();
-  await withTimeout(adapter.revoke(), 3000).catch(() => undefined);
+  await withTimeout(adapter.revoke(), ENTERPRISE_LOGOUT_TIMEOUT_MS).catch(() => undefined);
   adapter.clearLocalSession(); adapter.markLoggedOut?.(); adapter.clearAuthMethod();
   navigateAfterEnterpriseLogout(form, status, redirectToLoggedOut);
 }
 
 /** 三级回落:end-session 表单 POST → 今天的 `endSessionUrl` 顶层 GET → 留在 logged-out 页。 */
 function navigateAfterEnterpriseLogout(form: EnterpriseEndSessionForm | null, status: EnterpriseOidcStatus | null, redirectToLoggedOut: () => void): void {
-  if (form && submitEnterpriseEndSessionForm(form)) return;
-  const url = status?.endSessionUrl?.trim();
-  if (url && isSafeHttpsUrl(url)) { window.location.assign(url); return; }
-  redirectToLoggedOut();
+  const fallback = () => {
+    const url = status?.endSessionUrl?.trim();
+    if (url && isSafeHttpsUrl(url)) { window.location.assign(url); return; }
+    redirectToLoggedOut();
+  };
+  if (form && submitEnterpriseEndSessionForm(form)) { watchEndSessionNavigation(fallback); return; }
+  fallback();
+}
+
+/**
+ * 表单提交是「同步返回、异步导航」:CSP `form-action` 没放行 Authentik 源时,浏览器把这次
+ * 提交静默拦掉 —— 不抛异常、不发事件,页面就停在原地,而本地会话已经清了。所以提交之后再等
+ * 一个短窗口,期间没有开始离开本页就继续回落到 GET / logged-out。
+ *
+ * 判据用 `beforeunload` / `pagehide` 而不是计时器单打:前者在导航**开始时**(还没等上游响应)
+ * 就触发,所以上游慢不会被误判成「被拦了」而把在飞的 POST 打断。
+ */
+function watchEndSessionNavigation(fallback: () => void): void {
+  let leaving = false;
+  const onLeave = () => { leaving = true; };
+  window.addEventListener("pagehide", onLeave);
+  window.addEventListener("beforeunload", onLeave);
+  window.setTimeout(() => {
+    window.removeEventListener("pagehide", onLeave);
+    window.removeEventListener("beforeunload", onLeave);
+    if (!leaving) fallback();
+  }, ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS);
 }
 
 function isSafeHttpsUrl(value: string) { try { return new URL(value).protocol === "https:"; } catch { return false; } }

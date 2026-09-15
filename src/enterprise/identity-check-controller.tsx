@@ -70,15 +70,32 @@ function appendCheckFrame(src: string): HTMLIFrameElement {
 
 /** 在飞的静默复查:登出时要能一次掐光(见 abortEnterpriseIdentityChecks)。 */
 const activeIdentityChecks = new Set<() => void>();
+/** 登出闩:一旦登出过,本次页面加载内不再起新的静默复查。 */
+let identityChecksAborted = false;
 
 /**
- * 中止当前所有在飞的静默复查。
+ * 中止当前所有在飞的静默复查,并闩住后续的复查。
  *
  * 登出必须先调它:一次在飞的复查会在本地会话被清掉之后回来,把新 token 写回宿主 —— 于是
  * 「刚退出就又登录着」。结论按 `aborted` 结算,iframe 立即摘掉。
+ *
+ * 光掐在飞的那一次不够:登出还要等 `revoke()`(最多 3 s),这期间宿主的 401 拦截器或轮询
+ * 会起一次**新的**复查,它不在刚才遍历过的集合里,照样能在清会话之后写回新 token。所以这把
+ * 闩一直保持到下一次整页加载(那时是全新的模块实例)—— 也不能指望宿主卸载 hook:登出常常是
+ * `router.replace`,布局根本不卸载。
  */
 export function abortEnterpriseIdentityChecks(): void {
+  identityChecksAborted = true;
   for (const abort of [...activeIdentityChecks]) abort();
+}
+
+/** 只给测试用:正常页面加载天然是新的模块实例,宿主不需要、也不该自己解这把闩。 */
+export function resetEnterpriseIdentityCheckAbort(): void {
+  identityChecksAborted = false;
+}
+
+function isAbortedIdentityOutcome(outcome: IdentityCheckOutcome): boolean {
+  return outcome.outcome === "error" && outcome.kind === IDENTITY_CHECK_ABORTED_KIND;
 }
 
 /**
@@ -88,6 +105,8 @@ export function abortEnterpriseIdentityChecks(): void {
  * 类型不对的消息一概忽略(继续等),避免第三方页面伪造出一次「已登出」。
  */
 export function runSilentIdentityCheck({ silentAuthorizeUrl, timeoutMs, signal }: { silentAuthorizeUrl: string; timeoutMs: number; signal?: AbortSignal }): Promise<IdentityCheckOutcome> {
+  // 登出闩上之后连 iframe 都不挂:挂了就有机会在会话清掉之后带回一个新 token。
+  if (identityChecksAborted) return Promise.resolve<IdentityCheckOutcome>({ outcome: "error", kind: IDENTITY_CHECK_ABORTED_KIND });
   return new Promise((resolve) => {
     const frame = appendCheckFrame(silentAuthorizeUrl);
     let timer = 0;
@@ -159,8 +178,9 @@ export function useEnterpriseIdentityCheck(options: EnterpriseIdentityCheckOptio
       },
       async runCheck() {
         const outcome = await runSilentIdentityCheck({ silentAuthorizeUrl, timeoutMs, signal: aborter.signal });
-        // 已卸载/已停用就不再回调宿主 —— 那时宿主的 setState 早就没人接了。
-        if (!aborter.signal.aborted) deliverIdentityCheckOutcome(outcome, latest.current);
+        // 已卸载/已停用就不再回调宿主 —— 那时宿主的 setState 早就没人接了。登出掐掉的那一次
+        // 同样不回调:宿主的 onError 往往是一句「会话检查失败」的提示,登出途中弹它纯属噪音。
+        if (!aborter.signal.aborted && !isAbortedIdentityOutcome(outcome)) deliverIdentityCheckOutcome(outcome, latest.current);
         return outcome;
       },
     });

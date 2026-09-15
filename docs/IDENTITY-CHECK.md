@@ -169,6 +169,13 @@ else { /* error / timeout / disabled → 照旧走原来的会话过期 UI */ }
 - 登出时必须先 `abortEnterpriseIdentityChecks()` 再清本地会话:一次在飞的复查会在会话清掉之后回来,
   把新 token 写回宿主 —— 于是「刚退出就又登录着」。`performEnterpriseLogout` 已内置这一步,见
   [`LOGOUT.md`](LOGOUT.md)。
+- 这个中止是一把**闩**,一直保持到下一次整页加载:闩上之后再调 `runSilentIdentityCheck` /
+  `runCheck()` 会直接以 `{ outcome: "error", kind: "aborted" }` 结算,连 iframe 都不挂 —— 登出还要
+  等 `revoke()`,那几秒里宿主的 401 重试、轮询、可见性回调都可能再起一次新的复查,而它不在刚才
+  掐过的那一批里。也不能指望宿主卸载 hook:登出常常是 `router.replace`,布局根本不卸载。
+- 被中止的那一次**不回调宿主**:`onAuthenticated` / `onLoggedOut` / `onError` 一个都不发
+  (`runCheck()` 的返回值里照常能看到 `aborted`)。宿主的 `onError` 往往是一句「会话检查失败」的
+  提示,登出途中弹它纯属噪音。
 
 ## 导出速查
 
@@ -187,5 +194,6 @@ EnterpriseOidcSilentCompleteController({ labels, renderBackLink? })
 useEnterpriseIdentityCheck(options): { runCheck(): Promise<IdentityCheckOutcome> }
 runSilentIdentityCheck({ silentAuthorizeUrl, timeoutMs, signal? }): Promise<IdentityCheckOutcome>
 IDENTITY_CHECK_FRAME_TEST_ID / IDENTITY_CHECK_ABORTED_KIND
-abortEnterpriseIdentityChecks(): void          // 登出前掐掉在飞的复查
+abortEnterpriseIdentityChecks(): void          // 登出前掐掉在飞的复查,并闩住之后的复查
+resetEnterpriseIdentityCheckAbort(): void      // 只给测试用:解开上面那把闩(正常页面加载天然是新模块)
 ```

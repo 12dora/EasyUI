@@ -11,8 +11,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IDENTITY_CHECK_MESSAGE_TYPE, type IdentityCheckOutcome } from "./identity-check";
 import {
+  abortEnterpriseIdentityChecks,
   EnterpriseOidcSilentCompleteController,
   IDENTITY_CHECK_FRAME_TEST_ID,
+  resetEnterpriseIdentityCheckAbort,
   useEnterpriseIdentityCheck,
   type EnterpriseIdentityCheckHandle,
   type EnterpriseIdentityCheckOptions,
@@ -75,6 +77,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  // 登出的中止闩是模块级状态,活到下一次整页加载 —— 用例之间必须自己解开。
+  resetEnterpriseIdentityCheckAbort();
   await view?.unmount();
   view = null;
   handle = null;
@@ -208,6 +212,21 @@ describe("useEnterpriseIdentityCheck", () => {
     expect(frames()).toHaveLength(0);
     await expect(handle!.runCheck()).resolves.toEqual({ outcome: "error", kind: "disabled" });
     expect(options.onError).not.toHaveBeenCalled();
+  });
+
+  it("stays silent when a logout aborts the check, and mounts no frame afterwards", async () => {
+    const options = hookOptions();
+    view = await mount(<Harness {...options} />);
+    expect(frames()).toHaveLength(1);
+    await act(async () => { abortEnterpriseIdentityChecks(); await Promise.resolve(); });
+    // 登出途中弹一句「会话检查失败」纯属噪音:aborted 不回调宿主。
+    expect(frames()).toHaveLength(0);
+    expect(options.onError).not.toHaveBeenCalled();
+    // 闩住之后宿主的 401 重试不会再挂一个能在清会话之后带回新 token 的 iframe。
+    await expect(handle!.runCheck()).resolves.toEqual({ outcome: "error", kind: "aborted" });
+    expect(frames()).toHaveLength(0);
+    expect(options.onError).not.toHaveBeenCalled();
+    expect(options.onAuthenticated).not.toHaveBeenCalled();
   });
 
   it("removes the frame and stops calling back once the host unmounts", async () => {
