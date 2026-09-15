@@ -166,6 +166,9 @@ else { /* error / timeout / disabled → 照旧走原来的会话过期 UI */ }
 - 子页只往 `window.parent` 发,`targetOrigin` 固定为 `window.location.origin`,不用 `"*"`。
 - token 只在 postMessage 的负载里出现一次,页面自己不落盘、不留在 URL 里。
 - 复查页必须 `Cache-Control: no-store`。
+- 登出时必须先 `abortEnterpriseIdentityChecks()` 再清本地会话:一次在飞的复查会在会话清掉之后回来,
+  把新 token 写回宿主 —— 于是「刚退出就又登录着」。`performEnterpriseLogout` 已内置这一步,见
+  [`LOGOUT.md`](LOGOUT.md)。
 
 ## 导出速查
 
@@ -184,4 +187,5 @@ EnterpriseOidcSilentCompleteController({ labels, renderBackLink? })
 useEnterpriseIdentityCheck(options): { runCheck(): Promise<IdentityCheckOutcome> }
 runSilentIdentityCheck({ silentAuthorizeUrl, timeoutMs, signal? }): Promise<IdentityCheckOutcome>
 IDENTITY_CHECK_FRAME_TEST_ID / IDENTITY_CHECK_ABORTED_KIND
+abortEnterpriseIdentityChecks(): void          // 登出前掐掉在飞的复查
 ```

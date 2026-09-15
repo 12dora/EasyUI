@@ -11,6 +11,8 @@ export interface EnterpriseOidcStatus {
   endSessionUrl?: string | null;
   /** 静默身份复查(机制 2)的授权入口,相对 apiBase;后端未启用该机制时为空。 */
   silentAuthorizePath?: string | null;
+  /** RP-initiated logout 的准备端点,相对 apiBase;后端没给就按 `authorizePath` 推(见 ./logout.ts)。 */
+  endSessionPath?: string | null;
 }
 
 export interface EnterpriseLoginResult { mustChangePassword?: boolean; }
@@ -207,22 +209,4 @@ export function safeInternalTarget(value: string | null, fallback: string): stri
   return value;
 }
 
-export interface EnterpriseLogoutAdapter {
-  revoke(): Promise<unknown>;
-  loadOidcStatus(): Promise<EnterpriseOidcStatus>;
-  authMethod(): "local" | "oidc" | null;
-  clearLocalSession(): void;
-  clearAuthMethod(): void;
-  markLoggedOut?(): void;
-}
-
-export async function performEnterpriseLogout(adapter: EnterpriseLogoutAdapter, redirectToLoggedOut: () => void): Promise<void> {
-  const method = adapter.authMethod();
-  await withTimeout(adapter.revoke(), 3000).catch(() => undefined);
-  adapter.clearLocalSession(); adapter.markLoggedOut?.(); adapter.clearAuthMethod();
-  if (method === "oidc") { const status = await adapter.loadOidcStatus().catch(() => null); const url = status?.endSessionUrl?.trim(); if (url && isSafeHttpsUrl(url)) { window.location.assign(url); return; } }
-  redirectToLoggedOut();
-}
-
-function isSafeHttpsUrl(value: string) { try { return new URL(value).protocol === "https:"; } catch { return false; } }
-function withTimeout<T>(promise: Promise<T>, ms: number) { return new Promise<T>((resolve, reject) => { const timer = setTimeout(() => reject(new Error("timeout")), ms); promise.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); }); }); }
+// 退出登录(含 RP-initiated logout 的 end-session 表单)见 ./logout.ts。

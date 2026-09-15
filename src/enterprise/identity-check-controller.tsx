@@ -68,6 +68,19 @@ function appendCheckFrame(src: string): HTMLIFrameElement {
   return frame;
 }
 
+/** 在飞的静默复查:登出时要能一次掐光(见 abortEnterpriseIdentityChecks)。 */
+const activeIdentityChecks = new Set<() => void>();
+
+/**
+ * 中止当前所有在飞的静默复查。
+ *
+ * 登出必须先调它:一次在飞的复查会在本地会话被清掉之后回来,把新 token 写回宿主 —— 于是
+ * 「刚退出就又登录着」。结论按 `aborted` 结算,iframe 立即摘掉。
+ */
+export function abortEnterpriseIdentityChecks(): void {
+  for (const abort of [...activeIdentityChecks]) abort();
+}
+
 /**
  * 挂一个隐藏 iframe 跑一次静默复查,拿到同源 message 或超时后把它摘掉。
  *
@@ -82,6 +95,7 @@ export function runSilentIdentityCheck({ silentAuthorizeUrl, timeoutMs, signal }
       window.clearTimeout(timer);
       window.removeEventListener("message", onMessage);
       signal?.removeEventListener("abort", onAbort);
+      activeIdentityChecks.delete(onAbort);
       frame.remove();
       resolve(outcome);
     };
@@ -96,6 +110,7 @@ export function runSilentIdentityCheck({ silentAuthorizeUrl, timeoutMs, signal }
     timer = window.setTimeout(() => finish({ outcome: "error", kind: IDENTITY_CHECK_TIMEOUT_KIND }), timeoutMs);
     window.addEventListener("message", onMessage);
     signal?.addEventListener("abort", onAbort);
+    activeIdentityChecks.add(onAbort);
     if (signal?.aborted) onAbort();
   });
 }
