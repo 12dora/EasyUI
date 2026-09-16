@@ -15,15 +15,16 @@ sources directly.
 - `src/primitives/` — base primitives (Button, inputs, Dialog, the unsaved-changes guard, …)
 - `src/shell/` — data-driven app shell (Sidebar / MobileNav / Topbar)
 - `src/enterprise/` — enterprise surfaces (auth controller, silent identity re-check, security / access / settings workspaces, the general-settings page + brand slot + app frame, zero-grant permission onboarding; host wiring: EasyAuth settings adapter + its two write-only secrets in [`docs/ACCESS-SETTINGS.md`](docs/ACCESS-SETTINGS.md), silent identity re-check in [`docs/IDENTITY-CHECK.md`](docs/IDENTITY-CHECK.md), RP-initiated logout in [`docs/LOGOUT.md`](docs/LOGOUT.md), general settings / brand / app frame / identity label in [`docs/GENERAL-SETTINGS.md`](docs/GENERAL-SETTINGS.md), zero-grant landing in [`docs/PERMISSION-ONBOARDING.md`](docs/PERMISSION-ONBOARDING.md))
-- `src/table/` — antd-backed data table boundary (`DataTableShell`, `useAnimatedExpand`; antd ≥ 6.5 optional peer, own entry `@easy-enterprise/ui/table` + `table.css`)
+- `src/table/` — antd-backed table kit (`DataTable` / `ClientTable` list conventions, header search/filter/sort column decorators, the URL-shaped table query, `DataTableShell`, `useAnimatedExpand`; antd ≥ 6.5 optional peer, own entry `@easy-enterprise/ui/table` + `table.css`; API and host wiring in the 表格 section of `src/README.md`)
+- `src/antd/` — the shared antd `ConfigProvider` + theme token (`EasyAntdProvider`, `EASY_ANTD_THEME_TOKEN`, `createEasyAntdTheme`), also antd-backed, own entry `@easy-enterprise/ui/antd`
 - `src/enterprise-local-accounts/` — local-account admin surface (`EnterpriseLocalAccountsSurface`), also antd-backed, own entry `@easy-enterprise/ui/enterprise-local-accounts`
 - `src/theme.css` — design tokens
 - `src/control-tokens.ts`, `src/motion.ts`, `src/toast.ts`
 
-`src/index.ts` re-exports control-tokens / motion / toast / primitives / shell / enterprise. The two
-antd-backed entries are **deliberately left out of the barrel** so hosts that bring their own table
-never pull antd into their bundle — import them from their own subpath. The authoritative entry list
-is the `exports` map in `package.json`.
+`src/index.ts` re-exports control-tokens / motion / toast / primitives / shell / enterprise. The three
+antd-backed entries (`./table`, `./antd`, `./enterprise-local-accounts`) are **deliberately left out
+of the barrel** so hosts that bring their own table never pull antd into their bundle — import them
+from their own subpath. The authoritative entry list is the `exports` map in `package.json`.
 
 **Import boundary:** nothing under `src/` may import host code (no `@/…`, no `next/…`) — the
 package has to stay usable from any React host. See `src/README.md` for the theme wiring, the
@@ -36,7 +37,9 @@ then commit the pointer bump in the host repo.
 
 Peer deps the host must provide: `react` / `react-dom` ≥ 19, [`motion`](https://motion.dev) ≥ 12,
 `eslint` ≥ 9 and `typescript` ≥ 5 for the code-smell gate (see below), plus `antd` ^6.5.2 *only*
-if it imports the table or local-accounts entries (declared optional).
+if it imports the table, antd-provider or local-accounts entries (declared optional). Hosts should
+pin the **exact** antd version this package tests against (`6.5.2`) — two antd copies in one pnpm
+tree mean `ConfigProvider` tokens and locale never reach `Table`.
 
 ## Development
 

@@ -11,6 +11,22 @@
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
+   Table headers never wrap
+   1. antd version: ≥ 6.5;
+   2. not expressible as a token: there is no theme token for the header's
+      `white-space`, and a header carrying a filter/sort icon (both live in the
+      same <th> as the title) gets squeezed onto two lines;
+   3. remove when antd exposes a header-wrapping option.
+   The selector carries one class more than antd's own
+   `.ant-table-wrapper .ant-table .ant-table-thead >tr>th`, so it wins no matter
+   in which order the runtime-injected styles land. Column widths stay each
+   table's own business.
+   -------------------------------------------------------------------------- */
+.ant-table-wrapper .ant-table .ant-table-thead > tr > th.ant-table-cell {
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
    Enter/leave animation for Table tree child rows (pairs with
    src/table/animated-expand.tsx)
    1. antd version: ≥ 6.5;

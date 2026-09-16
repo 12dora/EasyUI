@@ -8,10 +8,13 @@ and reusable account/settings surfaces shared by EasyTrade, EasyCustoms and the
 deployable blank enterprise app.
 
 > Tables ship behind their own entry point: `@easy-enterprise/ui/table` wraps
-> **antd ≥ 6.5** (`DataTableShell` server-pagination boundary + `useAnimatedExpand`
-> tree-row animation; import `@easy-enterprise/ui/table.css` alongside). antd stays
+> **antd ≥ 6.5** (the `DataTable` / `ClientTable` list conventions, the header
+> search / filter / sort decorators, the query state, the `DataTableShell`
+> server-pagination boundary and the `useAnimatedExpand` tree-row animation;
+> import `@easy-enterprise/ui/table.css` alongside). The antd `ConfigProvider`
+> that themes them is a second antd entry, `@easy-enterprise/ui/antd`. antd stays
 > an *optional* peer — hosts that bring their own table (TanStack, AG Grid…) simply
-> never import that entry. The same applies to
+> never import those entries. The same applies to
 > `@easy-enterprise/ui/enterprise-local-accounts`. The package core remains the
 > theme, the shell (sidebar / topbar / app frame) and the form + action primitives
 > that make everything else look consistent.
@@ -32,8 +35,12 @@ src/
   enterprise/               ← complete login, security, Login & Permissions, general
                               settings (brand / logo / footer), brand slot, app frame,
                               notification and upstream-health surfaces
-  table/                    ← antd Table boundary (DataTableShell, useAnimatedExpand,
-                              table.css) — separate entry, antd ≥ 6.5 optional peer
+  table/                    ← antd table kit (DataTable/ClientTable, column
+                              decorators, table query, DataTableShell,
+                              useAnimatedExpand, table.css) — separate entry,
+                              antd ≥ 6.5 optional peer
+  antd/                     ← the shared antd ConfigProvider + theme token —
+                              separate entry, antd ≥ 6.5 optional peer
   enterprise-local-accounts/ ← local-account admin surface (antd) — separate entry
   index.ts                  ← barrel — import only what you need
 ```
@@ -67,9 +74,9 @@ they must not fork the page structure in host code.
    (`animate-fade-up`, `animate-shimmer`, `animate-tree-row-in`; all of them are
    neutralised under `prefers-reduced-motion`).
 3. Import from `@easy-enterprise/ui`, `@easy-enterprise/ui/shell`, or
-   `@easy-enterprise/ui/enterprise` — plus `@easy-enterprise/ui/table` /
-   `@easy-enterprise/ui/enterprise-local-accounts` if you want the antd-backed
-   surfaces (they are not in the barrel).
+   `@easy-enterprise/ui/enterprise` — plus `@easy-enterprise/ui/table`,
+   `@easy-enterprise/ui/antd` and `@easy-enterprise/ui/enterprise-local-accounts`
+   if you want the antd-backed surfaces (none of them is in the barrel).
 4. **Peer deps.** `react` / `react-dom` ≥ 19, and [`motion`](https://motion.dev) ≥ 12
    (framer-motion successor) for the animated primitives/shell. The shell takes
    your router's `Link` + active-path as props, so it stays framework-agnostic.
@@ -236,6 +243,121 @@ the topmost dialog.
 Full-page unloads (tab close, reload, external links) are already covered: the provider
 installs one `beforeunload` listener while any source is dirty and removes it as soon as
 everything is clean.
+
+## 表格 (tables)
+
+Everything a list page needs lives in `@easy-enterprise/ui/table`, and the antd
+`ConfigProvider` that themes it in `@easy-enterprise/ui/antd`. Both are antd-only
+entries kept off the barrel. The rule downstream: **a host app does not wire antd
+Table, ConfigProvider, URL query state or column conventions itself** — it imports
+them here and supplies only its router, its copy and its row actions.
+
+### The kit API
+
+| Layer | Exports |
+| --- | --- |
+| Constants | `TABLE_SCROLL` (`{ x: "max-content" }`), `PAGE_SIZE_OPTIONS` (`[20, 50, 100]`), `DEFAULT_PAGE_SIZE` (20) |
+| Types | `Page<T>` (`{ items, page, pageSize, total }`), `ListParams`, `TableSort`, `TableSortOrder`, `TableQueryState`, `TableQueryConfig`, `TableQueryDefaults`, `TableQueryPatch`, `TableQuery`, `TableHistory`, `DataTableLabels`, `TableHeaderLabels`, `HeaderFilterOption` |
+| Query (pure) | `parseSort`, `formatSort`, `parseTableQuery`, `serialiseTableQuery`, `mergeTableQueryParams`, `tableListParams`, `hasTableFilters`, `applyTableQueryPatch`, `sameFilterValues`, `tableQueryOf` |
+| Query (hooks) | `useTableQueryWith(config, history)`, `useLocalTableQuery(config)` |
+| Columns | `searchColumn`, `filterColumn`, `sortColumn`, `withEllipsis`, `withClientSort`, `clientSearchColumn`, `clientQueryState`, `sortOrderFor` |
+| Tables | `DataTable`, `ClientTable`, `DataTableShell`, `useAnimatedExpand` |
+| onChange helpers | `changePatch`, `filterPatch`, `sorterSort` |
+| Provider | `EasyAntdProvider`, `EasyAntdProviderZh`, `EasyAntdProviderEn`, `EasyAntdConfig`, `EASY_ANTD_THEME_TOKEN`, `createEasyAntdTheme` |
+
+Contract highlights — these are conventions, not options:
+
+- **One state, in the URL.** `keys` declares the parameters a table owns; every
+  other parameter on the address (a `?tab=`) survives a filter change untouched.
+  Values equal to the declared defaults stay out of the query string but are still
+  sent to the backend. Multi-select is a repeated parameter name (so a comma may
+  live inside a search term); `toListParams()` comma-joins them for the request.
+  Sort travels as `sort=<key>:<asc|desc>`.
+- **Backend whitelists.** `sortKeys` / `filterOptions` drop wild values from an old
+  bookmark before the request, instead of letting the endpoint reject them and
+  replacing the whole table with an error.
+- **Header only.** Search, filter and sort UI live in the column header — nothing
+  above the table. The funnel lights up only when a selection differs from the
+  table's default.
+- **Sort never clears.** antd's third click flips direction instead: the URL has no
+  "explicitly unsorted" slot, so clearing would silently come back on refresh.
+  A host that wants the third state uses `DataTableShell` directly.
+- **The kit ships no row menu.** `actions` is `{ title, width?, render, testId? }` —
+  a fixed-right column the host fills with its own menu or links.
+- **Empty state** defaults to EasyUI's `EmptyState` with `labels.empty`, under
+  `${testId}-empty`; pass `empty` to distinguish "nothing yet" from "no matches".
+
+### Host wiring
+
+**1. `globals.css`, in this order.** `table.css` carries the rules antd tokens
+cannot express (header nowrap, tree-row motion), so it comes after the theme and
+before any host overlay:
+
+```css
+@import "tailwindcss";
+@source "../../../packages/easy-enterprise/src";   /* so the dropdown utilities exist */
+@import "@easy-enterprise/ui/theme.css";
+@import "@easy-enterprise/ui/table.css";
+/* host overlays last */
+```
+
+**2. The provider, mounted once.** Around the app content (the protected shell plus
+any public page that renders antd) — and **never nest a second `cssVar`
+`ConfigProvider` inside it**: antd would inject its `--ant-*` custom properties
+twice and the two copies fight. Page-level theming goes through `token` /
+`components`.
+
+```tsx
+<EasyAntdProvider locale={locale === "en" ? "en" : "zh-CN"}>{children}</EasyAntdProvider>
+```
+
+`withApp` (antd's `<App component={false}>`) is opt-in: combined with `cssVar`,
+antd warns about it on every render. Hosts that need a different geometry pass
+`token={createEasyAntdTheme({ borderRadius: 10 })}`. To keep only the active
+locale pack in the bundle, code-split the single-locale components instead:
+`dynamic(() => import("@easy-enterprise/ui/antd/provider-zh").then((m) => m.EasyAntdProviderZh), { ssr: true })`.
+
+**3. The Next adapter.** EasyUI imports no router, so the URL hook takes a
+`TableHistory`. In Next that is the whole wrapper:
+
+```tsx
+"use client";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTableQueryWith, type TableQuery, type TableQueryConfig } from "@easy-enterprise/ui/table";
+
+export function useTableQuery(config: TableQueryConfig): TableQuery {
+  const pathname = usePathname();
+  const router = useRouter();
+  const search = useSearchParams().toString();
+  return useTableQueryWith(config, {
+    pathname,
+    search,
+    replace: (href) => router.replace(href, { scroll: false }),
+  });
+}
+```
+
+Rebuilding that object every render is fine — the hook keeps the latest one in a
+ref. `config`, on the other hand, **must be stable** (a module constant or
+`useMemo`): the returned `TableQuery` is memoised on it, and columns are memoised
+on the `TableQuery`, so an inline config would rebuild the columns every render
+and antd would close the funnel the user just opened.
+
+**4. A page.**
+
+```tsx
+const CONFIG = { keys: ["q", "status"], sortKeys: ["name", "updatedAt"],
+                 defaults: { sort: { key: "updatedAt", order: "desc" } } } as const satisfies TableQueryConfig;
+
+const table = useTableQuery(CONFIG);
+const columns = useMemo(() => [
+  sortColumn(searchColumn({ title: t.name }, { param: "q", query: table.query, labels: t.table }), "name", table.query),
+  filterColumn({ title: t.status }, { param: "status", query: table.query, options, labels: t.table }),
+], [table]);
+
+<DataTable testId="bank-table" rowKey="id" columns={columns} page={page} query={table} labels={t.table}
+           actions={{ title: t.actions, render: (row) => <RowMenu row={row} /> }} />
+```
 
 ## Design tokens (theme.css)
 

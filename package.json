@@ -7,6 +7,7 @@
   "sideEffects": [
     "**/*.css",
     "./src/toast.ts",
+    "./src/antd/provider-zh.tsx",
     "./src/primitives/dialog.tsx",
     "./src/primitives/unsaved-changes.tsx"
   ],
@@ -21,6 +22,9 @@
     "./shell": "./src/shell/index.ts",
     "./table": "./src/table/index.ts",
     "./table.css": "./src/table/table.css",
+    "./antd": "./src/antd/index.tsx",
+    "./antd/theme": "./src/antd/theme.ts",
+    "./antd/*": "./src/antd/*.tsx",
     "./enterprise": "./src/enterprise/index.ts",
     "./enterprise-local-accounts": "./src/enterprise-local-accounts/index.tsx",
     "./eslint-smells": "./eslint.smells.config.mjs"
