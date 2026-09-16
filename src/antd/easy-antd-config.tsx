@@ -15,7 +15,7 @@ import { App, ConfigProvider, type ThemeConfig } from "antd";
 import type { Locale } from "antd/es/locale";
 import type { ReactNode } from "react";
 
-import { EASY_ANTD_THEME_TOKEN, type EasyAntdToken } from "./theme";
+import { createEasyAntdTheme, EASY_ANTD_THEME_TOKEN, type EasyAntdToken } from "./theme";
 
 export interface EasyAntdThemeProps {
   children: ReactNode;
@@ -40,7 +40,7 @@ export function EasyAntdConfig({ locale, children, token, components, withApp = 
   return (
     <ConfigProvider
       locale={locale}
-      theme={{ cssVar: {}, hashed: false, token: { ...EASY_ANTD_THEME_TOKEN, ...token }, components }}
+      theme={{ cssVar: {}, hashed: false, token: createEasyAntdTheme(token), components }}
     >
       {withApp ? <App component={false}>{children}</App> : children}
     </ConfigProvider>

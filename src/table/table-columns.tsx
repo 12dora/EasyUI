@@ -92,15 +92,18 @@ function KeywordFilterDropdown({
         placeholder={labels.placeholder}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter") apply();
+          // 表格常落在宿主的 <form> 里:回车只提交表头检索,不能顺带把外层表单交出去。
+          if (event.key !== "Enter") return;
+          event.preventDefault();
+          apply();
         }}
         data-test-id={`${testId}-input`}
       />
       <div className="flex justify-end gap-2">
-        <Button size="sm" variant="outline" onClick={reset} data-test-id={`${testId}-reset`}>
+        <Button type="button" size="sm" variant="outline" onClick={reset} data-test-id={`${testId}-reset`}>
           {labels.reset}
         </Button>
-        <Button size="sm" variant="primary" onClick={apply} data-test-id={`${testId}-submit`}>
+        <Button type="button" size="sm" variant="primary" onClick={apply} data-test-id={`${testId}-submit`}>
           {labels.search}
         </Button>
       </div>

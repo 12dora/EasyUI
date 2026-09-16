@@ -46,6 +46,18 @@ describe("EasyAntdProvider", () => {
     expect(document.head.textContent).toContain(`--ant-control-height:${CONTROL.height}`);
   });
 
+  it("passes host token overrides through to the antd css variables", async () => {
+    // EasyCustoms mounts the provider with a rounder radius; the override must
+    // reach ConfigProvider, not just the exported helper.
+    view = await mount(
+      <EasyAntdProvider locale="en" token={{ borderRadius: 10 }}>
+        {EMPTY_TABLE}
+      </EasyAntdProvider>,
+    );
+    expect(document.head.textContent).toContain("--ant-border-radius:10");
+    expect(document.head.textContent).toContain(`--ant-control-height:${CONTROL.height}`);
+  });
+
   it("renders children unchanged with and without the antd App wrapper", async () => {
     view = await mount(
       <EasyAntdProvider locale="en">

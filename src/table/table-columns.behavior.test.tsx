@@ -107,6 +107,21 @@ describe("searchColumn", () => {
     expect(enter.confirm).toHaveBeenCalled();
   });
 
+  it("never submits an enclosing form: buttons are type=button and Enter is consumed", async () => {
+    const column = searchColumn(COLUMN, { param: "q", query: query(""), labels: LABELS, testId: "bank-search" });
+    const props = dropdownProps();
+    const mounted = await openDropdown(column, props);
+    expect((byTestId(mounted.host, "bank-search-submit") as HTMLButtonElement).type).toBe("button");
+    expect((byTestId(mounted.host, "bank-search-reset") as HTMLButtonElement).type).toBe("button");
+    const field = byTestId(mounted.host, "bank-search-input") as HTMLInputElement;
+    await fill(field, "fire");
+    const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    field.dispatchEvent(enter);
+    // A table inside a host <form>: Enter applies the header filter only.
+    expect(enter.defaultPrevented).toBe(true);
+    expect(props.confirm).toHaveBeenCalled();
+  });
+
   it("empties the input and clears the filter on reset", async () => {
     const column = searchColumn(COLUMN, { param: "q", query: query("q=fire"), labels: LABELS, testId: "bank-search" });
     const props = dropdownProps({ selectedKeys: ["fire"] });
