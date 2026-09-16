@@ -36,6 +36,7 @@ export {
   type LeaveConfirmation,
 } from "./unsaved-changes";
 export { SegmentedToggle, type SegmentedToggleOption } from "./segmented-toggle";
+export { Switch } from "./switch";
 export { TabList, TabPanel, tabPanelId, tabTriggerId, type TabDefinition, type TabListProps, type TabPanelProps } from "./tabs";
 export { Toaster } from "./toaster";
 export { UserAvatar, avatarInitials } from "./avatar";
