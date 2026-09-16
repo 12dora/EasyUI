@@ -15,7 +15,7 @@ import { App, ConfigProvider, type ThemeConfig } from "antd";
 import type { Locale } from "antd/es/locale";
 import type { ReactNode } from "react";
 
-import { createEasyAntdTheme, EASY_ANTD_THEME_TOKEN, type EasyAntdToken } from "./theme";
+import { createEasyAntdTheme, type EasyAntdToken } from "./theme";
 
 export interface EasyAntdThemeProps {
   children: ReactNode;
