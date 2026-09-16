@@ -275,5 +275,21 @@ describe("withEllipsis / withClientSort / clientSearchColumn", () => {
     const column = clientSearchColumn(COLUMN, { param: "q", value: "fire", labels: LABELS });
     expect(column.key).toBe("q");
     expect(column.filteredValue).toEqual(["fire"]);
+    // No `subject`: filtering the rows stays the caller's job, so antd gets no `onFilter`.
+    expect(column.onFilter).toBeUndefined();
+  });
+
+  it("filters a people column by pinyin once a subject is given", () => {
+    const column = clientSearchColumn<{ name: string; namePinyin: string; namePinyinInitials: string }>(COLUMN, {
+      param: "q",
+      value: "hyq",
+      labels: LABELS,
+      subject: (row) => row,
+    });
+    const hu = { name: "胡玉琴A", namePinyin: "huyuqina", namePinyinInitials: "hyqa" };
+    const zhang = { name: "张伟", namePinyin: "zhangwei", namePinyinInitials: "zw" };
+    expect(column.onFilter?.("hyq", hu)).toBe(true);
+    expect(column.onFilter?.("hyq", zhang)).toBe(false);
+    expect(column.onFilter?.("玉琴", hu)).toBe(true);
   });
 });

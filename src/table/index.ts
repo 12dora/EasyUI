@@ -15,7 +15,9 @@
  *     pagination, empty state, actions column) on top of antd Table;
  *   - `DataTableShell` — the lower-level boundary, for hosts that want the
  *     third "sort cleared" state or their own pagination chrome;
- *   - the query functions + column decorators, usable with either.
+ *   - the query functions + column decorators, usable with either;
+ *   - `matchesPersonQuery` — the shared person / pinyin matcher for in-memory
+ *     lists (pure, no antd, no React).
  *
  * The antd `ConfigProvider` that themes all of this is a separate entry:
  * `@easy-enterprise/ui/antd`.
@@ -87,3 +89,5 @@ export {
 } from "./data-table";
 
 export { ClientTable, type ClientTableProps } from "./client-table";
+
+export { matchesPersonQuery, normalizeQuery, type PersonQuerySubject } from "./person-query";

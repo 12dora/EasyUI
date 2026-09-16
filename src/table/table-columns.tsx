@@ -18,6 +18,7 @@ import type { ColumnFilterItem, FilterDropdownProps, SortOrder } from "antd/es/t
 
 import { Button } from "../primitives/button";
 import { Input } from "../primitives/field";
+import { matchesPersonQuery, type PersonQuerySubject } from "./person-query";
 import { sameFilterValues, type TableQueryState } from "./table-query";
 
 export interface HeaderFilterOption {
@@ -302,7 +303,7 @@ export function clientQueryState(param: string, value: string): TableQueryState 
   return { filters: trimmed ? { [param]: [trimmed] } : {}, q: "", sort: null, page: 1, pageSize: 0 };
 }
 
-export interface ClientSearchOptions {
+export interface ClientSearchOptions<T = unknown> {
   /** Query key (also the key antd reports this column under). */
   param: string;
   /** Current keyword (the caller's state). */
@@ -310,10 +311,24 @@ export interface ClientSearchOptions {
   labels: TableHeaderLabels;
   placeholder?: string;
   testId?: string;
+  /**
+   * People column: the row's name + directory pinyin, and antd filters the rows
+   * itself through `matchesPersonQuery` (contract: directory pinyin) — so「hyq」
+   * 「huyuqin」「玉琴」all find 胡玉琴 without the host writing a matcher.
+   *
+   * Omit it and the column behaves exactly as before: no `onFilter`, so
+   * filtering the rows stays the caller's job.
+   */
+  subject?: (record: T) => PersonQuerySubject;
 }
 
 /** Header keyword search for an in-memory table — same funnel, value owned by the caller. */
-export function clientSearchColumn<T>(column: ColumnType<T>, options: ClientSearchOptions): ColumnType<T> {
-  const { param, value, ...rest } = options;
-  return searchColumn<T>(column, { ...rest, param, query: clientQueryState(param, value) });
+export function clientSearchColumn<T>(column: ColumnType<T>, options: ClientSearchOptions<T>): ColumnType<T> {
+  const { param, value, subject, ...rest } = options;
+  const searchable = searchColumn<T>(column, { ...rest, param, query: clientQueryState(param, value) });
+  if (!subject) return searchable;
+  return {
+    ...searchable,
+    onFilter: (filterValue, record: T) => matchesPersonQuery(String(filterValue), subject(record)),
+  };
 }

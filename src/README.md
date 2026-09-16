@@ -261,6 +261,7 @@ them here and supplies only its router, its copy and its row actions.
 | Query (pure) | `parseSort`, `formatSort`, `parseTableQuery`, `serialiseTableQuery`, `mergeTableQueryParams`, `tableListParams`, `hasTableFilters`, `applyTableQueryPatch`, `sameFilterValues`, `tableQueryOf` |
 | Query (hooks) | `useTableQueryWith(config, history)`, `useLocalTableQuery(config)` |
 | Columns | `searchColumn`, `filterColumn`, `sortColumn`, `withEllipsis`, `withClientSort`, `clientSearchColumn`, `clientQueryState`, `sortOrderFor` |
+| People (pure) | `matchesPersonQuery`, `normalizeQuery`, `PersonQuerySubject` |
 | Tables | `DataTable`, `ClientTable`, `DataTableShell`, `useAnimatedExpand` |
 | onChange helpers | `changePatch`, `filterPatch`, `sorterSort` |
 | Provider | `EasyAntdProvider`, `EasyAntdProviderZh`, `EasyAntdProviderEn`, `EasyAntdConfig`, `EASY_ANTD_THEME_TOKEN`, `createEasyAntdTheme` |
@@ -286,6 +287,23 @@ Contract highlights — these are conventions, not options:
   a fixed-right column the host fills with its own menu or links.
 - **Empty state** defaults to EasyUI's `EmptyState` with `labels.empty`, under
   `${testId}-empty`; pass `empty` to distinguish "nothing yet" from "no matches".
+- **People search means pinyin.** The directory ships `namePinyin` (full pinyin,
+  lowercase, no separators) and `namePinyinInitials` next to every person's and
+  department's `name`. Server-backed lists search those columns in the backend;
+  in-memory lists use `matchesPersonQuery(keyword, subject)` — a pure function
+  (no antd, no React) shared by every host, so「hyq」「huyuqin」「玉琴」all find
+  胡玉琴 while a CJK keyword never reaches the pinyin columns and a row missing
+  them still matches by name. A people column in a `ClientTable` gets it for free
+  by handing `clientSearchColumn` a `subject` mapper — the column then carries an
+  `onFilter` and antd filters the rows; without `subject` nothing changes and
+  filtering the rows stays the caller's:
+
+  ```tsx
+  clientSearchColumn<Person>(
+    { title: t.columns.user, render: (_, row) => row.name },
+    { param: "q", value: keyword, labels: t.common.table, subject: (row) => row },
+  )
+  ```
 
 ### Host wiring
 
