@@ -257,7 +257,7 @@ them here and supplies only its router, its copy and its row actions.
 | Layer | Exports |
 | --- | --- |
 | Constants | `TABLE_SCROLL` (`{ x: "max-content" }`), `PAGE_SIZE_OPTIONS` (`[20, 50, 100]`), `DEFAULT_PAGE_SIZE` (20) |
-| Types | `Page<T>` (`{ items, page, pageSize, total }`), `ListParams`, `TableSort`, `TableSortOrder`, `TableQueryState`, `TableQueryConfig`, `TableQueryDefaults`, `TableQueryPatch`, `TableQuery`, `TableHistory`, `DataTableLabels`, `TableHeaderLabels`, `HeaderFilterOption` |
+| Types | `Page<T>` (`{ items, page, pageSize, total }`), `ListParams`, `TableSort`, `TableSortOrder`, `TableQueryState`, `TableQueryConfig`, `TableQueryDefaults`, `TableQueryPatch`, `TableQuery`, `TableHistory`, `DataTableLabels`, `TableHeaderLabels`, `HeaderFilterOption`, `ClientTablePagination` |
 | Query (pure) | `parseSort`, `formatSort`, `parseTableQuery`, `serialiseTableQuery`, `mergeTableQueryParams`, `tableListParams`, `hasTableFilters`, `applyTableQueryPatch`, `sameFilterValues`, `tableQueryOf` |
 | Query (hooks) | `useTableQueryWith(config, history)`, `useLocalTableQuery(config)` |
 | Columns | `searchColumn`, `filterColumn`, `sortColumn`, `withEllipsis`, `withClientSort`, `clientSearchColumn`, `clientQueryState`, `sortOrderFor` |
@@ -285,6 +285,15 @@ Contract highlights — these are conventions, not options:
   A host that wants the third state uses `DataTableShell` directly.
 - **The kit ships no row menu.** `actions` is `{ title, width?, render, testId? }` —
   a fixed-right column the host fills with its own menu or links.
+- **`ClientTable` pages locally too.** An in-memory list is still a list: the
+  default is `{ pageSize: DEFAULT_PAGE_SIZE, showSizeChanger: true }`, rendered
+  bottom-right at `size="small"` with `PAGE_SIZE_OPTIONS`, and `hideOnSinglePage`
+  means a ten-row table shows no pager chrome at all. The page index is the
+  component's own state (there is no query string for an in-memory table) and
+  returns to 1 whenever the visible set changes — a new `rows` array, or a header
+  filter whose `filteredValue` moved (with `subject`, antd filters the rows and
+  the pager counts the *filtered* ones). `pagination={false}` renders every row,
+  which is what a picker inside a scrolling dialog usually wants.
 - **Empty state** defaults to EasyUI's `EmptyState` with `labels.empty`, under
   `${testId}-empty`; pass `empty` to distinguish "nothing yet" from "no matches".
 - **People search means pinyin.** The directory ships `namePinyin` (full pinyin,

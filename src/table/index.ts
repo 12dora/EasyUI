@@ -88,6 +88,6 @@ export {
   type DataTableProps,
 } from "./data-table";
 
-export { ClientTable, type ClientTableProps } from "./client-table";
+export { ClientTable, type ClientTableProps, type ClientTablePagination } from "./client-table";
 
 export { matchesPersonQuery, normalizeQuery, type PersonQuerySubject } from "./person-query";

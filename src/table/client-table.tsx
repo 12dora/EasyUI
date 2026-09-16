@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * `ClientTable` — the unpaginated, in-memory list table.
+ * `ClientTable` — the in-memory list table.
  *
  * `DataTable`'s sibling: the rows are one array (API keys, import results,
  * collaborators), there is no server paging, and sorting / keyword filtering
@@ -13,15 +13,34 @@
  * Search and filtering still live in the header only: decorate columns with
  * `clientSearchColumn` / `filterColumn` and one header action comes back through
  * `onFilters`, keyed by the column's `param`. Filtering the rows is the caller's.
+ *
+ * **Paging is local.** A list handed over in one array still must not render as
+ * 800 `<tr>`: the table pages it itself (20 rows, bottom-right, `size="small"`)
+ * and `hideOnSinglePage` keeps the chrome away from the short lists this table
+ * was originally written for. The page index is this component's own state —
+ * there is no query string to put it in — and it returns to 1 whenever the
+ * visible set changes: a new `rows` array (the caller filtered or reloaded) or
+ * a different header filter (a `clientSearchColumn` with a `subject` lets antd
+ * filter the rows, and antd counts the *filtered* rows for the pager). Pass
+ * `pagination={false}` for the old unpaginated behaviour.
  */
 
 import { Table } from "antd";
-import type { ColumnsType, TableProps } from "antd/es/table";
-import type { ReactNode } from "react";
+import type { ColumnType, ColumnsType, TablePaginationConfig, TableProps } from "antd/es/table";
+import { useState, type ReactNode } from "react";
 
 import { EmptyState } from "../primitives/empty-state";
 import { filterPatch, type DataTableLabels } from "./data-table";
 import { TABLE_SCROLL } from "./table-columns";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "./table-query";
+
+/** Local pager options. `false` (instead of this object) renders every row, unpaginated. */
+export interface ClientTablePagination {
+  /** Rows per page; defaults to `DEFAULT_PAGE_SIZE` (20). */
+  pageSize?: number;
+  /** Offer `PAGE_SIZE_OPTIONS` in the pager; defaults to `true`. */
+  showSizeChanger?: boolean;
+}
 
 export interface ClientTableProps<T extends object> {
   /** Test id of the table root; the empty state is `<testId>-empty`. */
@@ -36,6 +55,8 @@ export interface ClientTableProps<T extends object> {
   /** Header search / filter change: every filtered column at once, keyed by `param`. */
   onFilters?: (filters: Record<string, string[]>) => void;
   rowSelection?: TableProps<T>["rowSelection"];
+  /** Local pager; `false` renders all rows. Default `{ pageSize: 20, showSizeChanger: true }`. */
+  pagination?: false | ClientTablePagination;
 }
 
 export function ClientTable<T extends object>({
@@ -48,7 +69,9 @@ export function ClientTable<T extends object>({
   empty,
   onFilters,
   rowSelection,
+  pagination = {},
 }: ClientTableProps<T>) {
+  const [paging, setPaging] = useClientPaging(rows, columns, pageSizeOf(pagination));
   return (
     <div data-test-id={testId}>
       <Table<T>
@@ -59,16 +82,88 @@ export function ClientTable<T extends object>({
         columns={columns}
         dataSource={rows as T[]}
         rowSelection={rowSelection}
-        pagination={false}
+        pagination={pagination === false ? false : paginationOf(paging, pagination, labels)}
         locale={{
           emptyText: empty ?? <EmptyState size="compact" title={labels.empty} data-test-id={`${testId}-empty`} />,
           triggerAsc: labels.sortAsc,
           triggerDesc: labels.sortDesc,
         }}
-        onChange={(_pagination, filters, _sorter, extra) => {
-          if (extra.action === "filter") onFilters?.(filterPatch(filters));
+        onChange={(nextPagination, filters, _sorter, extra) => {
+          if (extra.action === "paginate") {
+            setPaging({ page: nextPagination.current ?? 1, pageSize: nextPagination.pageSize ?? paging.pageSize });
+            return;
+          }
+          if (extra.action !== "filter") return;
+          // 换了筛选条件,旧页码多半已经不存在了(和 DataTable 的 nextPage 同一条规矩)。
+          setPaging((current) => ({ ...current, page: 1 }));
+          onFilters?.(filterPatch(filters));
         }}
       />
     </div>
   );
+}
+
+/** Where the pager sits: bottom-right, compact, and gone entirely on a single page. */
+function paginationOf(
+  paging: ClientPaging,
+  pagination: ClientTablePagination,
+  labels: DataTableLabels,
+): TablePaginationConfig {
+  return {
+    current: paging.page,
+    pageSize: paging.pageSize,
+    showSizeChanger: pagination.showSizeChanger ?? true,
+    pageSizeOptions: [...PAGE_SIZE_OPTIONS],
+    size: "small",
+    hideOnSinglePage: true,
+    // antd 6 把 `position` 换成了 `placement`,用旧名每次渲染都会打一条弃用警告。
+    placement: ["bottomEnd"],
+    locale: { items_per_page: labels.pageSize },
+  };
+}
+
+function pageSizeOf(pagination: false | ClientTablePagination): number {
+  if (pagination === false) return DEFAULT_PAGE_SIZE;
+  return pagination.pageSize ?? DEFAULT_PAGE_SIZE;
+}
+
+interface ClientPaging {
+  page: number;
+  pageSize: number;
+}
+
+/** Separators that cannot occur inside a filter value, so the key stays unambiguous. */
+const VALUE_SEPARATOR = "\u0000";
+const COLUMN_SEPARATOR = "\u0001";
+
+/**
+ * Which rows are on screen: the controlled header filters of every column.
+ *
+ * A `filterColumn` / `clientSearchColumn` carries its current selection as
+ * `filteredValue`, so a change here means antd is about to show a different
+ * subset — even though `rows` itself did not move.
+ */
+function filtersKey<T extends object>(columns: ColumnsType<T>): string {
+  const values = columns.map((column) => ((column as ColumnType<T>).filteredValue ?? []).join(VALUE_SEPARATOR));
+  return values.join(COLUMN_SEPARATOR);
+}
+
+/**
+ * Page index + page size, reset to page 1 whenever the visible set changes.
+ *
+ * Adjusting state during render (React's own "derive state from props" recipe)
+ * rather than in an effect: page 3 of a list that just shrank to one page would
+ * otherwise paint empty for a frame before the effect corrected it.
+ */
+function useClientPaging<T extends object>(rows: readonly T[], columns: ColumnsType<T>, pageSize: number) {
+  const filters = filtersKey(columns);
+  const [paging, setPaging] = useState<ClientPaging>({ page: 1, pageSize });
+  const [seen, setSeen] = useState({ rows, filters, pageSize });
+  if (seen.rows !== rows || seen.filters !== filters || seen.pageSize !== pageSize) {
+    // 调用方改了默认页大小才跟着回到默认值,用户在分页器里选的档位不能被普通重渲染吞掉。
+    const resized = seen.pageSize !== pageSize;
+    setSeen({ rows, filters, pageSize });
+    setPaging((current) => ({ page: 1, pageSize: resized ? pageSize : current.pageSize }));
+  }
+  return [paging, setPaging] as const;
 }
