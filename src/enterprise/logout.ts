@@ -5,7 +5,7 @@
  *
  * 只清本地会话是不够的:Authentik 那边的会话还在,下一次点「登录」会被直接放行,而且浏览器
  * 会停在 Authentik 自己的 session-end 页,再登录还落到 Authentik 用户门户 —— 用户看到的是
- * 「退不干净、回不了应用」。所以本地撤销之前,先问后端要一份 end-session 表单:
+ * 「退不干净、回不了应用」。所以本地撤销之前,先问后端要一份 end-session 参数:
  *
  * ```
  * POST {apiBase}/auth/oidc/end-session     Authorization: Bearer <当前会话 token>
@@ -15,14 +15,15 @@
  * → 404 { "code": "NO_END_SESSION" }   本地账号 / 没存过 id_token / OIDC 未启用
  * ```
  *
- * 顺序是硬性的:这一步必须在 `revoke()` **之前**(那时本地 bearer 还有效),拿到表单之后才
- * 撤销本地会话。navigate 走隐藏表单 POST 而不是 GET —— 带钉钉声明的 id_token 很长,GET 会被
- * 网关按 414 截断。任何一步失败都回落到今天的行为(`/status.endSessionUrl` 顶层 GET),没有
+ * 顺序是硬性的:这一步必须在 `revoke()` **之前**(那时本地 bearer 还有效),拿到参数之后才
+ * 撤销本地会话。任何一步失败都回落到今天的行为(`/status.endSessionUrl` 顶层 GET),没有
  * `endSessionUrl` 就留在 `/<locale>/logged-out`,绝不把用户卡在半截流程里。
  *
- * 宿主前置条件:CSP 的 `form-action` 必须放行 Authentik 源(见 docs/LOGOUT.md 的宿主清单)。
- * 没放行时表单提交会被浏览器静默拦掉 —— 不抛异常、不发事件、页面停在原地,所以提交之后还要
- * 等一个短窗口(`ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS`),没开始离开本页就继续回落。
+ * navigate 走 **GET**(`fields` 拼进 query,`location.assign` 一次顶层导航),不是隐藏表单
+ * POST:Authentik 的 end-session 视图挂着 Django 的 CSRF 保护,跨站 POST 一律 403
+ * 「CSRF验证失败」,而 OIDC RP-initiated logout 本来就允许 GET。也正因为不再提交表单,
+ * **宿主不再需要为 CSP 的 `form-action` 放行 Authentik 源**(`location.assign` 受
+ * `form-action` 管不着),那条前置条件已作废;提交后等导航开始的那层看门狗也一并去掉了。
  */
 
 import { safeInternalTarget, type EnterpriseOidcStatus } from "./auth-controller";
@@ -30,20 +31,19 @@ import { abortEnterpriseIdentityChecks } from "./identity-check-controller";
 
 /** 宿主支持的 locale 前缀;`returnTo` 默认按它从 pathname 推出来。 */
 export const ENTERPRISE_LOGOUT_LOCALES = ["zh-CN", "en"] as const;
-/** 隐藏 end-session 表单的 data-test-id;宿主不要依赖它,只给测试用。 */
-export const ENTERPRISE_END_SESSION_FORM_TEST_ID = "enterprise-end-session-form";
 /** `/status` / end-session / `revoke` 每一步的上限:网络挂住也不能让用户「点了登出没反应」。 */
 export const ENTERPRISE_LOGOUT_TIMEOUT_MS = 3000;
-/** 表单提交后等导航开始的上限;到点还在原地(典型是 CSP 拦了 form-action)就走 GET 回落。 */
-export const ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS = 1500;
 
-/** 后端 `POST /auth/oidc/end-session` 的 200 响应:一份待自动提交的表单。 */
+/** 后端 `POST /auth/oidc/end-session` 的 200 响应:上游端点 + 要带过去的参数。 */
 export interface EnterpriseEndSessionForm {
   /** 上游 end-session 端点,必须是 https。 */
   url: string;
-  /** 只认 POST;后端显式给别的动词一律当「拿不到表单」回落。 */
+  /**
+   * 后端建议的动词。仅作历史契约保留:本包一律按 GET 导航(Authentik 的 CSRF 保护挡跨站
+   * POST),所以这里给什么都不改变行为。
+   */
   method?: string | null;
-  /** 隐藏域:必须含 `id_token_hint`,外加可选的 `post_logout_redirect_uri`。 */
+  /** 要拼进 query 的参数:必须含 `id_token_hint`,外加可选的 `post_logout_redirect_uri`。 */
   fields?: Record<string, string> | null;
 }
 
@@ -92,28 +92,22 @@ function readEndSessionFields(raw: unknown): Record<string, string> {
   return fields;
 }
 
-function isPostMethod(method: string | null | undefined): boolean {
-  return (method ?? "POST").trim().toUpperCase() === "POST";
-}
-
 function readEndSessionForm(body: unknown): EnterpriseEndSessionForm | null {
   if (!body || typeof body !== "object") return null;
   const record = body as { url?: unknown; method?: unknown; fields?: unknown };
   const url = typeof record.url === "string" ? record.url.trim() : "";
   // 上游 URL 来自后端,但它最终会被顶层导航用掉:https 之外一律不认(与今天的 endSessionUrl 同一把尺)。
   if (!url || !isSafeHttpsUrl(url)) return null;
-  // 后端说 GET 就当这份表单没法用:`id_token_hint` 是整个 JWT,放 query 会被网关按 414 截断。
-  if (typeof record.method === "string" && !isPostMethod(record.method)) return null;
   const fields = readEndSessionFields(record.fields);
-  // 没有 hint 的表单在 Authentik 那边等于白发:它会忽略 post_logout_redirect_uri,把用户留在
+  // 没有 hint 的请求在 Authentik 那边等于白发:它会忽略 post_logout_redirect_uri,把用户留在
   // 自己的 session-end 页 —— 正是这条链要修的病。宁可回落今天的 GET。
   const hint = fields.id_token_hint;
   if (!hint || !hint.trim()) return null;
-  return { url, method: "POST", fields };
+  return { url, fields };
 }
 
 /**
- * 向后端要 end-session 表单。必须在本地会话被撤销之前调用。
+ * 向后端要 end-session 参数。必须在本地会话被撤销之前调用。
  *
  * 404(`NO_END_SESSION`)、401、5xx、网络错误、响应形状不对 —— 一律回 `null`,由调用方回落。
  */
@@ -133,36 +127,17 @@ export async function requestEnterpriseEndSession(adapter: EnterpriseLogoutAdapt
 }
 
 /**
- * 隐藏表单自动提交到上游 end-session 端点。
+ * 把后端给的 end-session 参数拼成一个可直接导航的 GET URL(`fields` 进 query)。
  *
- * 用表单 POST 而不是 `location.assign` 的唯一原因是长度:`id_token_hint` 是一整个 JWT。
- * 任何一步失败(body 已经没了、字段名遮住了 `submit`、动词不是 POST)都返回 `false`,让
- * 调用方接着往下回落 —— 这时本地会话已经清掉了,绝不能把用户扔在原地。
+ * 用 GET 而不是表单 POST:Authentik 的 end-session 视图受 Django CSRF 保护,跨站 POST 只会
+ * 换来 403「CSRF验证失败」,而 OIDC 规范对 end-session 端点 GET / POST 都认。URL 非 https
+ * 就回 `null`,由调用方继续回落 —— 这时本地会话已经清了,绝不能把用户扔在原地。
  */
-export function submitEnterpriseEndSessionForm(form: EnterpriseEndSessionForm): boolean {
-  if (!isSafeHttpsUrl(form.url) || !isPostMethod(form.method)) return false;
-  const element = document.createElement("form");
-  try {
-    element.setAttribute("method", "POST");
-    element.setAttribute("action", form.url);
-    element.setAttribute("data-test-id", ENTERPRISE_END_SESSION_FORM_TEST_ID);
-    element.hidden = true;
-    element.style.display = "none";
-    for (const [name, value] of Object.entries(form.fields ?? {})) {
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = name;
-      input.value = value;
-      element.appendChild(input);
-    }
-    // 卸载中的文档没有 body;`element.submit` 可能被同名隐藏域遮住 —— 走原型上的那个。
-    (document.body ?? document.documentElement).appendChild(element);
-    HTMLFormElement.prototype.submit.call(element);
-    return true;
-  } catch {
-    element.remove();
-    return false;
-  }
+export function enterpriseEndSessionUrl(form: EnterpriseEndSessionForm): string | null {
+  if (!isSafeHttpsUrl(form.url)) return null;
+  const query = new URLSearchParams(form.fields ?? {}).toString();
+  if (!query) return form.url;
+  return `${form.url}${form.url.includes("?") ? "&" : "?"}${query}`;
 }
 
 async function prepareEndSession(adapter: EnterpriseLogoutAdapter, status: EnterpriseOidcStatus, returnTo: string | null | undefined): Promise<EnterpriseEndSessionForm | null> {
@@ -175,10 +150,10 @@ async function prepareEndSession(adapter: EnterpriseLogoutAdapter, status: Enter
 }
 
 /**
- * 退出登录。OIDC 会话按 end-session 表单 → 今天的 `endSessionUrl` GET → 留在 logged-out
+ * 退出登录。OIDC 会话按 end-session GET → 今天的 `endSessionUrl` GET → 留在 logged-out
  * 三级回落;本地会话只清本地。`options.returnTo` 让宿主指定回哪个页面(默认 `/<locale>/login`)。
  *
- * 撤销之前的两个网络调用都有 3 s 上限:上游挂住时按「拿不到表单」继续走,本地会话照样清掉 ——
+ * 撤销之前的两个网络调用都有 3 s 上限:上游挂住时按「拿不到参数」继续走,本地会话照样清掉 ——
  * 卡在一半(本地还登着、页面不动)比退不干净更糟。
  */
 export async function performEnterpriseLogout(adapter: EnterpriseLogoutAdapter, redirectToLoggedOut: () => void, options?: EnterpriseLogoutOptions): Promise<void> {
@@ -192,35 +167,13 @@ export async function performEnterpriseLogout(adapter: EnterpriseLogoutAdapter, 
   navigateAfterEnterpriseLogout(form, status, redirectToLoggedOut);
 }
 
-/** 三级回落:end-session 表单 POST → 今天的 `endSessionUrl` 顶层 GET → 留在 logged-out 页。 */
+/** 三级回落:带 hint 的 end-session GET → 今天的 `endSessionUrl` 顶层 GET → 留在 logged-out 页。 */
 function navigateAfterEnterpriseLogout(form: EnterpriseEndSessionForm | null, status: EnterpriseOidcStatus | null, redirectToLoggedOut: () => void): void {
-  const fallback = () => {
-    const url = status?.endSessionUrl?.trim();
-    if (url && isSafeHttpsUrl(url)) { window.location.assign(url); return; }
-    redirectToLoggedOut();
-  };
-  if (form && submitEnterpriseEndSessionForm(form)) { watchEndSessionNavigation(fallback); return; }
-  fallback();
-}
-
-/**
- * 表单提交是「同步返回、异步导航」:CSP `form-action` 没放行 Authentik 源时,浏览器把这次
- * 提交静默拦掉 —— 不抛异常、不发事件,页面就停在原地,而本地会话已经清了。所以提交之后再等
- * 一个短窗口,期间没有开始离开本页就继续回落到 GET / logged-out。
- *
- * 判据用 `beforeunload` / `pagehide` 而不是计时器单打:前者在导航**开始时**(还没等上游响应)
- * 就触发,所以上游慢不会被误判成「被拦了」而把在飞的 POST 打断。
- */
-function watchEndSessionNavigation(fallback: () => void): void {
-  let leaving = false;
-  const onLeave = () => { leaving = true; };
-  window.addEventListener("pagehide", onLeave);
-  window.addEventListener("beforeunload", onLeave);
-  window.setTimeout(() => {
-    window.removeEventListener("pagehide", onLeave);
-    window.removeEventListener("beforeunload", onLeave);
-    if (!leaving) fallback();
-  }, ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS);
+  const target = form ? enterpriseEndSessionUrl(form) : null;
+  if (target) { window.location.assign(target); return; }
+  const url = status?.endSessionUrl?.trim();
+  if (url && isSafeHttpsUrl(url)) { window.location.assign(url); return; }
+  redirectToLoggedOut();
 }
 
 function isSafeHttpsUrl(value: string) { try { return new URL(value).protocol === "https:"; } catch { return false; } }

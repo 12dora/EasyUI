@@ -5,8 +5,14 @@
 回不了应用」。
 
 本包的 `performEnterpriseLogout` 负责把这条链补完:**在撤销本地会话之前**向后端要一份
-end-session 表单,本地清干净之后用隐藏表单 POST 到 Authentik,由 Authentik 把浏览器送回
-应用自己的登录页。
+end-session 参数,本地清干净之后把它们拼进 query、用一次顶层 GET 导航到 Authentik,由
+Authentik 把浏览器送回应用自己的登录页。
+
+> 2026-09-16 修复:上游那一跳曾经是隐藏表单 POST,结果被 Authentik 的 Django CSRF 保护挡下
+> (跨站 POST 一律 403「CSRF验证失败. 请求被中断.」),每个应用右上角的「退出登录」都死在那一页。
+> 现在改成 GET(OIDC 的 end-session 端点 GET / POST 都认)。**宿主因此不再需要为 CSP 的
+> `form-action` 放行 Authentik 源** —— `location.assign` 不受 `form-action` 管;已经加过那一源的
+> 宿主留着也无害,可以顺手删掉。
 
 ## 后端契约(EasyFrame `enterprise_platform`)
 
@@ -36,8 +42,9 @@ Content-Type: application/json
 同一 api base 下的兄弟路由从 `authorizePath` 推(`…/auth/oidc/authorize` → `…/auth/oidc/end-session`)。
 `authorizePath` 不是以 `/authorize` 结尾的相对路径时直接判定「推不出来」,跳过 end-session。
 
-上游那一跳必须是 **POST 表单**,不是 GET:带钉钉声明的 `id_token_hint` 是一整个 JWT,GET 会被
-网关按 414 截断。
+响应里的 `method` 只是历史契约,本包不再照它行事:上游那一跳一律是 **GET**(`fields` 全部拼进
+query)。Authentik 的 end-session 视图受 Django CSRF 保护,跨站 POST 只会换来 403;`id_token_hint`
+虽然是一整个 JWT,但实测在网关的 URL 长度限制之内。
 
 Authentik 侧还要给 provider 注册一条 `redirect_uri_type: logout` 的 URI,strict / regex 命中
 `post_logout_redirect_uri`,否则 Authentik 会忽略它、照样停在自己的页面(由部署脚本负责,
@@ -57,11 +64,9 @@ Authentik 侧还要给 provider 注册一条 `redirect_uri_type: logout` 的 URI
 
 | 情形 | 结果 |
 | --- | --- |
-| end-session 返回 200、`url` 是 https、`method` 是 POST、`fields.id_token_hint` 非空 | 隐藏表单 POST 到 `url`,隐藏域就是 `fields` |
-| 404 / 401 / 5xx / 网络错误 / 3 s 超时 / 响应形状不对 / `url` 非 https / `method` 不是 POST / 缺 `id_token_hint` | 回落今天的行为:`/status.endSessionUrl` 顶层 GET(同样过 https 校验) |
+| end-session 返回 200、`url` 是 https、`fields.id_token_hint` 非空 | `location.assign(url + "?" + fields)`,一次顶层 GET(`url` 自己带 query 就用 `&` 续上) |
+| 404 / 401 / 5xx / 网络错误 / 3 s 超时 / 响应形状不对 / `url` 非 https / 缺 `id_token_hint` | 回落今天的行为:`/status.endSessionUrl` 顶层 GET(同样过 https 校验) |
 | 宿主适配器没给 `apiUrl`,或 `authToken()` 是空 | 不发 end-session(没 bearer 只会换来 401),直接走上一行的 GET 回落 —— 未升级的宿主行为不变 |
-| 表单挂不上 / `submit()` 抛异常(文档正在卸载、字段名遮住了 `submit`) | 同上,继续往下回落;**绝不**因为一个异常把用户扔在已清会话的当前页 |
-| 表单提交了,但 1.5 s 内页面没开始离开(典型:CSP `form-action` 静默拦截) | 同上,改走 `endSessionUrl` 顶层 GET |
 | 两者都没有 | 停在 `/<locale>/logged-out`(宿主传进来的 `redirectToLoggedOut`) |
 
 「缺 `id_token_hint` 也算失败」不是洁癖:Authentik 没有有效 hint 就会忽略 `post_logout_redirect_uri`,
@@ -71,44 +76,18 @@ Authentik 侧还要给 provider 注册一条 `redirect_uri_type: logout` 的 URI
 `/<locale>/login`,否则 `/login`。宿主传进来的 `returnTo` 要过和 OIDC 回调 `next` 同一把尺
 (`safeInternalTarget`:必须单个 `/` 开头,`//`、反斜杠、控制字符一律丢弃回默认值)。
 
-## 宿主要做的三件事(顺序不能换)
+## 宿主要做的两件事
 
-### 1. 先给 CSP 的 `form-action` 放行 Authentik 源
+> 以前这里还有一条「先给 CSP 的 `form-action` 放行 Authentik 源」。上游那一跳改成 GET 之后
+> **它不再是前置条件**:`location.assign` 的顶层导航不受 `form-action` 约束(那条指令只管表单
+> 提交的目标)。已经放行过的宿主不用回滚,新宿主也不用再加。
 
-**这一步必须排在 `apiUrl` / `authToken` 之前。** 现有宿主的 CSP 都是 `form-action 'self'`
-(静默复查那一轮只放宽了 `frame-src`,`form-action` 一个字没动)。这条指令一收紧,浏览器就会把
-本包提交的那张隐藏表单**静默拦掉**:不抛异常、不发事件、页面停在原地,而本地会话已经清了 ——
-用户看到的是「点了退出什么都没发生」,Authentik 那边的会话还活着。先加 `authToken` 后加 CSP,
-比不升级还糟。
-
-```diff
-- "form-action 'self'",
-+ // 登出要把 end-session 表单 POST 给 Authentik(见 EasyUI docs/LOGOUT.md),少这一源会被静默拦掉。
-+ "form-action 'self' https://auth.jiefakj.com",
-```
-
-四个宿主各改一处(行号以 2026-09-16 的 HEAD 为准,按 `form-action` 搜更稳):
-
-| 宿主 | 文件 |
-| --- | --- |
-| EasyTrade | `frontend/next.config.ts`(`form-action 'self'`,约 :63) |
-| EasyCustoms | `frontend/apps/customs/next.config.ts`(约 :55) |
-| EasyLearning | `frontend/apps/learning/next.config.ts`(约 :56) |
-| EasyFrame blank(模板) | `frontend/apps/blank/next.config.ts`(约 :31) |
-
-Authentik 源就是 `/status.endSessionUrl` / end-session `url` 的源(生产是
-`https://auth.jiefakj.com`),**只加这一个源**,别写 `form-action *`。宿主如果有路由头断言用例
-(EasyTrade `tests/*.spec.ts` 那种),顺手加一条「CSP 的 `form-action` 含 Authentik 源」。
-
-本包自己也留了一层保险:表单提交 1.5 s 后页面还在原地,就回落到 `endSessionUrl` 顶层 GET。
-那是兜底,不是替代 —— 走到兜底意味着用户多等 1.5 s,而且 GET 带不动长 `id_token_hint`。
-
-### 2. bump 本包的 submodule pin
+### 1. bump 本包的 submodule pin
 
 `performEnterpriseLogout(adapter, redirectToLoggedOut)` 的签名没变,调用点一个字都不用改;
 只 bump pin 的宿主行为与今天完全一致(走 `endSessionUrl` GET 回落)。
 
-### 3. 在登出适配器上补两个可选成员
+### 2. 在登出适配器上补两个可选成员
 
 它们是本包唯一拿不到的东西:api base 与当前 bearer。两行都是宿主早就有的函数,**两个都给全**:
 `apiUrl` 决定往哪发,`authToken()` 决定能不能发(缺任一或 token 为空,本包直接跳过 end-session
@@ -136,13 +115,15 @@ await performEnterpriseLogout(adapter, () => router.replace(`/${locale}/logged-o
 ```
 
 后端侧对应的宿主清单(账号模型加 `oidc_id_token` 列 + 迁移 + 适配器实现 `store_id_token` /
-`end_session_hint`)见 EasyFrame 的 OIDC 登出文档;前端只要上面这三件。
+`end_session_hint`)见 EasyFrame 的 OIDC 登出文档;前端只要上面这两件。
 
 ## 安全边界
 
 - 上游 URL(后端返回的 `url` 与 `/status` 的 `endSessionUrl`)只认 `https:`,其余一律不导航。
-- `id_token_hint` 只经由隐藏表单的 `<input type="hidden">` 出现一次:不落 URL、不落
-  localStorage、不进日志。用 POST 也顺带保证它不会出现在地址栏与 Referer 里。
+- `id_token_hint` 会随这一次顶层导航出现在 URL 的 query 里(Authentik 的 CSRF 保护不接受跨站
+  POST,只能走 GET)。它不落 localStorage、不进应用日志,且只是一张**注销凭证**:Authentik 校验
+  完就把会话结束掉,不能拿它换任何访问权。跨源导航的 Referer 也带不走它(默认
+  `strict-origin-when-cross-origin` 只发源)。
 - `returnTo` 永远是本站相对路径,不接受绝对 URL —— 真正的 `post_logout_redirect_uri` 由后端
   用自己的 frontend base URL 拼,前端无权指定外站。
 - 登出会 `abortEnterpriseIdentityChecks()`,静默复查(见 [`IDENTITY-CHECK.md`](IDENTITY-CHECK.md))
@@ -157,16 +138,15 @@ performEnterpriseLogout(adapter, redirectToLoggedOut, options?): Promise<void>
   // options: { returnTo?: string | null }
 EnterpriseLogoutAdapter          // revoke / loadOidcStatus / authMethod / clearLocalSession
                                  // / clearAuthMethod / markLoggedOut? / apiUrl? / authToken?
-EnterpriseEndSessionForm         // { url, method?, fields? }
+EnterpriseEndSessionForm         // { url, method?(忽略), fields? }
 EnterpriseLogoutOptions
 requestEnterpriseEndSession(adapter, status, returnTo): Promise<EnterpriseEndSessionForm | null>
-submitEnterpriseEndSessionForm(form): boolean
+enterpriseEndSessionUrl(form): string | null   // fields 拼进 query 的 GET 目标;非 https 回 null
 enterpriseLogoutReturnTo(pathname, locales?): string
 enterpriseEndSessionPath(status): string | null
 abortEnterpriseIdentityChecks(): void          // 来自 identity-check-controller
-ENTERPRISE_LOGOUT_LOCALES / ENTERPRISE_END_SESSION_FORM_TEST_ID
+ENTERPRISE_LOGOUT_LOCALES
 ENTERPRISE_LOGOUT_TIMEOUT_MS                   // 3000:status / end-session / revoke 每一步的上限
-ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS   // 1500:提交后等导航开始的上限,到点回落 GET
 resetEnterpriseIdentityCheckAbort(): void      // 只给测试用,解开上面那把登出闩
 ```
 

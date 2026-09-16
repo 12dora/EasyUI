@@ -2,19 +2,18 @@
 // @vitest-environment-options { "settings": { "disableIframePageLoading": true } }
 /**
  * User risk: 退出登录时上游 Authentik 的会话没被结束,用户以为自己退干净了,下一个人打开
- * 浏览器点「登录」会被直接放行;或者退出卡在 Authentik 自己的页面回不来。这里锁死三件事:
- * end-session 必须在本地撤销之前带着 bearer 发出去、失败必须回落到今天的行为、上游 URL
- * 只认 https。
+ * 浏览器点「登录」会被直接放行;或者退出卡在 Authentik 自己的页面回不来。这里锁死四件事:
+ * end-session 必须在本地撤销之前带着 bearer 发出去、上游那一跳必须是**顶层 GET**(带 query
+ * 里的 id_token_hint / post_logout_redirect_uri,绝不再提交表单 —— Authentik 的 Django CSRF
+ * 会把跨站 POST 判 403)、失败必须回落到今天的行为、上游 URL 只认 https。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  ENTERPRISE_END_SESSION_FORM_TEST_ID,
-  ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS,
   enterpriseEndSessionPath,
+  enterpriseEndSessionUrl,
   enterpriseLogoutReturnTo,
   performEnterpriseLogout,
-  submitEnterpriseEndSessionForm,
   type EnterpriseLogoutAdapter,
 } from "./logout";
 import type { EnterpriseOidcStatus } from "./auth-controller";
@@ -38,9 +37,11 @@ const FORM_BODY = {
   fields: { id_token_hint: "raw.jwt.value", post_logout_redirect_uri: "https://app.example.test/zh-CN/login" },
 };
 
+/** 后端给的 fields 拼进 query 之后,浏览器该被送去的那个地址。 */
+const EXPECTED_END_SESSION_URL = `${FORM_BODY.url}?id_token_hint=raw.jwt.value&post_logout_redirect_uri=https%3A%2F%2Fapp.example.test%2Fzh-CN%2Flogin`;
+
 let calls: string[];
 let assigned: string[];
-let submitted: HTMLFormElement[];
 
 function response(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body } as unknown as Response;
@@ -60,29 +61,20 @@ function makeAdapter(overrides: Partial<EnterpriseLogoutAdapter> = {}): Enterpri
   };
 }
 
+/** 这条链里再也不该有表单:任何一个 <form> 都意味着 CSRF 403 的老路又回来了。 */
 function formElement(): HTMLFormElement | null {
-  return document.querySelector<HTMLFormElement>(`form[data-test-id='${ENTERPRISE_END_SESSION_FORM_TEST_ID}']`);
-}
-
-function hiddenFields(form: HTMLFormElement): Record<string, string> {
-  const entries = [...form.querySelectorAll<HTMLInputElement>("input")].map((input) => [input.name, input.value] as const);
-  return Object.fromEntries(entries);
+  return document.querySelector<HTMLFormElement>("form");
 }
 
 beforeEach(() => {
   calls = [];
   assigned = [];
-  submitted = [];
-  // 提交后的「导航没开始」看门狗是一个真实的 setTimeout;用假时钟才能既断言它、又不让它在
-  // 别的用例里迟到地开火。
+  // 每一步网络调用的 3 s 上限都是真实的 setTimeout;用假时钟才不会让它们在别的用例里迟到地开火。
   vi.useFakeTimers();
   resetEnterpriseIdentityCheckAbort();
   if (!document.body) document.documentElement.appendChild(document.createElement("body"));
   document.body.innerHTML = "";
-  // 「document 没有 body」那个用例会把表单挂到 <html> 上,别让它漏进下一个用例。
-  for (const stale of document.querySelectorAll(`form[data-test-id='${ENTERPRISE_END_SESSION_FORM_TEST_ID}']`)) stale.remove();
   window.history.replaceState(null, "", "/zh-CN/dashboard");
-  vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(function submitSpy(this: HTMLFormElement) { calls.push("submit"); submitted.push(this); });
   vi.spyOn(window.location, "assign").mockImplementation((href: string | URL) => { calls.push("assign"); assigned.push(String(href)); });
 });
 
@@ -118,48 +110,38 @@ describe("enterpriseEndSessionPath", () => {
   });
 });
 
-describe("submitEnterpriseEndSessionForm", () => {
-  it("appends a hidden POST form with one input per field and submits it", () => {
-    expect(submitEnterpriseEndSessionForm(FORM_BODY)).toBe(true);
-    const form = formElement();
-    expect(form).not.toBeNull();
-    expect(form?.getAttribute("method")).toBe("POST");
-    expect(form?.getAttribute("action")).toBe(FORM_BODY.url);
-    expect(form?.hidden).toBe(true);
-    expect(hiddenFields(form!)).toEqual(FORM_BODY.fields);
-    expect([...form!.querySelectorAll("input")].every((input) => input.type === "hidden")).toBe(true);
-    expect(submitted).toEqual([form]);
+describe("enterpriseEndSessionUrl", () => {
+  it("puts every field in the query string of a plain https GET target", () => {
+    expect(enterpriseEndSessionUrl(FORM_BODY)).toBe(EXPECTED_END_SESSION_URL);
+    const target = new URL(enterpriseEndSessionUrl(FORM_BODY)!);
+    expect(target.searchParams.get("id_token_hint")).toBe(FORM_BODY.fields.id_token_hint);
+    expect(target.searchParams.get("post_logout_redirect_uri")).toBe(FORM_BODY.fields.post_logout_redirect_uri);
   });
 
-  it("refuses a non-https action and submits nothing", () => {
-    expect(submitEnterpriseEndSessionForm({ ...FORM_BODY, url: "http://auth.example.test/end-session/" })).toBe(false);
-    expect(formElement()).toBeNull();
-    expect(submitted).toEqual([]);
+  it("appends to an endpoint that already carries a query instead of starting a second one", () => {
+    expect(enterpriseEndSessionUrl({ ...FORM_BODY, url: "https://auth.example.test/end-session/?tenant=a" }))
+      .toBe("https://auth.example.test/end-session/?tenant=a&id_token_hint=raw.jwt.value&post_logout_redirect_uri=https%3A%2F%2Fapp.example.test%2Fzh-CN%2Flogin");
   });
 
-  it("refuses a GET form so the JWT never lands in a query string", () => {
-    expect(submitEnterpriseEndSessionForm({ ...FORM_BODY, method: "GET" })).toBe(false);
-    expect(formElement()).toBeNull();
-    expect(submitted).toEqual([]);
+  it("keeps the bare endpoint when the backend sends no fields", () => {
+    expect(enterpriseEndSessionUrl({ url: FORM_BODY.url })).toBe(FORM_BODY.url);
   });
 
-  it("reports failure (instead of throwing) when submit() itself blows up, and leaves no orphan form", () => {
-    vi.spyOn(HTMLFormElement.prototype, "submit").mockImplementation(() => { throw new TypeError("submit is not a function"); });
-    expect(submitEnterpriseEndSessionForm(FORM_BODY)).toBe(false);
-    expect(formElement()).toBeNull();
+  it("refuses a non-https endpoint", () => {
+    expect(enterpriseEndSessionUrl({ ...FORM_BODY, url: "http://auth.example.test/end-session/" })).toBeNull();
+    expect(enterpriseEndSessionUrl({ ...FORM_BODY, url: "javascript:alert(1)" })).toBeNull();
   });
 
-  it("still submits when the document has no body left (mid-unload)", () => {
-    document.body.remove();
-    expect(document.body).toBeNull();
-    expect(submitEnterpriseEndSessionForm(FORM_BODY)).toBe(true);
-    expect(submitted).toHaveLength(1);
-    expect(submitted[0]?.parentElement).toBe(document.documentElement);
+  it("ignores the verb the backend declares: this hop is always a GET", () => {
+    // 老契约里 method 是 "POST";Authentik 的 Django CSRF 会把跨站 POST 判 403,所以本包
+    // 不再照做 —— 后端将来改口说 GET 也不该把登出打回回落路径。
+    expect(enterpriseEndSessionUrl({ ...FORM_BODY, method: "GET" })).toBe(EXPECTED_END_SESSION_URL);
+    expect(enterpriseEndSessionUrl({ ...FORM_BODY, method: null })).toBe(EXPECTED_END_SESSION_URL);
   });
 });
 
 describe("performEnterpriseLogout", () => {
-  it("asks for the end-session form with the bearer before revoking, then POSTs it", async () => {
+  it("asks for the end-session params with the bearer before revoking, then navigates by GET", async () => {
     const fetchMock = vi.fn(async () => response(200, FORM_BODY));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -172,11 +154,15 @@ describe("performEnterpriseLogout", () => {
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer session-token");
     expect(JSON.parse(String(init.body))).toEqual({ returnTo: "/zh-CN/login" });
     // 一条时间线上锁两件事:end-session 排在 revoke 之前(本地会话一撤销 bearer 就作废),
-    // 表单提交严格排在 clearLocalSession 之后(否则浏览器可能带着还活着的本地会话离开本页)。
-    expect(calls).toEqual(["status", "revoke", "clearLocalSession", "markLoggedOut", "clearAuthMethod", "submit"]);
-    expect(hiddenFields(formElement()!)).toEqual(FORM_BODY.fields);
-    expect(submitted).toHaveLength(1);
-    expect(assigned).toEqual([]);
+    // 那一次顶层导航严格排在 clearLocalSession 之后(否则浏览器可能带着还活着的本地会话离开本页)。
+    expect(calls).toEqual(["status", "revoke", "clearLocalSession", "markLoggedOut", "clearAuthMethod", "assign"]);
+    // 只导航一次,而且是 GET:hint 与回跳地址都在 query 里,页面上不留任何表单(表单 POST 会被
+    // Authentik 的 Django CSRF 判 403,正是这次要修的病)。
+    expect(assigned).toEqual([EXPECTED_END_SESSION_URL]);
+    const target = new URL(assigned[0]!);
+    expect(target.searchParams.get("id_token_hint")).toBe(FORM_BODY.fields.id_token_hint);
+    expect(target.searchParams.get("post_logout_redirect_uri")).toBe(FORM_BODY.fields.post_logout_redirect_uri);
+    expect(formElement()).toBeNull();
   });
 
   it("sends the host's returnTo override when one is given", async () => {
@@ -236,23 +222,22 @@ describe("performEnterpriseLogout fallbacks", () => {
     expect(assigned).toEqual([STATUS.endSessionUrl]);
   });
 
-  it("treats a 200 without a usable id_token_hint as no form at all", async () => {
+  it("treats a 200 without a usable id_token_hint as nothing usable at all", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response(200, { ...FORM_BODY, fields: { post_logout_redirect_uri: "https://app.example.test/zh-CN/login", id_token_hint: "  " } })));
 
     await performEnterpriseLogout(makeAdapter(), () => calls.push("redirect"));
 
-    // Authentik 没有 hint 就忽略 post_logout_redirect_uri,用户停在它自己的页面 —— 不如走 GET。
-    expect(submitted).toEqual([]);
+    // Authentik 没有 hint 就忽略 post_logout_redirect_uri,用户停在它自己的页面 —— 不如走老的 GET。
     expect(assigned).toEqual([STATUS.endSessionUrl]);
   });
 
-  it("refuses a backend-declared GET form and falls back", async () => {
+  it("still ends the upstream session when the backend declares a GET form", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response(200, { ...FORM_BODY, method: "GET" })));
 
     await performEnterpriseLogout(makeAdapter(), () => calls.push("redirect"));
 
-    expect(submitted).toEqual([]);
-    expect(assigned).toEqual([STATUS.endSessionUrl]);
+    expect(assigned).toEqual([EXPECTED_END_SESSION_URL]);
+    expect(formElement()).toBeNull();
   });
 
   it("falls back to the status endSessionUrl GET when the end-session call throws", async () => {
@@ -274,37 +259,25 @@ describe("performEnterpriseLogout fallbacks", () => {
     expect(calls).toContain("redirect");
   });
 
-  it("navigates by GET when the form POST is silently blocked (host CSP form-action)", async () => {
+  it("never appends a form and never navigates twice", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response(200, FORM_BODY)));
 
     await performEnterpriseLogout(makeAdapter(), () => calls.push("redirect"));
+    // 一次 location.assign 就走完了:没有「提交了但页面没动」的窗口,也就不需要看门狗再补一跳。
+    vi.advanceTimersByTime(10_000);
 
-    // 提交同步返回了,但页面没有开始离开:CSP 把它拦掉了,而本地会话已经清了。
-    expect(submitted).toHaveLength(1);
-    expect(assigned).toEqual([]);
-    vi.advanceTimersByTime(ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS);
-    expect(assigned).toEqual([STATUS.endSessionUrl]);
-  });
-
-  it("does not double-navigate once the browser really starts leaving the page", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => response(200, FORM_BODY)));
-
-    await performEnterpriseLogout(makeAdapter(), () => calls.push("redirect"));
-    window.dispatchEvent(new Event("pagehide"));
-    vi.advanceTimersByTime(ENTERPRISE_END_SESSION_NAVIGATION_TIMEOUT_MS * 4);
-
-    expect(assigned).toEqual([]);
+    expect(document.querySelectorAll("form")).toHaveLength(0);
+    expect(assigned).toEqual([EXPECTED_END_SESSION_URL]);
     expect(calls).not.toContain("redirect");
   });
 
-  it("keeps the https guard on both the returned form action and the legacy endSessionUrl", async () => {
+  it("keeps the https guard on both the returned end-session url and the legacy endSessionUrl", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response(200, { ...FORM_BODY, url: "http://auth.example.test/end-session/" })));
     const adapter = makeAdapter({ loadOidcStatus: async () => { calls.push("status"); return { ...STATUS, endSessionUrl: "http://auth.example.test/end-session/" }; } });
 
     await performEnterpriseLogout(adapter, () => calls.push("redirect"));
 
     expect(formElement()).toBeNull();
-    expect(submitted).toEqual([]);
     expect(assigned).toEqual([]);
     expect(calls).toContain("redirect");
   });
