@@ -75,6 +75,26 @@ function columnsOf({ keyword = "", status = "", titleOnOwner = false, placeholde
   ];
 }
 
+/** 多选枚举筛选列(芯片形态);`selected` 是已应用的值。 */
+function multiFilterColumns(selected: string[] = []): ColumnsType<Row> {
+  return [
+    { title: "名称", dataIndex: "name", key: "name" },
+    filterColumn<Row>(
+      { title: "状态" },
+      {
+        param: "status",
+        multiple: true,
+        query: { filters: { status: selected }, q: "", sort: null, page: 1, pageSize: 0 },
+        options: [
+          { text: "启用", value: "on" },
+          { text: "停用", value: "off" },
+        ],
+        labels: LABELS,
+      },
+    ),
+  ];
+}
+
 let view: MountedView | null = null;
 let filters: Record<string, string[]>[] = [];
 let selected: unknown[][] = [];
@@ -209,6 +229,39 @@ describe("TableCards 的选择、工具条与分页", () => {
     await renderCards();
     await pick(byTestId(view!.host, "list-cards-filter-status") as HTMLSelectElement, "off");
     expect(filters).toEqual([{ q: [], status: ["off"] }]);
+  });
+
+  it("多选筛选是一排开关芯片,每次开关交出完整的选中数组", async () => {
+    await renderCards({ columns: multiFilterColumns() });
+    await toggle(byTestId(view!.host, "list-cards-filter-status-on"));
+    expect(filters).toEqual([{ status: ["on"] }]);
+
+    filters = [];
+    await renderCards({ columns: multiFilterColumns(["on"]) });
+    await toggle(byTestId(view!.host, "list-cards-filter-status-off"));
+    expect(filters).toEqual([{ status: ["on", "off"] }]);
+
+    filters = [];
+    await toggle(byTestId(view!.host, "list-cards-filter-status-on"));
+    expect(filters).toEqual([{ status: [] }]);
+  });
+
+  it("多选筛选的「全部」芯片清空条件", async () => {
+    await renderCards({ columns: multiFilterColumns(["on", "off"]) });
+    await toggle(byTestId(view!.host, "list-cards-filter-status-all"));
+    expect(filters).toEqual([{ status: [] }]);
+  });
+
+  it("芯片的按下态跟着 filteredValue 走", async () => {
+    await renderCards({ columns: multiFilterColumns(["on"]) });
+    expect(byTestId(view!.host, "list-cards-filter-status-on").getAttribute("aria-pressed")).toBe("true");
+    expect(byTestId(view!.host, "list-cards-filter-status-off").getAttribute("aria-pressed")).toBe("false");
+    expect(byTestId(view!.host, "list-cards-filter-status-all").getAttribute("aria-pressed")).toBe("false");
+
+    await renderCards({ columns: multiFilterColumns() });
+    expect(byTestId(view!.host, "list-cards-filter-status-all").getAttribute("aria-pressed")).toBe("true");
+    // 手机上不许再出现被裁成两行的原生多选列表框。
+    expect(view!.host.querySelector("select[multiple]")).toBeNull();
   });
 
   it("已应用的检索词过滤行(列自带 onFilter 时由卡片执行)", async () => {

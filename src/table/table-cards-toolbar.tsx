@@ -80,6 +80,9 @@ export function TableCardsToolbar<T extends object>({
 }: ToolbarProps<T>) {
   const searches = onFilters ? searchColumnsOf(columns) : [];
   const options = onFilters ? optionColumnsOf(columns) : [];
+  // 多选筛选走横排的开关芯片:原生 <select multiple> 在手机上是个被裁成两行的列表框,按不动。
+  const chips = options.filter((column) => column.filterMultiple === true);
+  const picks = options.filter((column) => column.filterMultiple !== true);
   const sortable = sortColumnsOf(columns);
   if (searches.length === 0 && options.length === 0 && sortable.length === 0) return null;
   const applyFilter = (param: string, values: readonly string[]) => onFilters?.(filterPatchOf(columns, param, values));
@@ -95,9 +98,18 @@ export function TableCardsToolbar<T extends object>({
           onApply={(value) => applyFilter(columnKeyOf(column), value ? [value] : [])}
         />
       ))}
-      {(options.length > 0 || sortable.length > 0) && (
+      {chips.map((column) => (
+        <CardsChips
+          key={columnKeyOf(column)}
+          column={column}
+          all={cardLabels.all}
+          testId={`${testId}-filter-${columnKeyOf(column)}`}
+          onChange={(values) => applyFilter(columnKeyOf(column), values)}
+        />
+      ))}
+      {(picks.length > 0 || sortable.length > 0) && (
         <div className="flex flex-wrap items-center gap-2">
-          {options.map((column) => (
+          {picks.map((column) => (
             <CardsFilter
               key={columnKeyOf(column)}
               column={column}
@@ -171,29 +183,71 @@ interface FilterProps<T extends object> {
   onChange: (values: string[]) => void;
 }
 
-/** 枚举筛选:单选给一个"不限"选项,多选列退化成原生多选列表。 */
+/** 单选枚举筛选:原生下拉 + 一个"不限"选项。 */
 function CardsFilter<T extends object>({ column, all, testId, onChange }: FilterProps<T>) {
   const values = filterValuesOf(column);
-  const multiple = column.filterMultiple === true;
-  const items = flattenFilters(column.filters ?? []);
   const title = columnTitleText(column);
   return (
     <Select
       className={CONTROL_CLASS}
-      multiple={multiple}
-      {...(multiple ? { size: Math.min(items.length, 4) } : {})}
-      value={multiple ? values : (values[0] ?? "")}
+      value={values[0] ?? ""}
       aria-label={title}
       data-test-id={testId}
-      onChange={(event) => onChange(selectedValues(event.target, multiple))}
+      onChange={(event) => onChange(event.target.value ? [event.target.value] : [])}
     >
-      {!multiple && <option value="">{`${title}:${all}`}</option>}
-      {items.map((item) => (
+      <option value="">{`${title}:${all}`}</option>
+      {flattenFilters(column.filters ?? []).map((item) => (
         <option key={item.value} value={item.value}>
           {item.label}
         </option>
       ))}
     </Select>
+  );
+}
+
+const CHIP_CLASS =
+  "inline-flex min-h-8 items-center rounded-full border px-3 text-[12px] leading-4 transition-colors";
+const CHIP_ON = "border-ink bg-ink text-paper";
+const CHIP_OFF = "border-hairline bg-paper text-ink-soft";
+
+/**
+ * 多选枚举筛选:一排可换行的开关芯片。
+ *
+ * 原生 `<select multiple>` 在手机上会被浏览器压成一个两行高的列表框 —— 选项看不全、
+ * 多选要长按、清空更没法做。芯片则是直接能按的一行:每次开关都把**当前整个选中数组**交出去,
+ * 走的还是表头那份筛选契约;"全部"就是清空。
+ */
+function CardsChips<T extends object>({ column, all, testId, onChange }: FilterProps<T>) {
+  const values = filterValuesOf(column);
+  const title = columnTitleText(column);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={title}>
+      <span className="text-[12px] text-ink-faint">{title}</span>
+      <button
+        type="button"
+        aria-pressed={values.length === 0}
+        className={`${CHIP_CLASS} ${values.length === 0 ? CHIP_ON : CHIP_OFF}`}
+        data-test-id={`${testId}-all`}
+        onClick={() => onChange([])}
+      >
+        {all}
+      </button>
+      {flattenFilters(column.filters ?? []).map((item) => {
+        const on = values.includes(item.value);
+        return (
+          <button
+            key={item.value}
+            type="button"
+            aria-pressed={on}
+            className={`${CHIP_CLASS} ${on ? CHIP_ON : CHIP_OFF}`}
+            data-test-id={`${testId}-${item.value}`}
+            onClick={() => onChange(on ? values.filter((value) => value !== item.value) : [...values, item.value])}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -249,11 +303,6 @@ function parseSortValue(raw: string): TableCardsSort | null {
   const order = raw.slice(cut + 1);
   if (order !== "asc" && order !== "desc") return null;
   return { key: raw.slice(0, cut), order };
-}
-
-function selectedValues(select: HTMLSelectElement, multiple: boolean): string[] {
-  if (multiple) return Array.from(select.selectedOptions, (option) => option.value);
-  return select.value ? [select.value] : [];
 }
 
 interface FilterItem {

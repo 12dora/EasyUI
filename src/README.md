@@ -583,7 +583,9 @@ and are **not** part of the shared package.
 - **选择** = `rowSelection` 给了就在标题行左边出复选框,外加一行"全选本页",读写的都是
   `selectedRowKeys` / `onChange`(含 `getCheckboxProps` 的禁用态);
 - **工具条** = 表头上的能力搬到卡片上方:`searchColumn` / `clientSearchColumn` 每列一个检索框
-  (回车或失焦提交,placeholder = 列名,或列上的 `searchPlaceholder`),`filterColumn` 变成下拉,
+  (回车或失焦提交,placeholder = 列名,或列上的 `searchPlaceholder`),单选 `filterColumn`
+  变成下拉、**多选 `filterColumn`(`multiple: true`)变成一排可换行的开关芯片**(外加一个
+  「全部」芯片清空;原生 `<select multiple>` 在手机上会被压成两行的列表框,按不动),
   可排序列合成一个「排序」下拉(列 × 升/降);
 - **分页** = 底部居中的 antd `Pagination size="small" simple`。本地分页(`ClientTable`)一页
   放得下就整个不出现;服务端分页(`DataTable`)始终显示,与桌面一致 —— 页码是那张表状态的一部分;
@@ -607,7 +609,7 @@ and are **not** part of the shared package.
   清了);`DataTable` 不留:URL 没有"显式未排序"的槽位,清掉下次刷新会被默认排序顶回来,
   这与表头"第三次点击 = 翻向"是同一条规矩。手机上选的排序转回桌面表格继续生效
   (`ClientTable` 把排序提到自己那一层,写成受控的 `sortOrder`;表头点击同样回写这份状态)。
-- **下拉用原生 `<select>`。** 卡片工具条里的筛选与排序刻意不用 antd Select:手机上原生下拉
+- **下拉用原生 `<select>`(多选除外)。** 卡片工具条里的单选筛选与排序刻意不用 antd Select:手机上原生下拉
   会拉起系统选择器(滚轮 / 全屏列表),比浮层里的虚拟列表好按,也不用再往卡片流里塞一层
   portal。选择框与分页器仍是 antd,和表格保持同一套视觉。
 - **卡片不读表格的分页外观参数。** `DataTable` 的 `pageSizeOptions` / `pagination`(
