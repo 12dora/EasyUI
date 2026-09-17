@@ -454,6 +454,56 @@ const columns = useMemo(() => [
            actions={{ title: t.actions, render: (row) => <RowMenu row={row} /> }} />
 ```
 
+## 移动端 (phones, < md)
+
+口径:**手机 = Tailwind 的 `md` 以下(< 768px)**。所有移动端适配一律走 `max-md:` /
+`md:` 断点或 `(max-width: 767px)` 媒体查询,**md+ 的视觉一个像素都不变** —— 改的永远是
+响应式对子里的手机那一半,不是桌面那一半。
+
+### 一条头部栏
+
+手机上原来是 `Topbar`(57px)+ `MobileNav` 分区栏(57px)两条,正文要到 114px 之后才开始。
+新写法把汉堡按钮塞进 `Topbar` 自己的 `leading` 插槽,分区栏整条去掉:
+
+```tsx
+<AppShell
+  topbar={
+    <Topbar
+      testId="admin-topbar"
+      leading={<MobileNav variant="trigger" footer={<EnterpriseConfiguredFooter />} {...navProps} />}
+      brand={<EnterpriseBrandSlot … />}
+      actions={<EnterpriseTopbarActions … />}
+    />
+  }
+  sidebar={<Sidebar … />}
+  /* 不再传 mobileNav */
+  footer={<EnterpriseConfiguredFooter />}
+>
+```
+
+`MobileNav` 的两种形态共用同一份抽屉实现(`useDrawerController` + `NavDrawer`),所以下钻、
+`pathKey` 变化关闭并重置、焦点陷阱、Esc、断点关闭这些行为在两种形态下完全一致:
+
+| prop | 说明 |
+| ---- | ---- |
+| `variant="bar"` | 默认,旧行为:汉堡 + 当前分区标题的独立顶栏(`data-test-id="admin-mobile-nav"`)。 |
+| `variant="trigger"` | 只渲染汉堡按钮(`admin-mobile-nav-trigger`,自带 `md:hidden`)+ 抽屉 portal。 |
+| `footer` | 抽屉底部内容(`admin-mobile-nav-footer`),手机上页脚文案的落点。 |
+
+### 各组件的手机侧改动
+
+| 组件 | 手机 (< md) | 桌面 (md+) |
+| ---- | ----------- | ---------- |
+| `Topbar` | `px-3` / `gap-2`,高度仍是 `h-14` | `md:px-5` / `md:gap-4`,原值 |
+| `AppShell` | `APP_SHELL_MAIN_PADDING` 竖向留白 `py-4`;`footer` 包裹层 `hidden md:block`(页脚改由抽屉承载) | `md:px-10 md:py-12 2xl:px-12 3xl:px-16`,原值 |
+| `PageHeader` | `max-md:mb-4 max-md:pb-3`、行间距 `max-md:gap-2`、eyebrow `max-md:hidden`、副标题 `max-md:text-[12px]` | `mb-6 pb-5 gap-4`,原值;H1 仍是 22 → `sm:text-[26px]` |
+| `EnterpriseBrandSlot` | 只剩 logo + 标题(标题 `truncate`),副标题 `hidden … md:block` | 原值 |
+| `EnterpriseTopbarActions` | 语言切换整组移进用户菜单(`topbar-user-menu-language`,选项仍是 `topbar-language-option-<code>` + `role="menuitemradio"`);头像按钮 `max-md:h-10 max-md:min-w-10` | 语言仍是顶栏上的独立入口,菜单里没有它 |
+| 表格 | 切成卡片列表(`TableCards`,见 `table/`) | 仍是表格 |
+
+`EnterpriseTopbarActions` 的视口判定用 `useSyncExternalStore`,服务端 / 首帧快照固定为
+`false`(桌面形态),hydration 之后才切 —— 这样 SSR 与客户端首帧一致,不会闪。
+
 ## Design tokens (theme.css)
 
 | Group    | Tokens |

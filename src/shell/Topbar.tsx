@@ -29,8 +29,9 @@ export function Topbar({ brand, actions, leading, maxWidth, testId, className = 
       className={`sticky top-0 z-20 border-b border-hairline bg-paper/95 backdrop-blur-sm ${className}`}
       data-test-id={testId}
     >
+      {/* 手机上收窄左右留白与间距(h-14 高度不变),给品牌标题和右侧动作腾宽度。 */}
       <div
-        className="mx-auto flex h-14 items-center justify-between gap-4 px-5"
+        className="mx-auto flex h-14 items-center justify-between gap-2 px-3 md:gap-4 md:px-5"
         style={{ maxWidth }}
       >
         <div className="flex min-w-0 items-center gap-2">

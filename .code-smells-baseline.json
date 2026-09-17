@@ -205,14 +205,6 @@
         22
       ]
     },
-    "src/shell/MobileNav.tsx::MobileNav": {
-      "complexity": [
-        11
-      ],
-      "max-lines-per-function": [
-        162
-      ]
-    },
     "src/shell/nav-model.ts::activeNavLabel": {
       "complexity": [
         11

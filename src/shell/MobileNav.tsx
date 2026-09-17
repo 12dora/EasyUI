@@ -12,6 +12,9 @@ const MARKER = "easyui-mobilenav-active-marker";
 /** Drawer slide duration — matches `.easy-drawer-*` / `--duration-base`. */
 const DRAWER_MS = Math.round(DURATION.base * 1000);
 
+const TRIGGER_CLASS =
+  "flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-ink/[0.04] hover:text-ink -ml-1.5";
+
 function prefersReducedMotion(): boolean {
   return (
     typeof window !== "undefined" &&
@@ -31,18 +34,30 @@ export interface MobileNavProps {
   closeLabel: string;
   /** Localized drawer nav landmark aria-label. */
   navLabel: string;
-  /** Bar title fallback when nothing is active. */
+  /** Bar title fallback when nothing is active (`variant="bar"` only). */
   title?: ReactNode;
   /** Changing this (e.g. pathname) closes the drawer + resets drill state. */
   pathKey?: string;
+  /**
+   * `"bar"`(默认,旧行为):汉堡 + 当前分区标题的独立顶栏。
+   * `"trigger"`:只渲染汉堡按钮本身(自带 `md:hidden`)+ 抽屉 portal,
+   * 供宿主塞进 `<Topbar leading>`,这样手机上只剩一条头部栏。
+   * 两种形态共用同一套抽屉/下钻/路由关闭逻辑。
+   */
+  variant?: "bar" | "trigger";
+  /**
+   * 抽屉底部内容(通常是宿主的 `EnterpriseConfiguredFooter`)。手机上 `AppShell`
+   * 不再钉页脚,页脚文案改由抽屉承载。
+   */
+  footer?: ReactNode;
   className?: string;
 }
 
 /**
- * EasyUI mobile navigation: a slim top bar (hamburger + current section) plus a
- * left off-canvas drawer that renders the SAME drill-down nav model as the
- * desktop sidebar — so secondary menus (records / library / settings…) are
- * reachable on phones instead of being flattened into one scroll strip.
+ * EasyUI mobile navigation: a hamburger button (optionally inside a slim top
+ * bar) plus a left off-canvas drawer that renders the SAME drill-down nav model
+ * as the desktop sidebar — so secondary menus (records / library / settings…)
+ * are reachable on phones instead of being flattened into one scroll strip.
  *
  * Shown only below `md`. Drill-down is local (tapping a group reveals its items
  * without navigating); tapping a leaf link navigates and closes the drawer.
@@ -58,8 +73,88 @@ export function MobileNav({
   navLabel,
   title,
   pathKey,
+  variant = "bar",
+  footer,
   className = "",
 }: MobileNavProps) {
+  const drawer = useDrawerController(pathKey);
+  const triggerOnly = variant === "trigger";
+
+  const trigger = (
+    <button
+      type="button"
+      onClick={drawer.openDrawer}
+      aria-label={menuLabel}
+      aria-haspopup="menu"
+      aria-expanded={drawer.open}
+      className={triggerOnly ? `${TRIGGER_CLASS} md:hidden ${className}` : TRIGGER_CLASS}
+      data-test-id="admin-mobile-nav-trigger"
+    >
+      <MenuIcon />
+    </button>
+  );
+
+  const portal =
+    drawer.mounted && drawer.portalOpen
+      ? createPortal(
+          <NavDrawer
+            model={model}
+            renderLink={renderLink}
+            backLabel={backLabel}
+            menuLabel={menuLabel}
+            closeLabel={closeLabel}
+            navLabel={navLabel}
+            footer={footer}
+            drawer={drawer}
+          />,
+          document.body,
+        )
+      : null;
+
+  // trigger 形态没有自己的容器:按钮直接进宿主的 `<Topbar leading>`。
+  if (triggerOnly) {
+    return (
+      <>
+        {trigger}
+        {portal}
+      </>
+    );
+  }
+
+  const currentLabel = activeNavLabel(model) ?? title ?? null;
+  return (
+    <div
+      className={`z-[3] flex w-full shrink-0 items-center gap-2 border-b border-hairline bg-paper/95 px-4 py-2 backdrop-blur md:hidden ${className}`}
+      data-test-id="admin-mobile-nav"
+    >
+      {trigger}
+      {currentLabel ? (
+        <span className="truncate text-[13px] font-medium text-ink" data-test-id="admin-mobile-nav-current">
+          {currentLabel}
+        </span>
+      ) : null}
+      {portal}
+    </div>
+  );
+}
+
+interface DrawerController {
+  open: boolean;
+  portalOpen: boolean;
+  exiting: boolean;
+  mounted: boolean;
+  drillId: string | null;
+  setPanel: (node: HTMLDivElement | null) => void;
+  setDrillId: (id: string | null) => void;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+}
+
+/**
+ * 抽屉的全部状态与副作用:开合、退场动画、下钻、焦点陷阱、Esc、断点关闭、
+ * 路由变化关闭。两种 variant 共用同一份实现(所以 trigger 形态不是另一条代码路径)。
+ */
+function useDrawerController(pathKey?: string): DrawerController {
   const [open, setOpen] = useState(false);
   const [drillId, setDrillId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -136,99 +231,104 @@ export function MobileNav({
     return () => desktop.removeEventListener("change", onChange);
   }, [open]);
 
-  const currentLabel = activeNavLabel(model) ?? title ?? null;
+  return {
+    open,
+    portalOpen,
+    exiting,
+    mounted,
+    drillId,
+    setPanel,
+    setDrillId,
+    openDrawer: () => setOpen(true),
+    closeDrawer: () => {
+      setOpen(false);
+      setDrillId(null);
+    },
+  };
+}
+
+interface NavDrawerProps {
+  model: NavModel;
+  renderLink: RenderNavLink;
+  backLabel: string;
+  menuLabel: string;
+  closeLabel: string;
+  navLabel: string;
+  footer?: ReactNode;
+  drawer: DrawerController;
+}
+
+/** 抽屉本体(portal 的内容)。 */
+function NavDrawer({ model, renderLink, backLabel, menuLabel, closeLabel, navLabel, footer, drawer }: NavDrawerProps) {
+  const { exiting, drillId, setDrillId, setPanel, closeDrawer } = drawer;
   const drillPanel = findPanel(model, drillId);
-
-  function closeDrawer() {
-    setOpen(false);
-    setDrillId(null);
-  }
-
   return (
-    <div
-      className={`z-[3] flex w-full shrink-0 items-center gap-2 border-b border-hairline bg-paper/95 px-4 py-2 backdrop-blur md:hidden ${className}`}
-      data-test-id="admin-mobile-nav"
-    >
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label={menuLabel}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-ink/[0.04] hover:text-ink -ml-1.5"
-        data-test-id="admin-mobile-nav-trigger"
+    <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true" aria-label={menuLabel}>
+      <BodyScrollLock />
+      <div
+        className={`absolute inset-0 bg-ink/30 backdrop-blur-[1px] ${
+          exiting ? "easy-drawer-backdrop-exit" : "easy-drawer-backdrop-enter"
+        }`}
+        onClick={closeDrawer}
+      />
+      <div
+        ref={setPanel}
+        tabIndex={-1}
+        className={`absolute inset-y-0 left-0 flex w-[82%] max-w-[320px] flex-col border-r border-hairline bg-paper shadow-xl focus:outline-none ${
+          exiting ? "easy-drawer-panel-exit" : "easy-drawer-panel-enter"
+        }`}
+        data-test-id="admin-mobile-nav-drawer"
       >
-        <MenuIcon />
-      </button>
-      {currentLabel ? (
-        <span className="truncate text-[13px] font-medium text-ink" data-test-id="admin-mobile-nav-current">
-          {currentLabel}
-        </span>
-      ) : null}
-
-      {mounted && portalOpen
-        ? createPortal(
-            <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true" aria-label={menuLabel}>
-              <BodyScrollLock />
-              <div
-                className={`absolute inset-0 bg-ink/30 backdrop-blur-[1px] ${
-                  exiting ? "easy-drawer-backdrop-exit" : "easy-drawer-backdrop-enter"
-                }`}
-                onClick={closeDrawer}
+        <div className="flex items-center justify-between border-b border-hairline-soft px-4 py-3">
+          <span className="text-[13px] font-medium text-ink">{menuLabel}</span>
+          <button
+            type="button"
+            onClick={closeDrawer}
+            aria-label={closeLabel}
+            className="flex h-9 w-9 items-center justify-center rounded-md text-ink-faint transition-colors hover:bg-ink/[0.04] hover:text-ink -mr-1.5"
+            data-test-id="admin-mobile-nav-close"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+        <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label={navLabel}>
+          {drillPanel ? (
+            <div key={`drill-${drillPanel.id}`} className={panelEnterClass(18)} data-test-id={drillPanel.viewTestId}>
+              <NavPanelView
+                panel={drillPanel}
+                backLabel={backLabel}
+                onBack={() => setDrillId(null)}
+                renderLink={renderLink}
+                onNavigate={closeDrawer}
+                markerLayoutId={MARKER}
               />
-              <div
-                ref={setPanel}
-                tabIndex={-1}
-                className={`absolute inset-y-0 left-0 flex w-[82%] max-w-[320px] flex-col border-r border-hairline bg-paper shadow-xl focus:outline-none ${
-                  exiting ? "easy-drawer-panel-exit" : "easy-drawer-panel-enter"
-                }`}
-                data-test-id="admin-mobile-nav-drawer"
-              >
-                <div className="flex items-center justify-between border-b border-hairline-soft px-4 py-3">
-                  <span className="text-[13px] font-medium text-ink">{menuLabel}</span>
-                  <button
-                    type="button"
-                    onClick={closeDrawer}
-                    aria-label={closeLabel}
-                    className="flex h-9 w-9 items-center justify-center rounded-md text-ink-faint transition-colors hover:bg-ink/[0.04] hover:text-ink -mr-1.5"
-                    data-test-id="admin-mobile-nav-close"
-                  >
-                    <CloseIcon />
-                  </button>
-                </div>
-                <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label={navLabel}>
-                  {drillPanel ? (
-                    <div key={`drill-${drillPanel.id}`} className={panelEnterClass(18)} data-test-id={drillPanel.viewTestId}>
-                      <NavPanelView
-                        panel={drillPanel}
-                        backLabel={backLabel}
-                        onBack={() => setDrillId(null)}
-                        renderLink={renderLink}
-                        onNavigate={closeDrawer}
-                        markerLayoutId={MARKER}
-                      />
-                    </div>
-                  ) : (
-                    <div key="main" className={panelEnterClass(-18)}>
-                      {model.groups.map((group, index) => (
-                        <NavGroupList
-                          key={group.key}
-                          group={group}
-                          className={groupClassName(index, group)}
-                          renderLink={renderLink}
-                          onOpenPanel={(next) => setDrillId(next.id)}
-                          onNavigate={closeDrawer}
-                          markerLayoutId={MARKER}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </nav>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+            </div>
+          ) : (
+            <div key="main" className={panelEnterClass(-18)}>
+              {model.groups.map((group, index) => (
+                <NavGroupList
+                  key={group.key}
+                  group={group}
+                  className={groupClassName(index, group)}
+                  renderLink={renderLink}
+                  onOpenPanel={(next) => setDrillId(next.id)}
+                  onNavigate={closeDrawer}
+                  markerLayoutId={MARKER}
+                />
+              ))}
+            </div>
+          )}
+        </nav>
+        {/* 手机上 AppShell 不再钉页脚,页脚文案落在抽屉底部。 */}
+        {footer ? (
+          <div
+            className="shrink-0 border-t border-hairline-soft px-4 py-3 text-[12px] text-ink-faint"
+            data-test-id="admin-mobile-nav-footer"
+          >
+            {footer}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

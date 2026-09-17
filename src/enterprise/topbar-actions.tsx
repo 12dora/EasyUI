@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { UserAvatar } from "../primitives/avatar";
 import { PopoverSurface } from "../primitives/popover-surface";
 import type {
@@ -14,6 +14,34 @@ import type {
 import { RelativeTimestamp } from "./relative-time";
 
 type OpenMenu = "language" | "notifications" | "user" | null;
+
+/** 手机断点(< md),与 Tailwind 的 `max-md:` 同一口径。 */
+const PHONE_QUERY = "(max-width: 767px)";
+
+function phoneMediaQuery(): MediaQueryList | null {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return null;
+  return window.matchMedia(PHONE_QUERY);
+}
+
+function subscribePhone(onChange: () => void): () => void {
+  const query = phoneMediaQuery();
+  if (!query) return () => undefined;
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+/**
+ * 手机视口判定。SSR / 首帧快照固定为 `false`(桌面形态),hydration 之后才切,
+ * 所以服务端渲染与客户端首帧一致。表格切卡片用的是 primitives 里的共享 hook,
+ * 这里只服务 topbar,刻意保持局部、不跨切片耦合。
+ */
+function useIsPhoneViewport(): boolean {
+  return useSyncExternalStore(
+    subscribePhone,
+    () => phoneMediaQuery()?.matches ?? false,
+    () => false,
+  );
+}
 
 export interface EnterpriseTopbarActionsProps {
   /** Route identity; changing it closes any open popover. */
@@ -80,9 +108,19 @@ export function EnterpriseTopbarActions(props: EnterpriseTopbarActionsProps) {
     }
   }
 
+  const isPhone = useIsPhoneViewport();
+  // 手机上语言项并入用户菜单(见 UserAction),顶栏只留铃铛 + 头像;桌面保持三个独立入口。
+  const localeSwitch: LocaleSwitch = {
+    locale: props.locale,
+    localeOptions: props.localeOptions,
+    onLocaleChange: (nextLocale) => { setOpen(null); props.onLocaleChange(nextLocale); },
+  };
+
   return (
     <div ref={rootRef} className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3" data-test-id="admin-topbar-actions">
-      <LanguageAction {...props} onLocaleChange={(nextLocale) => { setOpen(null); props.onLocaleChange(nextLocale); }} open={open === "language"} toggle={() => setOpen(open === "language" ? null : "language")} />
+      {isPhone ? null : (
+        <LanguageAction {...localeSwitch} labels={props.labels} open={open === "language"} toggle={() => setOpen(open === "language" ? null : "language")} />
+      )}
       {props.notifications ? (
         <NotificationsAction
           {...props.notifications}
@@ -107,13 +145,37 @@ export function EnterpriseTopbarActions(props: EnterpriseTopbarActionsProps) {
           toggle={() => setOpen(open === "user" ? null : "user")}
           loggingOut={loggingOut}
           onLogout={props.onLogout ? logout : undefined}
+          localeSwitch={isPhone ? localeSwitch : undefined}
         />
       ) : null}
     </div>
   );
 }
 
-function LanguageAction({ locale, localeOptions, onLocaleChange, labels, open, toggle }: EnterpriseTopbarActionsProps & { open: boolean; toggle: () => void }) {
+/** 语言切换的三件套。桌面挂在独立按钮上,手机挂进用户菜单。 */
+interface LocaleSwitch {
+  locale: EnterpriseLocale;
+  localeOptions: readonly EnterpriseLocaleOption[];
+  onLocaleChange: (locale: EnterpriseLocale) => void;
+}
+
+/** 语言选项行。两处入口共用同一份标记与 test id,只有外框内边距不同。 */
+function LocaleOptions({ locale, localeOptions, onLocaleChange, rowClassName }: LocaleSwitch & { rowClassName: string }) {
+  return (
+    <>
+      {localeOptions.map((option) => {
+        const active = locale === option.code;
+        return (
+          <button key={option.code} type="button" role="menuitemradio" aria-checked={active} onClick={() => onLocaleChange(option.code)} className={`flex w-full items-center justify-between text-left text-[13px] transition-colors ${rowClassName} ${active ? "bg-ink/[0.06] font-medium text-ink" : "text-ink-soft hover:bg-ink/[0.04] hover:text-ink"}`} data-test-id={`topbar-language-option-${option.code}`}>
+            <span>{option.label}</span>{active ? <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--amber))]" aria-hidden="true" /> : null}
+          </button>
+        );
+      })}
+    </>
+  );
+}
+
+function LanguageAction({ locale, localeOptions, onLocaleChange, labels, open, toggle }: LocaleSwitch & { labels: EnterpriseShellLabels; open: boolean; toggle: () => void }) {
   const menu = useTopbarMenuFocus(open);
   return (
     <div className="relative" data-test-id="topbar-language-switcher">
@@ -123,14 +185,7 @@ function LanguageAction({ locale, localeOptions, onLocaleChange, labels, open, t
       {/* FE-PERF-04: PopoverSurface is CSS-enter only — no motion/react on the public shell path. */}
       {open ? (
         <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.switchLanguage} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-11 z-30 min-w-[132px] origin-top-right rounded-md border border-hairline bg-paper p-1 shadow-lg shadow-ink/10 focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-language-menu">
-          {localeOptions.map((option) => {
-            const active = locale === option.code;
-            return (
-              <button key={option.code} type="button" role="menuitemradio" aria-checked={active} onClick={() => onLocaleChange(option.code)} className={`flex w-full items-center justify-between rounded px-3 py-2 text-left text-[13px] transition-colors ${active ? "bg-ink/[0.06] font-medium text-ink" : "text-ink-soft hover:bg-ink/[0.04] hover:text-ink"}`} data-test-id={`topbar-language-option-${option.code}`}>
-                <span>{option.label}</span>{active ? <span className="h-1.5 w-1.5 rounded-full bg-[rgb(var(--amber))]" aria-hidden="true" /> : null}
-              </button>
-            );
-          })}
+          <LocaleOptions locale={locale} localeOptions={localeOptions} onLocaleChange={onLocaleChange} rowClassName="rounded px-3 py-2" />
         </PopoverSurface>
       ) : null}
     </div>
@@ -158,11 +213,11 @@ function NotificationsAction({ items, loading, error, viewAllHref, unreadCount, 
   );
 }
 
-function UserAction({ user, labels, securityHref, renderLink, open, toggle, loggingOut, onLogout }: { user: EnterpriseUserSummary; labels: EnterpriseShellLabels; securityHref?: string; renderLink: EnterpriseLinkRenderer; open: boolean; toggle: () => void; loggingOut: boolean; onLogout?: () => void }) {
+function UserAction({ user, labels, securityHref, renderLink, open, toggle, loggingOut, onLogout, localeSwitch }: { user: EnterpriseUserSummary; labels: EnterpriseShellLabels; securityHref?: string; renderLink: EnterpriseLinkRenderer; open: boolean; toggle: () => void; loggingOut: boolean; onLogout?: () => void; localeSwitch?: LocaleSwitch }) {
   const menu = useTopbarMenuFocus(open);
   return (
     <div className="relative" data-test-id="topbar-user">
-      <button ref={menu.triggerRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} aria-label={labels.userMenu} title={user.name} className="flex items-center gap-2.5 rounded-md px-1.5 py-1 transition-colors hover:bg-ink/[0.04]" data-test-id="topbar-user-trigger">
+      <button ref={menu.triggerRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} aria-label={labels.userMenu} title={user.name} className="flex items-center gap-2.5 rounded-md px-1.5 py-1 transition-colors hover:bg-ink/[0.04] max-md:h-10 max-md:min-w-10 max-md:justify-center" data-test-id="topbar-user-trigger">
         <span className="hidden min-w-0 flex-col items-end leading-tight sm:flex" data-test-id="topbar-user-identity">
           <span className="max-w-[150px] truncate text-[13px] font-semibold text-ink" data-test-id="topbar-user-name">{user.name}</span>
           <span className="text-[12px] text-ink-faint" data-test-id="topbar-user-role">{user.identity}</span>
@@ -172,6 +227,13 @@ function UserAction({ user, labels, securityHref, renderLink, open, toggle, logg
       {open ? (
         <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.userMenu} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[200px] origin-top-right rounded-md border border-hairline bg-paper py-1.5 shadow-[0_8px_18px_rgba(17,24,39,0.14)] focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-user-menu">
           {user.permissionSummary ? <div className="border-b border-hairline-soft px-3 py-2 text-[12px] text-ink-faint" data-test-id="topbar-user-permissions">{user.permissionSummary}</div> : null}
+          {/* 手机上顶栏放不下第三个入口:语言切换整组移到这里,仍是同一批 role/test id。 */}
+          {localeSwitch ? (
+            <div className="border-b border-hairline-soft py-1" data-test-id="topbar-user-menu-language">
+              <div className="px-3 pb-0.5 pt-1 text-[12px] text-ink-faint">{labels.switchLanguage}</div>
+              <LocaleOptions {...localeSwitch} rowClassName="px-3 py-2" />
+            </div>
+          ) : null}
           {securityHref ? renderLink({ href: securityHref, role: "menuitem", className: "flex w-full items-center gap-2 px-3 py-2 text-[13px] text-ink transition-colors hover:bg-ink/[0.04]", testId: "topbar-user-menu-security", children: labels.securitySettings }) : null}
           {onLogout ? (
             <button type="button" role="menuitem" onClick={onLogout} disabled={loggingOut} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[rgb(var(--signal-ink))] transition-colors hover:bg-[rgb(var(--signal))]/[0.06] disabled:opacity-60" data-test-id="topbar-user-menu-logout">

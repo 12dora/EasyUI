@@ -13,14 +13,15 @@ interface Props {
 /** Page title block — CSS enter (MOTION.route timing via theme.css). */
 export function PageHeader({ eyebrow, title, subtitle, meta, actions }: Props) {
   return (
-    <header className="easy-page-header-enter mb-6 border-b border-hairline pb-5">
+    /* 手机上压缩页头占位(桌面 md+ 的 mb-6 / pb-5 原样不动),让正文更早出现在首屏。 */
+    <header className="easy-page-header-enter mb-6 border-b border-hairline pb-5 max-md:mb-4 max-md:pb-3">
       {/* Stack on phones so a wide toolbar never squeezes the title into
           multiple lines; revert to the side-by-side layout from sm up. */}
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+      <div className="flex flex-col items-start gap-4 max-md:gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="w-full min-w-0 sm:flex-1">
-          {eyebrow && <div className="eyebrow mb-1.5">{eyebrow}</div>}
+          {eyebrow && <div className="eyebrow mb-1.5 max-md:hidden">{eyebrow}</div>}
           <h1 className="text-[22px] font-semibold leading-tight tracking-tight text-ink sm:text-[26px]">{title}</h1>
-          {subtitle && <p className="mt-1.5 max-w-2xl text-[13px] text-ink-soft">{subtitle}</p>}
+          {subtitle && <p className="mt-1.5 max-w-2xl text-[13px] text-ink-soft max-md:text-[12px]">{subtitle}</p>}
           {/* Meta row carries facts (ids, counts, timestamps) — 12px floor, same as labels. */}
           {meta && (
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[12px] text-ink-faint">{meta}</div>

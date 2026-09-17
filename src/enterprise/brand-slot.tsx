@@ -53,9 +53,10 @@ export function EnterpriseBrandSlot({ href, title, subtitle, logoSrc, testId, re
         </div>
         {subtitle ? (
           /* The link's accessible name is the product name alone; the subtitle is
-             a visible qualifier, not part of "where does this link go". */
+             a visible qualifier, not part of "where does this link go".
+             手机(< md)上只留 logo + 标题,副标题让位给右侧动作。 */
           <p
-            className="hidden text-[12px] text-ink-faint sm:block"
+            className="hidden text-[12px] text-ink-faint md:block"
             aria-hidden="true"
             data-test-id={testId ? `${testId}-subtitle` : undefined}
           >

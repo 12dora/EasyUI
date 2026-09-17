@@ -6,13 +6,22 @@ export interface AppShellProps {
   topbar?: ReactNode;
   /** Desktop sidebar, usually `<Sidebar />` (hides itself below md). */
   sidebar?: ReactNode;
-  /** Mobile nav bar + drawer, usually `<MobileNav />` (hides itself at md+). */
+  /**
+   * Mobile nav bar + drawer, usually `<MobileNav />` (hides itself at md+).
+   *
+   * 手机上「只留一条头部栏」的宿主不再用这个插槽:改成把
+   * `<MobileNav variant="trigger" footer={…} />` 放进 `<Topbar leading>`,
+   * 汉堡按钮与 Topbar 同处一行,页脚文案落到抽屉底部。这里保留是为了兼容旧宿主。
+   */
   mobileNav?: ReactNode;
   children: ReactNode;
   /**
    * Footer pinned to the bottom of the viewport frame, usually `<Footer />`.
    * Rendered as a sibling AFTER the scroll region, so it never scrolls with
    * `<main>`. Omitted from the DOM entirely when not provided.
+   *
+   * 只在 md+ 显示:手机上这条钉死的页脚会再吃掉 ~50px 首屏,同样的文案改由
+   * `<MobileNav footer>` 在抽屉底部呈现。
    */
   footer?: ReactNode;
   /**
@@ -40,7 +49,7 @@ export interface AppShellProps {
  * grow past ~1400px; hosts that compose their own `<main>` (see EasyTrade's
  * AdminShell) mirror this string so the two frames stay in sync.
  */
-export const APP_SHELL_MAIN_PADDING = "px-4 py-6 md:px-10 md:py-12 2xl:px-12 3xl:px-16";
+export const APP_SHELL_MAIN_PADDING = "px-4 py-4 md:px-10 md:py-12 2xl:px-12 3xl:px-16";
 
 /**
  * EasyUI application frame: sticky topbar over a full-height content region that
@@ -92,7 +101,8 @@ export function AppShell({
           </div>
         </div>
       </div>
-      {footer ? <div className="shrink-0">{footer}</div> : null}
+      {/* 手机上不钉页脚:114px 的头部已经吃掉首屏,页脚文案改由 MobileNav 抽屉底部承载。 */}
+      {footer ? <div className="hidden shrink-0 md:block">{footer}</div> : null}
     </div>
   );
 }
