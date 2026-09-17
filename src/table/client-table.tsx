@@ -163,11 +163,17 @@ export function ClientTable<T extends object>({
  * 没有排序时原样返回列定义(不复制、不接管,和这个特性上线前完全一致);一旦排过序,
  * 每个可排序列都显式给出 `sortOrder`,antd 就按它排行、画箭头 —— 于是手机卡片上选的排序
  * 转回桌面仍然成立,表头点击也继续可用(点击回写这份状态)。
+ *
+ * 列组要下钻:排序写在叶子列上,只扫一层的话「分组里的可排序列」在卡片上排得好好的,
+ * 一转回表格就散了(卡片那边本来就是把列组拍平来读的)。
  */
 function withSortOrder<T extends object>(columns: ColumnsType<T>, sort: TableCardsSort | null): ColumnsType<T> {
   if (!sort) return columns;
   return columns.map((column) => {
-    const entry = column as MobileColumn<T>;
+    const entry = column as MobileColumn<T> & { children?: ColumnsType<T> };
+    if (entry.children && entry.children.length > 0) {
+      return { ...entry, children: withSortOrder(entry.children, sort) } as ColumnsType<T>[number];
+    }
     if (!entry.sorter) return column;
     const matched = sortKeyOf(entry) === sort.key;
     const order: SortOrder = matched ? (sort.order === "asc" ? "ascend" : "descend") : null;

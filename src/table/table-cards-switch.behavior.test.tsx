@@ -142,6 +142,18 @@ const CLIENT_COLUMNS: ColumnsType<Row> = [
   ),
 ];
 
+/** 可排序的列藏在列组里 —— 受控 sortOrder 必须写到叶子列上。 */
+const GROUPED_COLUMNS: ColumnsType<Row> = [
+  {
+    title: "归属",
+    children: [
+      withClientSort<Row>({ title: "名称", dataIndex: "name", key: "name" }, (left, right) =>
+        left.name.localeCompare(right.name),
+      ),
+    ],
+  },
+];
+
 /** 表格体里每一行第一格的文字。 */
 function tableNames(): string[] {
   return Array.from(view!.host.querySelectorAll("tbody tr[data-row-key] td:first-child"), (cell) => cell.textContent ?? "");
@@ -248,6 +260,16 @@ describe("ClientTable 的手机形态", () => {
     await setPhone(false);
     expect(tableNames()[0]).toBe("Portal");
     expect(tableNames()[1]).toBe("Registry");
+  });
+
+  it("列组里的可排序子列同样跟着切回桌面", async () => {
+    installViewport(true);
+    await renderClient({ columns: GROUPED_COLUMNS });
+    await pick(byTestId(view!.host, "list-cards-sort") as HTMLSelectElement, "name:asc");
+    expect(view!.host.querySelector("[data-test-id='list-cards-card']")?.textContent).toContain("Portal");
+
+    await setPhone(false);
+    expect(tableNames()).toEqual(["Portal", "Registry"]);
   });
 
   it("手机上翻到第 2 页,切回桌面还在第 2 页", async () => {
