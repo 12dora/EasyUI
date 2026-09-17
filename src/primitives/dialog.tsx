@@ -197,7 +197,8 @@ function DialogFrame({
         className="fixed inset-0 cursor-default bg-ink/40 backdrop-blur-[2px]"
       />
       {/* Near full-screen on phones (edge-to-edge, dvh height); a centered card from sm up.
-          Header + footer stay pinned while only the body scrolls. */}
+          Header + footer stay pinned while only the body scrolls.
+          手机上 sheet 已经贴边,px-6/py-5 的卡片留白再吃掉 48px 宽度,所以 < md 统一收到 16px。 */}
       <div
         ref={setPanel}
         role="dialog"
@@ -216,7 +217,7 @@ function DialogFrame({
           asideRef={setHeaderAside}
         />
         <HeaderAsideContext.Provider value={headerAside}>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 max-md:px-4 max-md:py-4">{children}</div>
         </HeaderAsideContext.Provider>
         {footer ? <DialogFooter>{footer}</DialogFooter> : null}
       </div>
@@ -242,7 +243,7 @@ function DialogHeader({
   asideRef?: (el: HTMLElement | null) => void;
 }) {
   return (
-    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-ink/12 px-6 pb-4 pt-5">
+    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-ink/12 px-6 pb-4 pt-5 max-md:px-4 max-md:pb-4 max-md:pt-4">
       <div className="min-w-0 flex-1">
         {eyebrow ? <div className="eyebrow mb-1.5">{eyebrow}</div> : null}
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -269,7 +270,7 @@ function DialogHeader({
 
 function DialogFooter({ children }: { children: ReactNode }) {
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-ink/12 px-6 py-4 bg-paper-deep/30">
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-ink/12 px-6 py-4 bg-paper-deep/30 max-md:px-4">
       {children}
     </div>
   );

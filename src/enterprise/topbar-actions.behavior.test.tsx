@@ -65,12 +65,18 @@ function renderActions(onLocaleChange: (locale: string) => void = () => undefine
       localeOptions={localeOptions}
       onLocaleChange={onLocaleChange}
       labels={labels}
+      notifications={{ items: [], viewAllHref: "/notifications" }}
       user={{ name: "张三", identity: "管理员", permissionSummary: "3 项权限" }}
       securityHref="/security"
       renderLink={renderLink}
       onLogout={() => undefined}
     />
   );
+}
+
+function classesOf(node: Element | null | undefined): string[] {
+  if (!(node instanceof HTMLElement)) throw new Error("节点不存在");
+  return node.className.split(/\s+/);
 }
 
 afterEach(async () => {
@@ -94,6 +100,17 @@ describe("EnterpriseTopbarActions — 桌面", () => {
     await click(byTestId(view.host, "topbar-user-trigger"));
     expect(view.host.querySelector("[data-test-id='topbar-user-menu-language']")).toBeNull();
     expect(byTestId(view.host, "topbar-user-menu-security")).toBeTruthy();
+  });
+
+  it("通知弹层的桌面定宽没有变", async () => {
+    installViewport(false);
+    view = await mount(renderActions());
+    await click(byTestId(view.host, "topbar-notifications").querySelector("button") as HTMLElement);
+    const classes = classesOf(byTestId(view.host, "topbar-notifications-menu"));
+    expect(classes).toContain("w-[300px]");
+    expect(classes).toContain("absolute");
+    expect(classes).toContain("right-0");
+    expect(classes).toContain("top-11");
   });
 });
 
@@ -129,5 +146,24 @@ describe("EnterpriseTopbarActions — 手机", () => {
     expect(picked).toEqual(["en"]);
     // 切换后菜单收起,避免停在半开状态挡住内容。
     expect(view.host.querySelector("[data-test-id='topbar-user-menu']")).toBeNull();
+  });
+
+  it("弹层宽度受视口约束,不会从右锚点溢出到屏幕外", async () => {
+    installViewport(true);
+    view = await mount(renderActions());
+
+    // 通知弹层:桌面定宽 300,手机改成「视口宽 - 24」且封顶 360。
+    await click(byTestId(view.host, "topbar-notifications").querySelector("button") as HTMLElement);
+    const notifications = classesOf(byTestId(view.host, "topbar-notifications-menu"));
+    expect(notifications).toContain("max-md:w-[calc(100vw-24px)]");
+    expect(notifications).toContain("max-md:max-w-[360px]");
+    expect(notifications).toContain("w-[300px]");
+    expect(notifications).toContain("right-0");
+
+    // 用户菜单只有下限宽度,内容(权限摘要)可能把它撑过屏宽,补一个上限。
+    await click(byTestId(view.host, "topbar-user-trigger"));
+    const userMenu = classesOf(byTestId(view.host, "topbar-user-menu"));
+    expect(userMenu).toContain("max-md:max-w-[calc(100vw-24px)]");
+    expect(userMenu).toContain("min-w-[200px]");
   });
 });

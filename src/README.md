@@ -498,7 +498,9 @@ const columns = useMemo(() => [
 | `AppShell` | `APP_SHELL_MAIN_PADDING` 竖向留白 `py-4`;`footer` 包裹层 `hidden md:block`(页脚改由抽屉承载) | `md:px-10 md:py-12 2xl:px-12 3xl:px-16`,原值 |
 | `PageHeader` | `max-md:mb-4 max-md:pb-3`、行间距 `max-md:gap-2`、eyebrow `max-md:hidden`、副标题 `max-md:text-[12px]` | `mb-6 pb-5 gap-4`,原值;H1 仍是 22 → `sm:text-[26px]` |
 | `EnterpriseBrandSlot` | 只剩 logo + 标题(标题 `truncate`),副标题 `hidden … md:block` | 原值 |
-| `EnterpriseTopbarActions` | 语言切换整组移进用户菜单(`topbar-user-menu-language`,选项仍是 `topbar-language-option-<code>` + `role="menuitemradio"`);头像按钮 `max-md:h-10 max-md:min-w-10` | 语言仍是顶栏上的独立入口,菜单里没有它 |
+| `Dialog` | 整屏 sheet 的标题行 / 正文 / 页脚留白 `max-md:px-4` + `max-md:py-4`(贴边之后 24px 留白太贵) | `px-6` / `py-5` / `pb-4 pt-5`,原值 |
+| `ActionRow` | `max-md:flex-wrap`,长标签的提交按钮不会被挤出 360px 的 sheet | 单行,原值 |
+| `EnterpriseTopbarActions` | 语言切换整组移进用户菜单(`topbar-user-menu-language`,选项仍是 `topbar-language-option-<code>` + `role="menuitemradio"`);头像按钮 `max-md:h-10 max-md:min-w-10`;通知弹层 `max-md:w-[calc(100vw-24px)] max-md:max-w-[360px]`、用户菜单 `max-md:max-w-[calc(100vw-24px)]`,右锚点不再溢出屏幕 | 语言仍是顶栏上的独立入口(通知弹层仍是定宽 `w-[300px]`) |
 | 表格 | 切成卡片列表(`TableCards`,见 `table/`) | 仍是表格 |
 
 `EnterpriseTopbarActions` 的视口判定用 `useSyncExternalStore`,服务端 / 首帧快照固定为

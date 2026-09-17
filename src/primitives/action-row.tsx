@@ -20,8 +20,10 @@ export function ActionRow({
   className?: string;
 }) {
   const layout = align === "between" ? "justify-between" : "justify-end";
+  // 手机上才换行:360px 的 sheet 里「取消 + 一个长标签的提交按钮」放不下一行,
+  // 不换行会把按钮挤出可视区。桌面维持单行(换行会让对齐看起来在抖)。
   return (
-    <div className={`flex items-center gap-2 ${layout} ${className}`}>
+    <div className={`flex items-center gap-2 max-md:flex-wrap ${layout} ${className}`}>
       {left && <div className="mr-auto">{left}</div>}
       {children}
     </div>
