@@ -27,6 +27,8 @@ import type { FilterValue, SorterResult, TableCurrentDataSource } from "antd/es/
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { EmptyState } from "../primitives/empty-state";
+import { useIsPhone } from "../primitives/use-media-query";
+import { TableCards, type TableCardsLabels, type TableCardsPagination } from "./table-cards";
 import { TABLE_SCROLL, type TableHeaderLabels } from "./table-columns";
 import {
   DEFAULT_PAGE_SIZE,
@@ -43,6 +45,8 @@ export interface DataTableLabels extends TableHeaderLabels {
   sortDesc: string;
   empty: string;
   pageSize: string;
+  /** 手机卡片列表补充文案(排序 / 全部 / 全选本页);不传时用中文缺省值。 */
+  cards?: TableCardsLabels;
 }
 
 /**
@@ -73,11 +77,19 @@ export interface DataTableProps<T extends object> {
   empty?: ReactNode;
   /** Fixed-right actions column; omit for no such column. */
   actions?: DataTableActions<T>;
+  /** 手机卡片里哪一列算动作列(默认 `"actions"`,即 `actions` 生成的那一列);`fixed: "right"` 的列同样算。 */
+  actionsKey?: string;
   rowSelection?: TableProps<T>["rowSelection"];
   /** Override the page-size options (dialog tables often start at 10). */
   pageSizeOptions?: readonly number[];
   /** Override the rest of the pagination config (e.g. `showSizeChanger: false`). */
   pagination?: Partial<TablePaginationConfig>;
+  /**
+   * 手机(< 768px)上的形态:`"cards"`(默认)换成卡片列表,`"table"` 保留横向滚动的表格。
+   *
+   * 只有个位数窄列、或者行与行之间必须对齐着比的表(对账、金额矩阵)才值得 `"table"`。
+   */
+  mobile?: "cards" | "table";
 }
 
 export function DataTable<T extends object>({
@@ -90,11 +102,31 @@ export function DataTable<T extends object>({
   rowKey,
   empty,
   actions,
+  actionsKey,
   rowSelection,
   pageSizeOptions,
   pagination,
+  mobile = "cards",
 }: DataTableProps<T>) {
   useClampedPage(page, query);
+  const phone = useIsPhone();
+  const allColumns = actions ? [...columns, actionsColumn(actions)] : columns;
+  if (phone && mobile === "cards") {
+    return (
+      <DataTableCards<T>
+        testId={testId}
+        columns={allColumns}
+        page={page}
+        query={query}
+        rowKey={rowKey}
+        labels={labels}
+        loading={loading}
+        empty={empty}
+        actionsKey={actionsKey}
+        rowSelection={rowSelection}
+      />
+    );
+  }
   return (
     <div data-test-id={testId}>
       <Table<T>
@@ -102,7 +134,7 @@ export function DataTable<T extends object>({
         scroll={TABLE_SCROLL}
         rowKey={rowKey}
         loading={loading}
-        columns={actions ? [...columns, actionsColumn(actions)] : columns}
+        columns={allColumns}
         dataSource={page?.items ?? []}
         rowSelection={rowSelection}
         locale={{
@@ -118,6 +150,58 @@ export function DataTable<T extends object>({
       />
     </div>
   );
+}
+
+type DataTableCardsProps<T extends object> = Pick<
+  DataTableProps<T>,
+  "testId" | "page" | "query" | "rowKey" | "labels" | "loading" | "empty" | "actionsKey" | "rowSelection"
+> & { columns: ColumnsType<T> };
+
+/**
+ * 手机形态。表头的两条通路原样复用:一次筛选 / 排序 / 翻页仍然只是交给查询钩子的一个
+ * patch,所以 URL、请求与回退键分不出这次操作来自表头还是卡片。
+ */
+function DataTableCards<T extends object>({
+  testId,
+  columns,
+  page,
+  query,
+  rowKey,
+  labels,
+  loading,
+  empty,
+  actionsKey,
+  rowSelection,
+}: DataTableCardsProps<T>) {
+  return (
+    <div data-test-id={testId}>
+      <TableCards<T>
+        testId={testId}
+        columns={columns}
+        rows={page?.items ?? []}
+        rowKey={rowKey}
+        labels={labels}
+        loading={loading}
+        empty={empty}
+        actionsKey={actionsKey}
+        rowSelection={rowSelection}
+        onFilters={(filters) => query.apply({ filters })}
+        onSort={(sort) => query.apply({ sort })}
+        pagination={cardsPagination(page, query)}
+      />
+    </div>
+  );
+}
+
+/** 卡片分页:与表格分页读同一组数字,翻页走 `changePatch` 那条一样的 patch。 */
+function cardsPagination<T extends object>(page: Page<T> | null, query: TableQuery): TableCardsPagination {
+  const pageSize = page?.pageSize ?? query.query.pageSize;
+  return {
+    current: page?.page ?? query.query.page,
+    pageSize,
+    total: page?.total ?? 0,
+    onChange: (next, size) => query.apply(size !== pageSize ? { pageSize: size, page: 1 } : { page: next }),
+  };
 }
 
 /** Actions column: pinned right so it does not scroll away from its row. */

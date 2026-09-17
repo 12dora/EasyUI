@@ -532,3 +532,56 @@ unchanged (the older `@easy-ui` aliases serve the same migration purpose).
 App-specific, business-coupled components (data grids, currency inputs,
 remote-search selects, money formatting) stay under `@/components/ui`
 and are **not** part of the shared package.
+
+## 移动端卡片列表 (table cards)
+
+手机上一张横向表格是读不了的:`TABLE_SCROLL` 让每列保住宽度、整张表横向滚动,于是标题列
+被裁掉、右侧固定的动作列压在内容上,390px 宽的屏幕一屏只剩四行。所以 `ClientTable` 与
+`DataTable` 在手机(`< 768px`,和 Tailwind `md` 同一个断点)上**默认换成卡片列表**:
+
+```tsx
+// 宿主什么都不用改 —— 同一份列定义,两种形态
+<ClientTable testId="keys" rowKey="id" columns={columns} rows={rows} labels={t.table} />
+
+// 需要保留表格(个位数窄列、或行与行必须对齐着比的对账表)时显式退出:
+<DataTable … mobile="table" />
+```
+
+| 导出 | 作用 |
+| --- | --- |
+| `useMediaQuery(query)` / `useIsPhone()` / `PHONE_MEDIA_QUERY` | `@easy-enterprise/ui` 主包。`useSyncExternalStore` 订阅 `matchMedia`,**服务端快照恒为 `false`** |
+| `TableCards` | 卡片列表本体,`ClientTable` / `DataTable` 之外也能单用 |
+| `MobileColumn` / `MobileColumnRole` | 列定义的 `mobile?: "hidden" \| "title"` 扩展 |
+| `TableCardsLabels` / `DEFAULT_TABLE_CARDS_LABELS` | 卡片专有文案(排序 / 全部 / 全选本页),通过 `labels.cards` 覆盖 |
+| `mobile?: "cards" \| "table"` | `ClientTable` / `DataTable` 的形态开关,默认 `"cards"` |
+
+一张卡怎么排:
+
+- **标题行** = 第一列数据列,或任何标记了 `mobile: "title"` 的列(排序后的第一列未必还是
+  那个"名字",所以标记优先),14px medium;
+- **定义表** = 其余数据列,两列网格(`dt` 列名 12px 弱化,`dd` 单元格 13px)。`render` 收到
+  与表格里完全一样的 `(value, record, index)`;**渲染结果为空的列整行不出现**(桌面上的留白
+  在手机上是纯噪声);标了 `mobile: "hidden"` 的列同样不出现(ID、创建人这类列);
+- **动作行** = `actionsKey`(默认 `"actions"`,即 `DataTable` 的 `actions` 生成的那一列)或任何
+  `fixed: "right"` 的列,右对齐贴在卡片底部,宿主的 `RowActions` 原样渲染;
+- **选择** = `rowSelection` 给了就在标题行左边出复选框,外加一行"全选本页",读写的都是
+  `selectedRowKeys` / `onChange`(含 `getCheckboxProps` 的禁用态);
+- **工具条** = 表头上的能力搬到卡片上方:`searchColumn` / `clientSearchColumn` 每列一个检索框
+  (回车或失焦提交),`filterColumn` 变成下拉,可排序列合成一个「排序」下拉(列 × 升/降)。
+  下拉用的是 EasyUI 原生 `Select`,手机上直接拉起系统选择器;
+- **分页** = 底部居中的 antd `Pagination size="small" simple`,一页放得下就整个不出现。
+
+契约要点 —— 这些是约定,不是选项:
+
+- **状态只有一份。** 卡片工具条的一次改动走的是表头那条**同一条**通路:`ClientTable` 回调
+  `onFilters`(带上全部受控筛选列,没选的给空数组),`DataTable` 交给查询钩子一个 patch
+  (`{ filters }` / `{ sort }` / `{ page }`)。所以 URL、请求、回退键分不出这次操作来自表头
+  还是卡片,横竖屏来回切也不会丢关键字或页码(分页共用 `ClientTable` 的本地页码状态)。
+- **行的过滤与排序照旧由列定义决定。** 表格模式下这是 antd 干的活,卡片模式没有 antd Table,
+  于是由 `TableCards` 按同样语义补上:列上有 `onFilter`(`clientSearchColumn` 的 `subject`
+  会生成)就用它筛行,有 `sorter` 比较函数就用它排序;`sorter: true` 的服务端列不本地排序,
+  顺序仍由后端给。
+- **首帧是桌面形态。** `useIsPhone()` 的服务端快照恒为 `false`:服务器上没有视口,猜错会让
+  hydration 前后不一致、整棵子树重渲染。手机在 hydration 之后的第一次订阅里立刻切成卡片 ——
+  多一帧表格,换一个不会在 SSR 上出错的钩子。
+- **桌面像素不变。** 整个特性只在 `(max-width: 767px)` 命中时生效,`md` 及以上一行样式都没动。

@@ -30,7 +30,9 @@ import type { ColumnType, ColumnsType, TablePaginationConfig, TableProps } from 
 import { useState, type ReactNode } from "react";
 
 import { EmptyState } from "../primitives/empty-state";
+import { useIsPhone } from "../primitives/use-media-query";
 import { filterPatch, type DataTableLabels } from "./data-table";
+import { TableCards } from "./table-cards";
 import { TABLE_SCROLL } from "./table-columns";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "./table-query";
 
@@ -57,6 +59,14 @@ export interface ClientTableProps<T extends object> {
   rowSelection?: TableProps<T>["rowSelection"];
   /** Local pager; `false` renders all rows. Default `{ pageSize: 20, showSizeChanger: true }`. */
   pagination?: false | ClientTablePagination;
+  /** 手机卡片里哪一列算动作列(默认 `"actions"`);`fixed: "right"` 的列同样算。 */
+  actionsKey?: string;
+  /**
+   * 手机(< 768px)上的形态:`"cards"`(默认)换成卡片列表,`"table"` 保留横向滚动的表格。
+   *
+   * 卡片里的检索 / 筛选 / 排序 / 分页与表头同一份状态,所以来回切换不会丢页码或关键字。
+   */
+  mobile?: "cards" | "table";
 }
 
 export function ClientTable<T extends object>({
@@ -70,8 +80,43 @@ export function ClientTable<T extends object>({
   onFilters,
   rowSelection,
   pagination = {},
+  actionsKey,
+  mobile = "cards",
 }: ClientTableProps<T>) {
   const [paging, setPaging] = useClientPaging(rows, columns, pageSizeOf(pagination));
+  const phone = useIsPhone();
+  // 换了筛选条件,旧页码多半已经不存在了(表头那条路走 onChange,卡片这条路走这里)。
+  const filtered = (filters: Record<string, string[]>) => {
+    setPaging((current) => ({ ...current, page: 1 }));
+    onFilters?.(filters);
+  };
+  if (phone && mobile === "cards") {
+    return (
+      <div data-test-id={testId}>
+        <TableCards<T>
+          testId={testId}
+          columns={columns}
+          rows={rows}
+          rowKey={rowKey}
+          labels={labels}
+          loading={loading}
+          empty={empty}
+          actionsKey={actionsKey}
+          rowSelection={rowSelection}
+          onFilters={filtered}
+          pagination={
+            pagination === false
+              ? false
+              : {
+                  current: paging.page,
+                  pageSize: paging.pageSize,
+                  onChange: (page, pageSize) => setPaging({ page, pageSize }),
+                }
+          }
+        />
+      </div>
+    );
+  }
   return (
     <div data-test-id={testId}>
       <Table<T>
@@ -94,9 +139,7 @@ export function ClientTable<T extends object>({
             return;
           }
           if (extra.action !== "filter") return;
-          // 换了筛选条件,旧页码多半已经不存在了(和 DataTable 的 nextPage 同一条规矩)。
-          setPaging((current) => ({ ...current, page: 1 }));
-          onFilters?.(filterPatch(filters));
+          filtered(filterPatch(filters));
         }}
       />
     </div>

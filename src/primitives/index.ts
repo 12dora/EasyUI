@@ -42,6 +42,7 @@ export { Toaster } from "./toaster";
 export { UserAvatar, avatarInitials } from "./avatar";
 export { PopoverSurface, POPOVER_MOTION } from "./popover-surface";
 export { CollapseReveal } from "./collapse-reveal";
+export { useMediaQuery, useIsPhone, PHONE_MEDIA_QUERY } from "./use-media-query";
 export {
   AsyncStateTransition,
   type AsyncSurfaceState,

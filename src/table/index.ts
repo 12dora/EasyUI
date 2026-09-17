@@ -74,9 +74,20 @@ export {
   type ClientSearchOptions,
   type FilterColumnOptions,
   type HeaderFilterOption,
+  type MobileColumn,
+  type MobileColumnRole,
   type SearchColumnOptions,
   type TableHeaderLabels,
 } from "./table-columns";
+
+export {
+  TableCards,
+  DEFAULT_TABLE_CARDS_LABELS,
+  type TableCardsLabels,
+  type TableCardsPagination,
+  type TableCardsProps,
+  type TableCardsSort,
+} from "./table-cards";
 
 export {
   DataTable,

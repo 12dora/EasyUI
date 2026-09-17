@@ -29,6 +29,29 @@ export interface HeaderFilterOption {
 }
 
 /**
+ * 这一列在手机卡片模式(`TableCards`)里的角色。表格模式完全读不到它。
+ *
+ * - `"hidden"` —— 卡片里不展示(桌面上有用、手机上纯噪声的列:ID、创建人、宽度占位列);
+ * - `"title"` —— 抢下卡片的标题行(默认是第一列数据列,但排序后第一列未必是那个"名字")。
+ */
+export type MobileColumnRole = "hidden" | "title";
+
+/**
+ * 带移动端标记的列定义。
+ *
+ * 只是给 antd 的 `ColumnType` 加一个可选字段:桌面表格原样透传(antd 忽略不认识的 key),
+ * 手机卡片读它决定标题与取舍。列装饰器(`searchColumn` / `filterColumn` / `sortColumn`)
+ * 都用展开语法复制列对象,所以标记可以加在装饰前后的任何一层。
+ */
+export interface MobileColumn<T> extends ColumnType<T> {
+  mobile?: MobileColumnRole;
+}
+
+// 下面的装饰器都收 / 回 `MobileColumn`:标记才能写在最里层的列字面量上而不被 TS 拒收,
+// 也才能穿过一串装饰(它们全是展开复制)活到卡片那一端。`MobileColumn` 是 `ColumnType`
+// 的超集,所以对表格侧完全透明。
+
+/**
  * Horizontal scrolling for every list table.
  *
  * Without `scroll.x` antd uses `table-layout: auto`: columns get squeezed below
@@ -58,12 +81,12 @@ interface KeywordLabels {
  * `width` is the column's target width (other `max-content` columns can still
  * push it). Short fields should just declare an explicit px `width` instead.
  */
-export function withEllipsis<T>(column: ColumnType<T>, width: number): ColumnType<T> {
+export function withEllipsis<T>(column: MobileColumn<T>, width: number): MobileColumn<T> {
   return { ...column, width, ellipsis: true };
 }
 
 /** In-memory sort for a small table whose rows are all loaded. */
-export function withClientSort<T>(column: ColumnType<T>, compare: (a: T, b: T) => number): ColumnType<T> {
+export function withClientSort<T>(column: MobileColumn<T>, compare: (a: T, b: T) => number): MobileColumn<T> {
   return { ...column, sorter: compare };
 }
 
@@ -128,7 +151,7 @@ export interface SearchColumnOptions {
  * The column's `key` is forced to `param` so antd reports the filter under that
  * name; `dataIndex` is left to sorting (`sortColumn` uses it as the server sort key).
  */
-export function searchColumn<T>(column: ColumnType<T>, options: SearchColumnOptions): ColumnType<T> {
+export function searchColumn<T>(column: MobileColumn<T>, options: SearchColumnOptions): MobileColumn<T> {
   const { param, query, labels, placeholder } = options;
   const testId = options.testId ?? `${param}-search`;
   const value = query.filters[param]?.[0] ?? "";
@@ -185,7 +208,7 @@ export interface FilterColumnOptions {
  * funnel lights up only when the selection differs from the default, otherwise
  * a pristine page is covered in highlights and "am I filtering?" is unreadable.
  */
-export function filterColumn<T>(column: ColumnType<T>, config: FilterColumnOptions): ColumnType<T> {
+export function filterColumn<T>(column: MobileColumn<T>, config: FilterColumnOptions): MobileColumn<T> {
   const { param, query, labels } = config;
   const values = query.filters[param] ?? [];
   const active = isFiltering(values, config);
@@ -281,7 +304,7 @@ export function sortOrderFor(query: TableQueryState, key: string): SortOrder {
  * (i.e. `dataIndex`), and the same column may already have given its `key` to
  * `searchColumn` — so the sort key and `dataIndex` have to agree.
  */
-export function sortColumn<T>(column: ColumnType<T>, key: string, query: TableQueryState): ColumnType<T> {
+export function sortColumn<T>(column: MobileColumn<T>, key: string, query: TableQueryState): MobileColumn<T> {
   return {
     ...column,
     dataIndex: column.dataIndex ?? key,
@@ -323,7 +346,7 @@ export interface ClientSearchOptions<T = unknown> {
 }
 
 /** Header keyword search for an in-memory table — same funnel, value owned by the caller. */
-export function clientSearchColumn<T>(column: ColumnType<T>, options: ClientSearchOptions<T>): ColumnType<T> {
+export function clientSearchColumn<T>(column: MobileColumn<T>, options: ClientSearchOptions<T>): MobileColumn<T> {
   const { param, value, subject, ...rest } = options;
   const searchable = searchColumn<T>(column, { ...rest, param, query: clientQueryState(param, value) });
   if (!subject) return searchable;
