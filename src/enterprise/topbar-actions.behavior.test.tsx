@@ -7,6 +7,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 
+import { PHONE_MEDIA_QUERY } from "../primitives/use-media-query";
 import { byTestId, click, mount, type MountedView } from "./behavior-test-utils";
 import type { EnterpriseLinkRenderer, EnterpriseShellLabels } from "./models";
 import { EnterpriseTopbarActions } from "./topbar-actions";
@@ -16,12 +17,12 @@ import { EnterpriseTopbarActions } from "./topbar-actions";
 let view: MountedView | null = null;
 const originalMatchMedia = Object.getOwnPropertyDescriptor(window, "matchMedia");
 
-/** 视口 mock:只有 `(max-width: 767px)` 这条查询按 `phone` 回答,其余一律 false。 */
+/** 视口 mock:只有共享 hook 的手机断点按 `phone` 回答,其余查询(减少动效等)一律 false。 */
 function installViewport(phone: boolean): void {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => ({
-      matches: phone && query.includes("max-width: 767px"),
+      matches: phone && query === PHONE_MEDIA_QUERY,
       media: query,
       onchange: null,
       addListener: () => undefined,

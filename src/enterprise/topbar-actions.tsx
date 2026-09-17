@@ -1,8 +1,9 @@
 "use client";
 
-import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
 import { UserAvatar } from "../primitives/avatar";
 import { PopoverSurface } from "../primitives/popover-surface";
+import { useIsPhone } from "../primitives/use-media-query";
 import type {
   EnterpriseLinkRenderer,
   EnterpriseLocale,
@@ -14,34 +15,6 @@ import type {
 import { RelativeTimestamp } from "./relative-time";
 
 type OpenMenu = "language" | "notifications" | "user" | null;
-
-/** 手机断点(< md),与 Tailwind 的 `max-md:` 同一口径。 */
-const PHONE_QUERY = "(max-width: 767px)";
-
-function phoneMediaQuery(): MediaQueryList | null {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return null;
-  return window.matchMedia(PHONE_QUERY);
-}
-
-function subscribePhone(onChange: () => void): () => void {
-  const query = phoneMediaQuery();
-  if (!query) return () => undefined;
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-/**
- * 手机视口判定。SSR / 首帧快照固定为 `false`(桌面形态),hydration 之后才切,
- * 所以服务端渲染与客户端首帧一致。表格切卡片用的是 primitives 里的共享 hook,
- * 这里只服务 topbar,刻意保持局部、不跨切片耦合。
- */
-function useIsPhoneViewport(): boolean {
-  return useSyncExternalStore(
-    subscribePhone,
-    () => phoneMediaQuery()?.matches ?? false,
-    () => false,
-  );
-}
 
 export interface EnterpriseTopbarActionsProps {
   /** Route identity; changing it closes any open popover. */
@@ -108,7 +81,8 @@ export function EnterpriseTopbarActions(props: EnterpriseTopbarActionsProps) {
     }
   }
 
-  const isPhone = useIsPhoneViewport();
+  // 与表格切卡片共用同一个断点 hook(SSR / 首帧快照为桌面形态,hydration 后才切)。
+  const isPhone = useIsPhone();
   // 手机上语言项并入用户菜单(见 UserAction),顶栏只留铃铛 + 头像;桌面保持三个独立入口。
   const localeSwitch: LocaleSwitch = {
     locale: props.locale,

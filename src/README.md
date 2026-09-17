@@ -503,8 +503,10 @@ const columns = useMemo(() => [
 | `EnterpriseTopbarActions` | 语言切换整组移进用户菜单(`topbar-user-menu-language`,选项仍是 `topbar-language-option-<code>` + `role="menuitemradio"`);头像按钮 `max-md:h-10 max-md:min-w-10`;通知弹层 `max-md:w-[calc(100vw-24px)] max-md:max-w-[360px]`、用户菜单 `max-md:max-w-[calc(100vw-24px)]`,右锚点不再溢出屏幕 | 语言仍是顶栏上的独立入口(通知弹层仍是定宽 `w-[300px]`) |
 | 表格 | 切成卡片列表(`TableCards`,见 `table/`) | 仍是表格 |
 
-`EnterpriseTopbarActions` 的视口判定用 `useSyncExternalStore`,服务端 / 首帧快照固定为
-`false`(桌面形态),hydration 之后才切 —— 这样 SSR 与客户端首帧一致,不会闪。
+视口判定统一走 `primitives/use-media-query` 的 `useIsPhone()`(`useMediaQuery` +
+`PHONE_MEDIA_QUERY = "(max-width: 767px)"`):`useSyncExternalStore` 订阅 `MediaQueryList`,
+服务端 / 首帧快照固定为 `false`(桌面形态),hydration 之后才切 —— 这样 SSR 与客户端首帧
+一致,不会闪。`EnterpriseTopbarActions` 的语言项归属与表格的卡片/表格切换都以它为准。
 
 ## Design tokens (theme.css)
 
