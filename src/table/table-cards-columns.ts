@@ -6,7 +6,7 @@
  * `ColumnType` 上读出来。这样宿主一份列定义同时长出表格与卡片两种形态,不用写第二遍。
  */
 
-import { isValidElement, type Key, type ReactNode } from "react";
+import { isValidElement, type ReactNode } from "react";
 import type { ColumnType, ColumnsType, TableProps } from "antd/es/table";
 import type { CompareFn } from "antd/es/table/interface";
 
@@ -202,11 +202,28 @@ export function sortRows<T>(rows: readonly T[], columns: ColumnsType<T>, sort: T
   return [...rows].sort((left, right) => compare(left, right, order) * direction);
 }
 
-/** 行 key:与 antd `rowKey` 同一口径(函数 / 字段名 / 默认 `key` 字段)。 */
-export function rowKeyOf<T extends object>(rowKey: TableProps<T>["rowKey"], record: T, index: number): Key {
-  if (typeof rowKey === "function") return rowKey(record, index);
+/**
+ * 行 key 的收窄类型。
+ *
+ * antd 的 `rowKey` 可以回 `PropertyKey`(symbol / bigint 也在里面),而 React 的 `Key` 只认
+ * 字符串与数字 —— 直接把 antd 的口径透出去,宿主开 strict 的 tsc 就会在 `Map<T, Key>` 上炸。
+ * 所以这一层统一收窄:非数字一律 `String()`。
+ */
+export type CardRowKey = string | number;
+
+/** 行 key:与 antd `rowKey` 同一口径(函数 / 字段名 / 默认 `key` 字段),但收窄到 React 认的类型。 */
+export function rowKeyOf<T extends object>(
+  rowKey: TableProps<T>["rowKey"],
+  record: T,
+  index: number,
+): CardRowKey {
+  if (typeof rowKey === "function") return narrowKey(rowKey(record, index), index);
   const field = typeof rowKey === "string" ? rowKey : "key";
-  const value = (record as Record<string, unknown>)[field];
+  return narrowKey((record as Record<string, unknown>)[field], index);
+}
+
+function narrowKey(value: unknown, index: number): CardRowKey {
   if (typeof value === "string" || typeof value === "number") return value;
-  return index;
+  if (value === undefined || value === null) return index;
+  return String(value);
 }

@@ -35,6 +35,7 @@ import {
   sortRows,
   splitColumns,
   type CardColumns,
+  type CardRowKey,
   type TableCardsSort,
 } from "./table-cards-columns";
 import { DEFAULT_TABLE_CARDS_LABELS, TableCardsToolbar } from "./table-cards-toolbar";
@@ -97,7 +98,7 @@ export function TableCards<T extends object>({
   const sort = onSort ? columnSort(columns) : localSort;
   const visible = sortRows(filterRows(rows, columns), columns, sort);
   const paged = pageRows(visible, pagination);
-  const keys = new Map(rows.map((row, index) => [row, rowKeyOf(rowKey, row, index)]));
+  const keys = new Map<T, CardRowKey>(rows.map((row, index) => [row, rowKeyOf(rowKey, row, index)]));
   const selection = selectionOf(rowSelection, rows, keys);
   return (
     <div data-test-id={cardsId} aria-busy={loading} className={loading ? "opacity-60" : undefined}>
@@ -133,7 +134,7 @@ interface BodyProps<T extends object> {
   testId: string;
   cardsId: string;
   rows: readonly T[];
-  keys: Map<T, Key>;
+  keys: Map<T, CardRowKey>;
   columns: CardColumns<T>;
   selection: CardsSelection<T> | null;
   emptyLabel: string;
@@ -174,7 +175,7 @@ function CardsBody<T extends object>({
 interface CardProps<T extends object> {
   record: T;
   index: number;
-  rowKeyValue: Key;
+  rowKeyValue: CardRowKey;
   columns: CardColumns<T>;
   testId: string;
   selection: CardsSelection<T> | null;
@@ -220,7 +221,7 @@ interface SelectAllProps<T extends object> {
   label: string;
   testId: string;
   rows: readonly T[];
-  keys: Map<T, Key>;
+  keys: Map<T, CardRowKey>;
   selection: CardsSelection<T> | null;
 }
 
@@ -280,15 +281,18 @@ interface CardsSelection<T extends object> {
 function selectionOf<T extends object>(
   rowSelection: TableProps<T>["rowSelection"],
   rows: readonly T[],
-  keys: Map<T, Key>,
+  keys: Map<T, CardRowKey>,
 ): CardsSelection<T> | null {
   if (!rowSelection) return null;
   const selected = [...(rowSelection.selectedRowKeys ?? [])];
   const emit = (next: Key[], type: RowSelectMethod) => {
-    const chosen = new Set(next);
+    const chosen = new Set<Key>(next);
     rowSelection.onChange?.(
       next,
-      rows.filter((row) => chosen.has(keys.get(row) as Key)),
+      rows.filter((row) => {
+        const key = keys.get(row);
+        return key !== undefined && chosen.has(key);
+      }),
       { type },
     );
   };
@@ -296,12 +300,14 @@ function selectionOf<T extends object>(
     keys: selected,
     disabled: (record) => rowSelection.getCheckboxProps?.(record)?.disabled === true,
     toggle: (record, checked) => {
-      const key = keys.get(record) as Key;
+      const key = keys.get(record);
+      if (key === undefined) return;
       emit(checked ? [...selected, key] : selected.filter((entry) => entry !== key), "single");
     },
     toggleAll: (records, checked) => {
-      const pageKeys = records.map((record) => keys.get(record) as Key);
-      const rest = selected.filter((key) => !pageKeys.includes(key));
+      const pageKeys = records.flatMap((record) => keys.get(record) ?? []);
+      const onPage = new Set<Key>(pageKeys);
+      const rest = selected.filter((key) => !onPage.has(key));
       emit(checked ? [...rest, ...pageKeys] : rest, "all");
     },
   };
