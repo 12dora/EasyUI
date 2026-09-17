@@ -113,11 +113,39 @@ function renderedNode(rendered: unknown): ReactNode {
   return rendered as ReactNode;
 }
 
-/** 单元格内容:和表格里完全一样的 `render(value, record, index)` 调用。 */
+/**
+ * 只放 React 真的画得出来的东西:基本类型、React 元素,以及整条都合法的数组。
+ *
+ * 别的(普通对象、Date、Map……)一律当空。卡片里这些值本来就没有展示形态,而直接塞给 React
+ * 会当场抛 "Objects are not valid as a React child" —— 整页白屏,只因为某一列多了个没
+ * `render` 的对象字段。rc-table 在表格那边也是同样的保守做法。
+ */
+function renderableNode(value: unknown): ReactNode {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (isValidElement(value)) return value;
+  if (Array.isArray(value)) return value.every(isRenderable) ? (value as ReactNode) : null;
+  return null;
+}
+
+function isRenderable(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (typeof value === "object") return isValidElement(value) || (Array.isArray(value) && value.every(isRenderable));
+  return typeof value !== "function" && typeof value !== "symbol";
+}
+
+/**
+ * 单元格内容:和表格里完全一样的 `render(value, record, index)` 调用。
+ *
+ * 既没有 `dataIndex` 也没有 `render` 的列(占位列、只声明 `width` 的列)什么都不画 ——
+ * 否则 `dataIndex` 缺省取的是**整行记录**,卡片会拿一个对象去渲染。
+ */
 export function cellOf<T>(column: MobileColumn<T>, record: T, index: number): ReactNode {
+  const hasDataIndex = column.dataIndex !== undefined && column.dataIndex !== null;
+  if (!hasDataIndex && !column.render) return null;
   const value = readCell(record, column.dataIndex);
-  if (!column.render) return value as ReactNode;
-  return renderedNode(column.render(value, record, index));
+  if (!column.render) return renderableNode(value);
+  return renderableNode(renderedNode(column.render(value, record, index)));
 }
 
 /** 单元格的纯文本(给 aria-label 用);渲染成节点时拿不到文本,返回 `null`。 */

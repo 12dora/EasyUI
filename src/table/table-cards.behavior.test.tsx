@@ -6,7 +6,7 @@
  * 会分叉),选择要真的写回 `rowSelection`,分页要和桌面共用页码。
  */
 import type { ColumnsType } from "antd/es/table";
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { byTestId, change, fill, mount, type MountedView } from "../enterprise/behavior-test-utils";
@@ -283,6 +283,31 @@ describe("TableCards 的列解读与加载态", () => {
     expect(cards()[0]!.textContent).toContain("已启用");
     expect(cards()[0]!.textContent).toContain("编辑 a");
     expect(definitions(cards()[0]!)).not.toHaveProperty("状态");
+  });
+
+  it("既没有 dataIndex 也没有 render 的列什么都不画,不会把整行记录塞给 React", async () => {
+    await renderCards({
+      columns: [
+        { title: "名称", dataIndex: "name", key: "name" },
+        { title: "占位", key: "blank", width: 40 },
+      ],
+    });
+    expect(cards()).toHaveLength(2);
+    expect(definitions(cards()[0]!)).not.toHaveProperty("占位");
+  });
+
+  it("值或 render 结果是普通对象时同样跳过", async () => {
+    await renderCards({
+      columns: [
+        { title: "名称", dataIndex: "name", key: "name" },
+        { title: "原始", dataIndex: "raw", key: "raw" },
+        { title: "算出来的", key: "computed", render: () => ({ hello: "world" }) as unknown as ReactNode },
+      ],
+      rows: [{ ...ROWS[0]!, raw: { deep: 1 } } as Row & { raw: unknown }],
+    });
+    const first = definitions(cards()[0]!);
+    expect(first).not.toHaveProperty("原始");
+    expect(first).not.toHaveProperty("算出来的");
   });
 
   it("加载中且还没有行时给占位卡,而不是空状态", async () => {
