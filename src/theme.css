@@ -266,6 +266,19 @@ select {
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* 导航进度条(NavigationProgress):不定量增长 + 收尾补满淡出。
+   用 transform: scaleX 而不是 width —— 只走合成层,导航在途时不掉帧。
+   增长曲线刻意很长(10s)且缓出:越接近 90% 越慢,永远走不到头,真正落地时由
+   `.easy-nav-progress-done` 补满。 */
+@keyframes easyNavProgressGrow {
+  from { transform: scaleX(0.04); }
+  to { transform: scaleX(0.9); }
+}
+@keyframes easyNavProgressDone {
+  0% { transform: scaleX(0.9); opacity: 1; }
+  55% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
 
 .animate-fade-up { animation: fadeUp var(--duration-slow) var(--ease-out-paper) both; }
 .animate-fade-in { animation: fadeIn var(--duration-base) var(--ease-out-paper) both; }
@@ -294,6 +307,34 @@ select {
 }
 .easy-nav-panel-enter-left {
   animation: easyNavPanelInLeft var(--duration-fast) var(--ease-out-paper) both;
+}
+
+/* 导航进度条 —— 2px 琥珀细轨,贴在内容列顶边(AppShell 的 relative 包裹层里) */
+.easy-nav-progress-grow,
+.easy-nav-progress-done {
+  background: rgb(var(--amber));
+  transform-origin: left center;
+  /* 关键帧被 prefers-reduced-motion 关掉时的兜底:直接整条显示(纯显示/隐藏)。 */
+  transform: scaleX(1);
+}
+.easy-nav-progress-grow {
+  animation: easyNavProgressGrow 10s var(--ease-out-paper) both;
+}
+.easy-nav-progress-done {
+  animation: easyNavProgressDone 200ms var(--ease-out-paper) both;
+}
+
+/* 视觉隐藏、读屏可读 —— 只给状态区域的文案用(NavigationProgress 的 label)。 */
+.easy-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip-path: inset(50%);
 }
 
 /* Mobile drawer backdrop + panel */
@@ -429,6 +470,8 @@ select {
   .animate-pulse,
   .easy-nav-panel-enter-right,
   .easy-nav-panel-enter-left,
+  .easy-nav-progress-grow,
+  .easy-nav-progress-done,
   .easy-drawer-backdrop-enter,
   .easy-drawer-backdrop-exit,
   .easy-drawer-panel-enter,

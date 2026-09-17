@@ -9,7 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { EnterpriseAppFrame } from "./app-frame";
 import { EnterpriseConfiguredFooter } from "./footer";
 import { EnterpriseSettingsPageFrame } from "./page-frames";
-import { byTestId, mount, type MountedView } from "./behavior-test-utils";
+import { byTestId, mount, settle, type MountedView } from "./behavior-test-utils";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -47,6 +47,19 @@ describe("EnterpriseAppFrame", () => {
     expect(html.textContent).toContain("企业应用");
     expect(html.textContent).toContain(String(new Date().getFullYear()));
     expect(view.host.querySelector("[data-test-id='app-footer-fallback']")).toBeNull();
+  });
+
+  it("forwards the navigation-pending props down to AppShell", async () => {
+    view = await mount(
+      <EnterpriseAppFrame pending pendingLabel="加载中" footer={<EnterpriseConfiguredFooter html="" fallback="回退页脚" />}>
+        <p>内容</p>
+      </EnterpriseAppFrame>,
+    );
+    // 延迟 150ms 之后细轨才显形(见 NAV_PROGRESS_DELAY_MS),aria-busy 则是立刻就有。
+    expect(view.host.querySelector("main")?.getAttribute("aria-busy")).toBe("true");
+    await settle(220);
+    expect(byTestId(view.host, "nav-progress").dataset.state).toBe("running");
+    expect(byTestId(view.host, "nav-progress").textContent).toBe("加载中");
   });
 
   it("falls back to the host string when nothing is configured", async () => {

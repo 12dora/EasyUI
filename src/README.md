@@ -31,7 +31,8 @@ src/
                               PageHeader, EmptyState, InlineNotice, Section, Avatar,
                               SegmentedToggle, TabList/TabPanel, Toaster,
                               UnsavedChangesProvider, …  (visual, business-free)
-  shell/                    ← AppShell, Sidebar (drill-down + mobile drawer), Topbar
+  shell/                    ← AppShell, Sidebar (drill-down + mobile drawer), Topbar,
+                              useNavIntent + NavigationProgress (导航即时反馈)
   enterprise/               ← complete login, security, Login & Permissions, general
                               settings (brand / logo / footer), brand slot, app frame,
                               notification and upstream-health surfaces
@@ -243,6 +244,72 @@ the topmost dialog.
 Full-page unloads (tab close, reload, external links) are already covered: the provider
 installs one `beforeunload` listener while any source is dirty and removes it as soon as
 everything is clean.
+
+## 导航即时反馈 (nav intent + 进度条)
+
+App Router 的 `usePathname()` 只在导航**提交**之后才翻页(布局 force-dynamic、刻意没有
+route 级 `loading.tsx`、侧栏链接靠 hover 意图预取)。远端访问时点击到内容切换之间有
+300~1500ms,侧栏标记和内容一起跳 —— 用户看到的是"侧栏不跟手"。
+
+shell 给的解法是两件小东西,**不要**为此重新引入 route 级 `loading.tsx` / `<Suspense>`
+(React 对 Suspense 揭示有 ~300ms 节流,加回来反而更慢更闪):
+
+| 导出 | 作用 |
+| --- | --- |
+| `useNavIntent(pathname): NavIntent` | 记下用户刚选中的目标路径,`nav.path` 在路由提交前就能拿来算选中态 |
+| `intentPathOf(href)` | 纯函数:取 href 的路径部分(剥掉 `?query` / `#hash`,不做 locale 改写) |
+| `NAV_INTENT_TIMEOUT_MS` (8000) | 导航中止/出错时的安全超时,标记弹回真实路由 |
+| `NavigationProgress` / `NAV_PROGRESS_DELAY_MS` (150) | 内容列顶边 2px 琥珀细轨,迟到 150ms 才显形,落地时补满淡出 |
+
+`NavIntent` 的语义:`onIntent(href)` 同步记下意图 → `pending` 为真,直到 `pathname` 发生
+**任何**变化(导航落地,可能落在重定向目标上)或超时;点当前页是空操作(不产生 pending);
+pending 期间再点一次就换目标并重置计时。钩子纯前端、与路由库无关,初始状态只由 `pathname`
+推导,不会造成水合不一致。
+
+进度条由 `AppShell` 自己挂:它在 `<main>` 外面的 relative 包裹层里(贴内容列顶边,不随内容
+滚动),`pending` 时 `<main>` 还会挂上 `aria-busy`。动效是 theme.css 里的 CSS 关键帧
+(`easyNavProgress*`,shell 关键路径不引 motion/react),`prefers-reduced-motion` 下退化成
+纯显示/隐藏;`pendingLabel` 以视觉隐藏文本放进 `role="status"`。
+
+### Host wiring
+
+```tsx
+const pathname = usePathname();
+const nav = useNavIntent(pathname);
+
+// 所有原本从 pathname 推导「选中」的地方改用 nav.path
+const isActive = (href: string) => nav.path === href;
+
+// 链接:在 onClick 里、onNavigate() 之前同步记意图(预取逻辑保持不变)
+renderLink={({ href, onNavigate, children, ...rest }) => (
+  <Link
+    href={href}
+    onClick={() => {
+      nav.onIntent(href);
+      onNavigate();
+    }}
+    {...rest}
+  >
+    {children}
+  </Link>
+)}
+
+// 抽屉/面板项:push 之前先记意图
+const openPanel = (next: NavPanel) => {
+  nav.onIntent(next.firstHref);
+  setPanel(next.id);
+  router.push(next.firstHref);
+};
+
+// 框架:把 pending 交给 AppShell / EnterpriseAppFrame
+<EnterpriseAppFrame pending={nav.pending} pendingLabel={t.shell.loading} footer={<AppFooter />}>
+  {children}
+</EnterpriseAppFrame>
+```
+
+只有**视觉上的选中计算**搬到 `nav.path`。继续用真实 `pathname` 的地方:`MobileNav` 的
+`pathKey`(抽屉要在路由真的变了以后才关)、topbar 的 `pathKey`、身份刷新、语言切换,以及
+任何发请求的逻辑。
 
 ## 表格 (tables)
 

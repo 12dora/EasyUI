@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { NavigationProgress } from "./NavigationProgress";
 
 export interface AppShellProps {
   /** Sticky header, usually `<Topbar />`. */
@@ -24,6 +25,13 @@ export interface AppShellProps {
   maxWidth?: number;
   /** Extra classes for the scrollable <main>. */
   mainClassName?: string;
+  /**
+   * 有一次客户端导航在途:内容列顶边显示延迟出现的进度条,`<main>` 挂 `aria-busy`。
+   * 宿主用 `useNavIntent(pathname).pending` 喂它。
+   */
+  pending?: boolean;
+  /** 进度条状态文案(本地化,视觉隐藏,只读给读屏),例如「加载中」。 */
+  pendingLabel?: string;
 }
 
 /**
@@ -60,6 +68,8 @@ export function AppShell({
   footer,
   maxWidth,
   mainClassName = "",
+  pending = false,
+  pendingLabel,
 }: AppShellProps) {
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-paper">
@@ -68,13 +78,18 @@ export function AppShell({
         <div className="mx-auto flex h-full flex-col md:flex-row" style={{ maxWidth }}>
           {sidebar}
           {mobileNav}
-          <main
-            // scrollbar-gutter: stable —— main 自己的滚动条出现/消失时内容不再横向抖动。
-            style={{ scrollbarGutter: "stable" }}
-            className={`min-h-0 w-full min-w-0 flex-1 overflow-y-auto ${APP_SHELL_MAIN_PADDING} ${mainClassName}`}
-          >
-            {children}
-          </main>
+          {/* 进度条挂在这层 relative 包裹里、`<main>` 之外:它贴内容列顶边,不随内容滚动。 */}
+          <div className="relative flex min-h-0 w-full min-w-0 flex-1 flex-col">
+            <NavigationProgress pending={pending} label={pendingLabel} />
+            <main
+              // scrollbar-gutter: stable —— main 自己的滚动条出现/消失时内容不再横向抖动。
+              style={{ scrollbarGutter: "stable" }}
+              aria-busy={pending || undefined}
+              className={`min-h-0 w-full min-w-0 flex-1 overflow-y-auto ${APP_SHELL_MAIN_PADDING} ${mainClassName}`}
+            >
+              {children}
+            </main>
+          </div>
         </div>
       </div>
       {footer ? <div className="shrink-0">{footer}</div> : null}
