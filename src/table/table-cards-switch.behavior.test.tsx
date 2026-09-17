@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { byTestId, change, fill, mount, type MountedView } from "../enterprise/behavior-test-utils";
 import { ClientTable } from "./client-table";
 import { DataTable, type DataTableLabels } from "./data-table";
-import { clientSearchColumn, searchColumn, sortColumn } from "./table-columns";
+import { clientSearchColumn, searchColumn, sortColumn, withClientSort } from "./table-columns";
 import {
   parseTableQuery,
   tableListParams,
@@ -48,6 +48,8 @@ const ROWS: Row[] = [
 type Listener = (event: { matches: boolean; media: string }) => void;
 
 const listeners = new Set<{ query: string; handler: Listener }>();
+/** 环境自带的 matchMedia,afterEach 要原样放回去(别的用例还指着它)。 */
+const REAL_MATCH_MEDIA = Object.getOwnPropertyDescriptor(window, "matchMedia");
 let phone = false;
 
 /** 视口桩:`useIsPhone` 订阅的就是它,`setPhone` 现场翻转并通知订阅者。 */
@@ -90,6 +92,9 @@ afterEach(async () => {
   view = null;
   filters = [];
   applied = [];
+  listeners.clear();
+  if (REAL_MATCH_MEDIA) Object.defineProperty(window, "matchMedia", REAL_MATCH_MEDIA);
+  else Reflect.deleteProperty(window, "matchMedia");
 });
 
 function cardsRoot(): HTMLElement | null {
@@ -131,8 +136,16 @@ function manyRows(count: number): Row[] {
 }
 
 const CLIENT_COLUMNS: ColumnsType<Row> = [
-  clientSearchColumn<Row>({ title: "名称", dataIndex: "name" }, { param: "q", value: "", labels: LABELS }),
+  withClientSort<Row>(
+    clientSearchColumn<Row>({ title: "名称", dataIndex: "name" }, { param: "q", value: "", labels: LABELS }),
+    (left, right) => left.name.localeCompare(right.name),
+  ),
 ];
+
+/** 表格体里每一行第一格的文字。 */
+function tableNames(): string[] {
+  return Array.from(view!.host.querySelectorAll("tbody tr[data-row-key] td:first-child"), (cell) => cell.textContent ?? "");
+}
 
 async function renderClient(overrides: Partial<Parameters<typeof ClientTable<Row>>[0]> = {}) {
   const node = (
@@ -226,6 +239,17 @@ describe("ClientTable 的手机形态", () => {
     expect(filters).toEqual([{ q: ["Portal"] }]);
   });
 
+  it("手机上选的排序,切回桌面的表格仍然成立", async () => {
+    installViewport(true);
+    await renderClient();
+    await pick(byTestId(view!.host, "list-cards-sort") as HTMLSelectElement, "name:asc");
+    expect(view!.host.querySelector("[data-test-id='list-cards-card']")?.textContent).toContain("Portal");
+
+    await setPhone(false);
+    expect(tableNames()[0]).toBe("Portal");
+    expect(tableNames()[1]).toBe("Registry");
+  });
+
   it("手机上翻到第 2 页,切回桌面还在第 2 页", async () => {
     installViewport(true);
     await renderClient({ rows: manyRows(25) });
@@ -266,6 +290,18 @@ describe("DataTable 的手机形态", () => {
     applied = [];
     await tap(view!.host.querySelector(".ant-pagination-next")!);
     expect(applied).toEqual([{ page: 2 }]);
+  });
+
+  it("排序下拉不给清空:选空值不写 patch,已排序时连空选项都没有", async () => {
+    installViewport(true);
+    await renderServer();
+    const select = byTestId(view!.host, "list-cards-sort") as HTMLSelectElement;
+    await pick(select, "");
+    expect(applied).toEqual([]);
+
+    await renderServer({ query: stubQuery("sort=name%3Aasc") });
+    const sorted = byTestId(view!.host, "list-cards-sort") as HTMLSelectElement;
+    expect(Array.from(sorted.options).some((option) => option.value === "")).toBe(false);
   });
 
   it("受控排序从列上的 sortOrder 读回来", async () => {

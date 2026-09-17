@@ -568,7 +568,7 @@ and are **not** part of the shared package.
 | `useMediaQuery(query)` / `useIsPhone()` / `PHONE_MEDIA_QUERY` | `@easy-enterprise/ui` 主包。`useSyncExternalStore` 订阅 `matchMedia`,**服务端快照恒为 `false`** |
 | `TableCards` | 卡片列表本体,`ClientTable` / `DataTable` 之外也能单用 |
 | `MobileColumn` / `MobileColumnRole` | 列定义的 `mobile?: "hidden" \| "title"` 扩展 |
-| `TableCardsLabels` / `DEFAULT_TABLE_CARDS_LABELS` | 卡片专有文案(排序 / 全部 / 全选本页),通过 `labels.cards` 覆盖 |
+| `TableCardsLabels` / `DEFAULT_TABLE_CARDS_LABELS` | 卡片专有文案(排序 / 全部 / 全选本页 / 选择);`labels.cards` 收 `Partial`,只覆盖给出的那几句 |
 | `mobile?: "cards" \| "table"` | `ClientTable` / `DataTable` 的形态开关,默认 `"cards"` |
 
 一张卡怎么排:
@@ -583,9 +583,12 @@ and are **not** part of the shared package.
 - **选择** = `rowSelection` 给了就在标题行左边出复选框,外加一行"全选本页",读写的都是
   `selectedRowKeys` / `onChange`(含 `getCheckboxProps` 的禁用态);
 - **工具条** = 表头上的能力搬到卡片上方:`searchColumn` / `clientSearchColumn` 每列一个检索框
-  (回车或失焦提交),`filterColumn` 变成下拉,可排序列合成一个「排序」下拉(列 × 升/降)。
-  下拉用的是 EasyUI 原生 `Select`,手机上直接拉起系统选择器;
-- **分页** = 底部居中的 antd `Pagination size="small" simple`,一页放得下就整个不出现。
+  (回车或失焦提交,placeholder = 列名,或列上的 `searchPlaceholder`),`filterColumn` 变成下拉,
+  可排序列合成一个「排序」下拉(列 × 升/降);
+- **分页** = 底部居中的 antd `Pagination size="small" simple`。本地分页(`ClientTable`)一页
+  放得下就整个不出现;服务端分页(`DataTable`)始终显示,与桌面一致 —— 页码是那张表状态的一部分;
+- **加载中** = 还没有行时给三张占位卡,**不出空状态**:首屏没拿到数据就说"暂无数据"是假话;
+- **读屏** = 每个行选择框的名字是「选择 + 该行标题」,全选行只统计可选行。
 
 契约要点 —— 这些是约定,不是选项:
 
@@ -600,4 +603,17 @@ and are **not** part of the shared package.
 - **首帧是桌面形态。** `useIsPhone()` 的服务端快照恒为 `false`:服务器上没有视口,猜错会让
   hydration 前后不一致、整棵子树重渲染。手机在 hydration 之后的第一次订阅里立刻切成卡片 ——
   多一帧表格,换一个不会在 SSR 上出错的钩子。
+- **排序清空看形态。** `ClientTable` 的「排序」下拉留着"未排序"一项(状态在组件里,清了就是
+  清了);`DataTable` 不留:URL 没有"显式未排序"的槽位,清掉下次刷新会被默认排序顶回来,
+  这与表头"第三次点击 = 翻向"是同一条规矩。手机上选的排序转回桌面表格继续生效
+  (`ClientTable` 把排序提到自己那一层,写成受控的 `sortOrder`;表头点击同样回写这份状态)。
+- **下拉用原生 `<select>`。** 卡片工具条里的筛选与排序刻意不用 antd Select:手机上原生下拉
+  会拉起系统选择器(滚轮 / 全屏列表),比浮层里的虚拟列表好按,也不用再往卡片流里塞一层
+  portal。选择框与分页器仍是 antd,和表格保持同一套视觉。
+- **卡片不读表格的分页外观参数。** `DataTable` 的 `pageSizeOptions` / `pagination`(
+  `showSizeChanger`、`items_per_page` 之类)、`ClientTable` 的 `showSizeChanger` 都只作用于
+  桌面表格:手机上是 `simple` 分页,只有上一页 / 下一页,页大小不在手机上改。`pagination={false}`
+  仍然有效(两种形态都不分页)。
+- **列组会被拍平。** 卡片没有两层表头:列组(`children`)直接展开成它的子列;`fixed: "right"`
+  的列**每一列**都进底部动作行,`mobile: "hidden"` 的列两种形态都能标。
 - **桌面像素不变。** 整个特性只在 `(max-width: 767px)` 命中时生效,`md` 及以上一行样式都没动。

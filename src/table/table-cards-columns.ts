@@ -22,16 +22,24 @@ export interface TableCardsSort {
   order: TableSortOrder;
 }
 
-/** 列定义拆成卡片的三块:标题行、定义列表、底部动作行。 */
+/** 列定义拆成卡片的三块:标题行、定义列表、底部动作行(动作列可能不止一列)。 */
 export interface CardColumns<T> {
   title: MobileColumn<T> | null;
   fields: readonly MobileColumn<T>[];
-  actions: MobileColumn<T> | null;
+  actions: readonly MobileColumn<T>[];
 }
 
-/** antd 的 `ColumnsType` 含列组;卡片只认平铺的数据列,列组按普通列读(没有 render 就自然被跳过)。 */
+/**
+ * antd 的 `ColumnsType` 含列组(`children`),卡片里没有两层表头这回事:直接把列组拍平成
+ * 它的子列,否则那一组的数据在手机上会整片消失(列组自己既没有 `dataIndex` 也没有 `render`)。
+ */
 function plainColumns<T>(columns: ColumnsType<T>): readonly MobileColumn<T>[] {
-  return columns as readonly MobileColumn<T>[];
+  const flat: MobileColumn<T>[] = [];
+  for (const column of columns as readonly (MobileColumn<T> & { children?: ColumnsType<T> })[]) {
+    if (column.children && column.children.length > 0) flat.push(...plainColumns(column.children));
+    else flat.push(column);
+  }
+  return flat;
 }
 
 /** 动作列 = 约定的 `actionsKey`,或任何钉在右侧的列(表格里 `fixed: "right"` 就是动作列的写法)。 */
@@ -46,10 +54,10 @@ function isActionsColumn<T>(column: MobileColumn<T>, actionsKey: string): boolea
  */
 export function splitColumns<T>(columns: ColumnsType<T>, actionsKey: string): CardColumns<T> {
   const all = plainColumns(columns);
-  const actions = all.find((column) => isActionsColumn(column, actionsKey)) ?? null;
-  const data = all.filter(
-    (column) => column !== actions && column.mobile !== "hidden" && !isActionsColumn(column, actionsKey),
-  );
+  // 动作列可以有好几列(一个 `fixed: "right"` 的状态列 + 一个操作列):全部收进底部那一行,
+  // 丢掉任何一列都等于在手机上藏掉一个入口。
+  const actions = all.filter((column) => isActionsColumn(column, actionsKey));
+  const data = all.filter((column) => column.mobile !== "hidden" && !isActionsColumn(column, actionsKey));
   const title = data.find((column) => column.mobile === "title") ?? data[0] ?? null;
   return { title, fields: data.filter((column) => column !== title), actions };
 }
@@ -110,6 +118,13 @@ export function cellOf<T>(column: MobileColumn<T>, record: T, index: number): Re
   const value = readCell(record, column.dataIndex);
   if (!column.render) return value as ReactNode;
   return renderedNode(column.render(value, record, index));
+}
+
+/** 单元格的纯文本(给 aria-label 用);渲染成节点时拿不到文本,返回 `null`。 */
+export function cellText(node: ReactNode): string | null {
+  if (typeof node === "string" && node.trim()) return node;
+  if (typeof node === "number") return String(node);
+  return null;
 }
 
 /** 空单元格不占卡片的一行(桌面表格里是留白,手机上是一条纯噪声的定义项)。 */

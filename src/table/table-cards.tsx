@@ -26,6 +26,7 @@ import type { DataTableLabels } from "./data-table";
 import {
   DEFAULT_ACTIONS_KEY,
   cellOf,
+  cellText,
   columnKeyOf,
   columnSort,
   columnTitleNode,
@@ -71,8 +72,22 @@ export interface TableCardsProps<T extends object> {
   rowSelection?: TableProps<T>["rowSelection"];
   /** 检索 / 筛选改动:与 antd 表头 `onChange` 同一口径(按 param 给出全部受控筛选列)。 */
   onFilters?: (filters: Record<string, string[]>) => void;
-  /** 受控排序(服务端):给了就由列上的 `sortOrder` 决定当前值,改动交回调用方落到查询里。 */
+  /**
+   * 受控排序的当前值,和 `onSort` 一起给。
+   *
+   * 省略时(但给了 `onSort`)从列上的 `sortOrder` 读 —— 服务端表格的排序本来就写在列上。
+   * `ClientTable` 则把状态提到自己那一层再传下来,于是手机转桌面时排序不会丢。
+   */
+  sort?: TableCardsSort | null;
+  /** 排序改动;不给就由卡片自己记一份(独立使用 `TableCards` 时)。 */
   onSort?: (sort: TableCardsSort | null) => void;
+  /**
+   * 排序下拉是否保留"未排序"这一项,默认 `true`。
+   *
+   * `DataTable` 传 `false`:URL 没有"显式未排序"这个槽位,清掉排序下次刷新又会被默认排序
+   * 顶回来(与表头"第三次点击 = 翻向"同一条规矩)。
+   */
+  sortClearable?: boolean;
   pagination?: false | TableCardsPagination;
 }
 
@@ -87,16 +102,18 @@ export function TableCards<T extends object>({
   actionsKey = DEFAULT_ACTIONS_KEY,
   rowSelection,
   onFilters,
+  sort,
   onSort,
+  sortClearable = true,
   pagination = false,
 }: TableCardsProps<T>) {
   const cardsId = `${testId}-cards`;
   const cardColumns = splitColumns(columns, actionsKey);
-  const cardLabels = labels.cards ?? DEFAULT_TABLE_CARDS_LABELS;
+  const cardLabels = { ...DEFAULT_TABLE_CARDS_LABELS, ...labels.cards };
   const [localSort, setLocalSort] = useState<TableCardsSort | null>(null);
-  // 服务端排序是受控的(列上带 sortOrder);客户端排序没人替我们记,所以自己记一份。
-  const sort = onSort ? columnSort(columns) : localSort;
-  const visible = sortRows(filterRows(rows, columns), columns, sort);
+  // 受控排序看调用方给的值(没给就从列上的 sortOrder 读);没人接管就自己记一份。
+  const active = onSort ? (sort === undefined ? columnSort(columns) : sort) : localSort;
+  const visible = sortRows(filterRows(rows, columns), columns, active);
   const paged = pageRows(visible, pagination);
   const keys = new Map<T, CardRowKey>(rows.map((row, index) => [row, rowKeyOf(rowKey, row, index)]));
   const selection = selectionOf(rowSelection, rows, keys);
@@ -108,7 +125,8 @@ export function TableCards<T extends object>({
         labels={labels}
         cardLabels={cardLabels}
         onFilters={onFilters}
-        sort={sort}
+        sort={active}
+        clearable={sortClearable}
         onSortChange={(next) => {
           setLocalSort(next);
           onSort?.(next);
@@ -122,8 +140,10 @@ export function TableCards<T extends object>({
         keys={keys}
         columns={cardColumns}
         selection={selection}
+        selectLabel={cardLabels.select}
         emptyLabel={labels.empty}
         empty={empty}
+        loading={loading}
       />
       <CardsPager testId={cardsId} pagination={pagination} visible={visible.length} />
     </div>
@@ -137,11 +157,17 @@ interface BodyProps<T extends object> {
   keys: Map<T, CardRowKey>;
   columns: CardColumns<T>;
   selection: CardsSelection<T> | null;
+  selectLabel: string;
   emptyLabel: string;
   empty?: ReactNode;
+  loading: boolean;
 }
 
-/** 卡片流本身;空列表落到与表格共用的那个空状态(test id 也还是 `<testId>-empty`)。 */
+/**
+ * 卡片流本身。空列表落到与表格共用的那个空状态(test id 也还是 `<testId>-empty`),但
+ * **正在加载时不许出空状态** —— 首屏还没拿到数据就告诉用户"暂无数据"是假话,表格那边
+ * antd 也是用 loading 遮罩盖住的。
+ */
 function CardsBody<T extends object>({
   testId,
   cardsId,
@@ -149,9 +175,12 @@ function CardsBody<T extends object>({
   keys,
   columns,
   selection,
+  selectLabel,
   emptyLabel,
   empty,
+  loading,
 }: BodyProps<T>) {
+  if (rows.length === 0 && loading) return <CardsSkeleton testId={cardsId} />;
   if (rows.length === 0) {
     return empty ?? <EmptyState size="compact" title={emptyLabel} data-test-id={`${testId}-empty`} />;
   }
@@ -166,9 +195,24 @@ function CardsBody<T extends object>({
           columns={columns}
           testId={cardsId}
           selection={selection}
+          selectLabel={selectLabel}
         />
       ))}
     </ul>
+  );
+}
+
+/** 加载占位:三张空卡,和真实卡片一样高,避免列表在加载结束时整块跳动。 */
+function CardsSkeleton({ testId }: { testId: string }) {
+  return (
+    <div className="flex flex-col gap-2" data-test-id={`${testId}-loading`} aria-hidden="true">
+      {[0, 1, 2].map((index) => (
+        <div key={index} className="paper-card p-3">
+          <div className="animate-shimmer h-4 w-1/2 rounded-[3px]" />
+          <div className="animate-shimmer mt-2 h-3 w-3/4 rounded-[3px]" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -179,14 +223,26 @@ interface CardProps<T extends object> {
   columns: CardColumns<T>;
   testId: string;
   selection: CardsSelection<T> | null;
+  selectLabel: string;
 }
 
 /** 一行 = 一张卡:标题行(可带选择框)、定义表、底部动作行。 */
-function TableCard<T extends object>({ record, index, rowKeyValue, columns, testId, selection }: CardProps<T>) {
+function TableCard<T extends object>({
+  record,
+  index,
+  rowKeyValue,
+  columns,
+  testId,
+  selection,
+  selectLabel,
+}: CardProps<T>) {
   const fields = columns.fields
     .map((column) => ({ column, cell: cellOf(column, record, index) }))
     .filter((entry) => !isEmptyCell(entry.cell));
-  const actions = columns.actions ? cellOf(columns.actions, record, index) : null;
+  const actions = columns.actions
+    .map((column) => ({ column, cell: cellOf(column, record, index) }))
+    .filter((entry) => !isEmptyCell(entry.cell));
+  const titleCell = columns.title ? cellOf(columns.title, record, index) : null;
   return (
     <li className="paper-card p-3" data-row-key={String(rowKeyValue)} data-test-id={`${testId}-card`}>
       <div className="flex items-start gap-2">
@@ -194,13 +250,13 @@ function TableCard<T extends object>({ record, index, rowKeyValue, columns, test
           <Checkbox
             checked={selection.keys.includes(rowKeyValue)}
             disabled={selection.disabled(record)}
+            // 一屏几十个同样的方框,读屏必须能说出勾的是哪一行。
+            aria-label={`${selectLabel} ${cellText(titleCell) ?? String(rowKeyValue)}`}
             data-test-id={`${testId}-select-${String(rowKeyValue)}`}
             onChange={(event) => selection.toggle(record, event.target.checked)}
           />
         )}
-        <div className="min-w-0 flex-1 text-[14px] leading-5 font-medium break-words text-ink">
-          {columns.title ? cellOf(columns.title, record, index) : null}
-        </div>
+        <div className="min-w-0 flex-1 text-[14px] leading-5 font-medium break-words text-ink">{titleCell}</div>
       </div>
       {fields.length > 0 && (
         <dl className="mt-2 mb-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
@@ -212,7 +268,13 @@ function TableCard<T extends object>({ record, index, rowKeyValue, columns, test
           ))}
         </dl>
       )}
-      {!isEmptyCell(actions) && <div className="mt-2 flex justify-end">{actions}</div>}
+      {actions.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+          {actions.map((entry) => (
+            <Fragment key={columnKeyOf(entry.column)}>{entry.cell}</Fragment>
+          ))}
+        </div>
+      )}
     </li>
   );
 }
@@ -225,10 +287,17 @@ interface SelectAllProps<T extends object> {
   selection: CardsSelection<T> | null;
 }
 
-/** 本页全选 —— 表格里是表头那一格,卡片里就得单独有一行。没有选择或没有行时整行不出现。 */
+/**
+ * 本页全选 —— 表格里是表头那一格,卡片里就得单独有一行。
+ *
+ * 只数**可选**的行:被 `getCheckboxProps` 禁用的行既不该被全选勾上,也不该让"全选"永远
+ * 停在半选态。`hideSelectAll` 与表格一样直接把这一行藏掉。
+ */
 function SelectAllRow<T extends object>({ label, testId, rows, keys, selection }: SelectAllProps<T>) {
-  if (!selection || rows.length === 0) return null;
-  const pageKeys = rows.map((row, index) => keys.get(row) ?? index);
+  if (!selection || selection.hideSelectAll) return null;
+  const selectable = rows.filter((row) => !selection.disabled(row));
+  if (selectable.length === 0) return null;
+  const pageKeys = selectable.map((row, index) => keys.get(row) ?? index);
   const selected = pageKeys.filter((key) => selection.keys.includes(key));
   return (
     <div className="mb-2 flex items-center gap-2 text-[12px] text-ink-soft">
@@ -236,7 +305,7 @@ function SelectAllRow<T extends object>({ label, testId, rows, keys, selection }
         checked={selected.length > 0 && selected.length === pageKeys.length}
         indeterminate={selected.length > 0 && selected.length < pageKeys.length}
         data-test-id={`${testId}-select-all`}
-        onChange={(event) => selection.toggleAll(rows, event.target.checked)}
+        onChange={(event) => selection.toggleAll(selectable, event.target.checked)}
       >
         {label}
       </Checkbox>
@@ -251,11 +320,18 @@ interface PagerProps {
   visible: number;
 }
 
-/** 底部居中的简版分页;一页放得下就整个不出现(与表格的 `hideOnSinglePage` 同义)。 */
+/**
+ * 底部居中的简版分页。
+ *
+ * 本地分页(没有 `total`)时一页放得下就整个不出现,和 `ClientTable` 的 `hideOnSinglePage`
+ * 同义;服务端分页(有 `total`)则始终显示 —— 桌面的 `DataTable` 也从不隐藏分页器,页码是
+ * 那张表的状态的一部分。
+ */
 function CardsPager({ testId, pagination, visible }: PagerProps) {
   if (!pagination) return null;
+  const server = pagination.total !== undefined;
   const total = pagination.total ?? visible;
-  if (total <= pagination.pageSize) return null;
+  if (!server && total <= pagination.pageSize) return null;
   return (
     <div className="mt-3 flex justify-center" data-test-id={`${testId}-pagination`}>
       <Pagination
@@ -275,6 +351,7 @@ interface CardsSelection<T extends object> {
   toggle: (record: T, checked: boolean) => void;
   toggleAll: (records: readonly T[], checked: boolean) => void;
   disabled: (record: T) => boolean;
+  hideSelectAll: boolean;
 }
 
 /** `rowSelection` 的读写两端:选中集合来自 `selectedRowKeys`,改动原样喂回 `onChange`。 */
@@ -296,16 +373,18 @@ function selectionOf<T extends object>(
       { type },
     );
   };
+  const disabled = (record: T) => rowSelection.getCheckboxProps?.(record)?.disabled === true;
   return {
     keys: selected,
-    disabled: (record) => rowSelection.getCheckboxProps?.(record)?.disabled === true,
+    disabled,
+    hideSelectAll: rowSelection.hideSelectAll === true,
     toggle: (record, checked) => {
       const key = keys.get(record);
       if (key === undefined) return;
       emit(checked ? [...selected, key] : selected.filter((entry) => entry !== key), "single");
     },
     toggleAll: (records, checked) => {
-      const pageKeys = records.flatMap((record) => keys.get(record) ?? []);
+      const pageKeys = records.filter((record) => !disabled(record)).flatMap((record) => keys.get(record) ?? []);
       const onPage = new Set<Key>(pageKeys);
       const rest = selected.filter((key) => !onPage.has(key));
       emit(checked ? [...rest, ...pageKeys] : rest, "all");

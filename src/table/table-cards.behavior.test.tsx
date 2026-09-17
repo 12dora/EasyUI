@@ -43,15 +43,16 @@ interface ColumnOptions {
   keyword?: string;
   status?: string;
   titleOnOwner?: boolean;
+  placeholder?: string;
 }
 
 /** 一份"什么都有"的列定义:检索列、普通列、空值列、隐藏列、可排序列、右固定动作列。 */
-function columnsOf({ keyword = "", status = "", titleOnOwner = false }: ColumnOptions = {}): ColumnsType<Row> {
+function columnsOf({ keyword = "", status = "", titleOnOwner = false, placeholder }: ColumnOptions = {}): ColumnsType<Row> {
   const owner: MobileColumn<Row> = { title: "负责人", dataIndex: "owner", key: "owner" };
   return [
     clientSearchColumn<Row>(
       { title: "名称", dataIndex: "name" },
-      { param: "q", value: keyword, labels: LABELS, subject: (row) => ({ name: row.name }) },
+      { param: "q", value: keyword, labels: LABELS, placeholder, subject: (row) => ({ name: row.name }) },
     ),
     withClientSort<Row>(titleOnOwner ? { ...owner, mobile: "title" } : owner, (left, right) =>
       left.owner.localeCompare(right.owner),
@@ -173,6 +174,9 @@ describe("TableCards", () => {
     expect(definitions(cards()[0]!)).not.toHaveProperty("操作");
   });
 
+});
+
+describe("TableCards 的选择、工具条与分页", () => {
   it("勾选卡片把 key 与行原样写回 rowSelection", async () => {
     await renderCards({
       rowSelection: {
@@ -252,6 +256,72 @@ describe("TableCards", () => {
     await renderCards({ pagination: { current: 2, pageSize: 2, total: 40, onChange: () => undefined } });
     expect(cards()).toHaveLength(2);
     expect(byTestId(view!.host, "list-cards-pagination")).toBeTruthy();
+  });
+
+
+});
+
+describe("TableCards 的列解读与加载态", () => {
+  it("列组拍平成定义项,不会整片消失", async () => {
+    await renderCards({
+      columns: [
+        { title: "名称", dataIndex: "name", key: "name" },
+        { title: "归属", children: [{ title: "负责人", dataIndex: "owner", key: "owner" }] },
+      ],
+    });
+    expect(definitions(cards()[0]!)).toMatchObject({ 负责人: "Ann" });
+  });
+
+  it("多个右固定列都落进动作行,一个都不丢", async () => {
+    await renderCards({
+      columns: [
+        { title: "名称", dataIndex: "name", key: "name" },
+        { title: "状态", key: "state", fixed: "right", render: () => <span>已启用</span> },
+        { title: "操作", key: "actions", fixed: "right", render: (_value, row: Row) => <span>{`编辑 ${row.id}`}</span> },
+      ],
+    });
+    expect(cards()[0]!.textContent).toContain("已启用");
+    expect(cards()[0]!.textContent).toContain("编辑 a");
+    expect(definitions(cards()[0]!)).not.toHaveProperty("状态");
+  });
+
+  it("加载中且还没有行时给占位卡,而不是空状态", async () => {
+    await renderCards({ rows: [], loading: true });
+    expect(byTestId(view!.host, "list-cards-loading")).toBeTruthy();
+    expect(view!.host.querySelector("[data-test-id='list-empty']")).toBeNull();
+  });
+
+  it("全选只数可选的行,禁用行既不勾也不让它半选", async () => {
+    await renderCards({
+      rowSelection: {
+        selectedRowKeys: ["a"],
+        getCheckboxProps: (row: Row) => ({ disabled: row.id === "b" }),
+        onChange: (keys) => selected.push([keys]),
+      },
+    });
+    const all = inputOf("list-cards-select-all");
+    expect(inputOf("list-cards-select-b").disabled).toBe(true);
+    expect(all.checked).toBe(true);
+    expect(all.getAttribute("aria-checked")).not.toBe("mixed");
+    await toggle(all);
+    expect(selected).toEqual([[[]]]);
+  });
+
+  it("hideSelectAll 把整行全选藏掉", async () => {
+    await renderCards({ rowSelection: { selectedRowKeys: [], hideSelectAll: true, onChange: () => undefined } });
+    expect(view!.host.querySelector("[data-test-id='list-cards-select-all']")).toBeNull();
+  });
+
+  it("行选择框的读屏名字带上这一行的标题", async () => {
+    await renderCards({ rowSelection: { selectedRowKeys: [], onChange: () => undefined } });
+    expect(inputOf("list-cards-select-a").getAttribute("aria-label")).toBe("选择 Registry");
+  });
+
+  it("检索框的名字就是列名,列自带 placeholder 时用它", async () => {
+    await renderCards();
+    expect(inputOf("list-cards-search-q").getAttribute("placeholder")).toBe("名称");
+    await renderCards({ columns: columnsOf({ placeholder: "名称或编号" }) });
+    expect(inputOf("list-cards-search-q").getAttribute("placeholder")).toBe("名称或编号");
   });
 
   it("空列表落到与表格同一个空状态", async () => {

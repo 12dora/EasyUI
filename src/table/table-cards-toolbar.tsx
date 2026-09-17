@@ -38,13 +38,19 @@ export interface TableCardsLabels {
   all: string;
   /** 本页全选复选框。 */
   selectAll: string;
+  /** 单行选择框的读屏名字前缀(后面接这一行的标题)。 */
+  select: string;
 }
+
+// 宿主只需要覆盖自己关心的那几句:`DataTableLabels.cards` 收的是 `Partial<TableCardsLabels>`,
+// 由 `TableCards` 与缺省文案合并。以后往这里加一句文案,也就不会把所有宿主一起编译坏。
 
 /** 缺省文案(中文宿主直接用,双语宿主通过 `labels.cards` 覆盖)。 */
 export const DEFAULT_TABLE_CARDS_LABELS: TableCardsLabels = {
   sort: "排序",
   all: "全部",
   selectAll: "全选本页",
+  select: "选择",
 };
 
 const CONTROL_CLASS = "min-w-28 flex-1 text-[13px]";
@@ -57,6 +63,8 @@ interface ToolbarProps<T extends object> {
   cardLabels: TableCardsLabels;
   onFilters?: (filters: Record<string, string[]>) => void;
   sort: TableCardsSort | null;
+  /** 排序下拉是否保留"未排序"这一项。 */
+  clearable: boolean;
   onSortChange: (sort: TableCardsSort | null) => void;
 }
 
@@ -67,6 +75,7 @@ export function TableCardsToolbar<T extends object>({
   cardLabels,
   onFilters,
   sort,
+  clearable,
   onSortChange,
 }: ToolbarProps<T>) {
   const searches = onFilters ? searchColumnsOf(columns) : [];
@@ -80,7 +89,8 @@ export function TableCardsToolbar<T extends object>({
         <CardsSearch
           key={columnKeyOf(column)}
           applied={filterValuesOf(column)[0] ?? ""}
-          placeholder={`${labels.search} ${columnTitleText(column)}`.trim()}
+          // 输入框自己就是"检索"这件事的可见形态,名字该是被检索的那一列(或列自带的提示语)。
+          placeholder={column.searchPlaceholder ?? columnTitleText(column)}
           testId={`${testId}-search-${columnKeyOf(column)}`}
           onApply={(value) => applyFilter(columnKeyOf(column), value ? [value] : [])}
         />
@@ -103,6 +113,7 @@ export function TableCardsToolbar<T extends object>({
               sortLabel={cardLabels.sort}
               testId={`${testId}-sort`}
               sort={sort}
+              clearable={clearable}
               onChange={onSortChange}
             />
           )}
@@ -192,23 +203,30 @@ interface SortProps<T extends object> {
   sortLabel: string;
   testId: string;
   sort: TableCardsSort | null;
+  clearable: boolean;
   onChange: (sort: TableCardsSort | null) => void;
 }
 
-/** 一个下拉盖住全部可排序列 × 两个方向;空值 = 回到表格自己的默认排序。 */
-function CardsSort<T extends object>({ columns, labels, sortLabel, testId, sort, onChange }: SortProps<T>) {
+/**
+ * 一个下拉盖住全部可排序列 × 两个方向。
+ *
+ * "未排序"这一项只在 `clearable` 时保留(或者当前压根没排序 —— 那它就是下拉的占位):
+ * `DataTable` 的排序不许清,URL 里没有"显式未排序"的槽位,清掉下次刷新就被默认排序顶回来。
+ */
+function CardsSort<T extends object>({ columns, labels, sortLabel, testId, sort, clearable, onChange }: SortProps<T>) {
   // 当前排序键可能压根不在这几列里(后端默认排序的列没做成表头排序列):那就显示"未排序",
   // 而不是让原生下拉停在一个不存在的选项上(渲染成空白)。
   const known = sort ? columns.some((column) => sortKeyOf(column) === sort.key) : false;
+  const active = sort !== null && known;
   return (
     <Select
       className={CONTROL_CLASS}
-      value={sort && known ? `${sort.key}:${sort.order}` : ""}
+      value={active ? `${sort.key}:${sort.order}` : ""}
       aria-label={sortLabel}
       data-test-id={testId}
       onChange={(event) => onChange(parseSortValue(event.target.value))}
     >
-      <option value="">{sortLabel}</option>
+      {(clearable || !active) && <option value="">{sortLabel}</option>}
       {columns.flatMap((column) => sortOptionsOf(column, labels))}
     </Select>
   );

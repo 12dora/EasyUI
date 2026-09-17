@@ -45,8 +45,8 @@ export interface DataTableLabels extends TableHeaderLabels {
   sortDesc: string;
   empty: string;
   pageSize: string;
-  /** 手机卡片列表补充文案(排序 / 全部 / 全选本页);不传时用中文缺省值。 */
-  cards?: TableCardsLabels;
+  /** 手机卡片列表补充文案(排序 / 全部 / 全选本页 / 选择);只覆盖给出的那几句,其余用中文缺省值。 */
+  cards?: Partial<TableCardsLabels>;
 }
 
 /**
@@ -186,7 +186,12 @@ function DataTableCards<T extends object>({
         actionsKey={actionsKey}
         rowSelection={rowSelection}
         onFilters={(filters) => query.apply({ filters })}
-        onSort={(sort) => query.apply({ sort })}
+        // 排序不许清:URL 没有"显式未排序"的槽位,清掉下次刷新会被默认排序顶回来
+        // (与表头"第三次点击 = 翻向"同一条规矩)。下拉里也就不给"未排序"这一项。
+        onSort={(sort) => {
+          if (sort) query.apply({ sort });
+        }}
+        sortClearable={false}
         pagination={cardsPagination(page, query)}
       />
     </div>

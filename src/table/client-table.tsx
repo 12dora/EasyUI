@@ -27,13 +27,15 @@
 
 import { Table } from "antd";
 import type { ColumnType, ColumnsType, TablePaginationConfig, TableProps } from "antd/es/table";
+import type { SortOrder } from "antd/es/table/interface";
 import { useState, type ReactNode } from "react";
 
 import { EmptyState } from "../primitives/empty-state";
 import { useIsPhone } from "../primitives/use-media-query";
-import { filterPatch, type DataTableLabels } from "./data-table";
+import { filterPatch, sorterSort, type DataTableLabels } from "./data-table";
 import { TableCards } from "./table-cards";
-import { TABLE_SCROLL } from "./table-columns";
+import { sortKeyOf, type TableCardsSort } from "./table-cards-columns";
+import { TABLE_SCROLL, type MobileColumn } from "./table-columns";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "./table-query";
 
 /** Local pager options. `false` (instead of this object) renders every row, unpaginated. */
@@ -84,6 +86,8 @@ export function ClientTable<T extends object>({
   mobile = "cards",
 }: ClientTableProps<T>) {
   const [paging, setPaging] = useClientPaging(rows, columns, pageSizeOf(pagination));
+  // 排序状态提到这一层:卡片里选的排序,转回桌面表格后还得算数(页码同理)。
+  const [sort, setSort] = useState<TableCardsSort | null>(null);
   const phone = useIsPhone();
   // 换了筛选条件,旧页码多半已经不存在了(表头那条路走 onChange,卡片这条路走这里)。
   const filtered = (filters: Record<string, string[]>) => {
@@ -96,6 +100,8 @@ export function ClientTable<T extends object>({
         <TableCards<T>
           testId={testId}
           columns={columns}
+          sort={sort}
+          onSort={setSort}
           rows={rows}
           rowKey={rowKey}
           labels={labels}
@@ -124,7 +130,7 @@ export function ClientTable<T extends object>({
         scroll={TABLE_SCROLL}
         rowKey={rowKey}
         loading={loading}
-        columns={columns}
+        columns={withSortOrder(columns, sort)}
         dataSource={rows as T[]}
         rowSelection={rowSelection}
         pagination={pagination === false ? false : paginationOf(paging, pagination, labels)}
@@ -133,9 +139,14 @@ export function ClientTable<T extends object>({
           triggerAsc: labels.sortAsc,
           triggerDesc: labels.sortDesc,
         }}
-        onChange={(nextPagination, filters, _sorter, extra) => {
+        onChange={(nextPagination, filters, sorter, extra) => {
           if (extra.action === "paginate") {
             setPaging({ page: nextPagination.current ?? 1, pageSize: nextPagination.pageSize ?? paging.pageSize });
+            return;
+          }
+          if (extra.action === "sort") {
+            // 表头排序也写进这一份状态,受控的 sortOrder 才不会把表头点击冻住。
+            setSort(sorterSort(sorter));
             return;
           }
           if (extra.action !== "filter") return;
@@ -144,6 +155,24 @@ export function ClientTable<T extends object>({
       />
     </div>
   );
+}
+
+/**
+ * 把这一层持有的排序写成受控的 `sortOrder`。
+ *
+ * 没有排序时原样返回列定义(不复制、不接管,和这个特性上线前完全一致);一旦排过序,
+ * 每个可排序列都显式给出 `sortOrder`,antd 就按它排行、画箭头 —— 于是手机卡片上选的排序
+ * 转回桌面仍然成立,表头点击也继续可用(点击回写这份状态)。
+ */
+function withSortOrder<T extends object>(columns: ColumnsType<T>, sort: TableCardsSort | null): ColumnsType<T> {
+  if (!sort) return columns;
+  return columns.map((column) => {
+    const entry = column as MobileColumn<T>;
+    if (!entry.sorter) return column;
+    const matched = sortKeyOf(entry) === sort.key;
+    const order: SortOrder = matched ? (sort.order === "asc" ? "ascend" : "descend") : null;
+    return { ...entry, sortOrder: order };
+  });
 }
 
 /** Where the pager sits: bottom-right, compact, and gone entirely on a single page. */

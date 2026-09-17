@@ -45,6 +45,13 @@ export type MobileColumnRole = "hidden" | "title";
  */
 export interface MobileColumn<T> extends ColumnType<T> {
   mobile?: MobileColumnRole;
+  /**
+   * 表头检索框的 placeholder,由 `searchColumn` / `clientSearchColumn` 原样落在列上。
+   *
+   * 手机卡片的工具条没有表头可依附,输入框需要自己说明检索的是哪一列;漏斗里的 placeholder
+   * 关在 `filterDropdown` 的闭包里读不到,所以在这里留一份。手动填也可以。
+   */
+  searchPlaceholder?: string;
 }
 
 // 下面的装饰器都收 / 回 `MobileColumn`:标记才能写在最里层的列字面量上而不被 TS 拒收,
@@ -56,8 +63,10 @@ export interface MobileColumn<T> extends ColumnType<T> {
  *
  * Without `scroll.x` antd uses `table-layout: auto`: columns get squeezed below
  * their `width` and both headers and cells start wrapping. `max-content` lets
- * each column hold its width and scrolls horizontally when they do not fit —
- * which is also why list tables never turn into cards on a narrow screen.
+ * each column hold its width and scrolls horizontally when they do not fit.
+ *
+ * 这条规矩只管桌面与显式 `mobile="table"` 的表格:手机(< 768px)上 `ClientTable` /
+ * `DataTable` 默认换成 `TableCards`,不再横向滚动(见 `table-cards.tsx`)。
  */
 export const TABLE_SCROLL = { x: "max-content" } as const;
 
@@ -158,6 +167,8 @@ export function searchColumn<T>(column: MobileColumn<T>, options: SearchColumnOp
   return {
     ...column,
     key: param,
+    // 手机卡片的检索框读它(漏斗里的 placeholder 在闭包里,列上读不到)。
+    ...(placeholder ? { searchPlaceholder: placeholder } : {}),
     filteredValue: value ? [value] : null,
     filterDropdown: (props: FilterDropdownProps) => (
       <KeywordFilterDropdown
