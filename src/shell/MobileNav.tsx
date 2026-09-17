@@ -46,8 +46,9 @@ export interface MobileNavProps {
    */
   variant?: "bar" | "trigger";
   /**
-   * 抽屉底部内容(通常是宿主的 `EnterpriseConfiguredFooter`)。手机上 `AppShell`
-   * 不再钉页脚,页脚文案改由抽屉承载。
+   * 抽屉底部内容(通常是宿主的 `<EnterpriseConfiguredFooter bare />`)。手机上 `AppShell`
+   * 的页脚包裹层是 `hidden md:block`,所以传了 `AppShell footer` 的宿主必须把同一份文案
+   * 再传到这里,否则手机上页脚整条消失。两种 `variant` 都渲染这个插槽。
    */
   footer?: ReactNode;
   className?: string;
@@ -319,12 +320,11 @@ function NavDrawer({ model, renderLink, backLabel, menuLabel, closeLabel, navLab
             </div>
           )}
         </nav>
-        {/* 手机上 AppShell 不再钉页脚,页脚文案落在抽屉底部。 */}
+        {/* 手机上 AppShell 不再钉页脚,页脚文案落在抽屉底部。这里只是一个透明的布局槽:
+            分隔线与内边距属于抽屉自己(和上面的标题行同一套),外观 / 地标由传进来的节点决定 ——
+            宿主应当传 `<EnterpriseConfiguredFooter bare />`,避免在抽屉里嵌出第二个 <footer> 地标。 */}
         {footer ? (
-          <div
-            className="shrink-0 border-t border-hairline-soft px-4 py-3 text-[12px] text-ink-faint"
-            data-test-id="admin-mobile-nav-footer"
-          >
+          <div className="shrink-0 border-t border-hairline-soft px-4 py-3" data-test-id="admin-mobile-nav-footer">
             {footer}
           </div>
         ) : null}

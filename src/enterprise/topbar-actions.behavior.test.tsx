@@ -112,6 +112,8 @@ describe("EnterpriseTopbarActions — 桌面", () => {
     expect(classes).toContain("absolute");
     expect(classes).toContain("right-0");
     expect(classes).toContain("top-11");
+    // 桌面上不许出现无断点的 fixed —— 那会让弹层脱离顶栏锚点。
+    expect(classes).not.toContain("fixed");
   });
 });
 
@@ -149,22 +151,56 @@ describe("EnterpriseTopbarActions — 手机", () => {
     expect(view.host.querySelector("[data-test-id='topbar-user-menu']")).toBeNull();
   });
 
-  it("弹层宽度受视口约束,不会从右锚点溢出到屏幕外", async () => {
+  it("弹层在手机上改成相对视口定位,不会从右锚点溢出到屏幕外", async () => {
     installViewport(true);
     view = await mount(renderActions());
 
-    // 通知弹层:桌面定宽 300,手机改成「视口宽 - 24」且封顶 360。
+    // 锚点是铃铛按钮那层 relative,不是视口右缘:只放宽宽度反而会把左边推出屏幕。
+    // 手机上改成 fixed + right-3 + top-14(顶栏 h-14 正下方),宽度取 min(300, 视口-24)。
     await click(byTestId(view.host, "topbar-notifications").querySelector("button") as HTMLElement);
     const notifications = classesOf(byTestId(view.host, "topbar-notifications-menu"));
-    expect(notifications).toContain("max-md:w-[calc(100vw-24px)]");
-    expect(notifications).toContain("max-md:max-w-[360px]");
+    expect(notifications).toContain("max-md:fixed");
+    expect(notifications).toContain("max-md:right-3");
+    expect(notifications).toContain("max-md:left-auto");
+    expect(notifications).toContain("max-md:top-14");
+    expect(notifications).toContain("max-md:w-[min(300px,calc(100vw-24px))]");
+    // 旧的「只放宽宽度」写法必须消失,它正是溢出的来源。
+    expect(notifications).not.toContain("max-md:max-w-[360px]");
+    expect(notifications).not.toContain("max-md:w-[calc(100vw-24px)]");
+    // 桌面侧原值仍在。
     expect(notifications).toContain("w-[300px]");
+    expect(notifications).toContain("absolute");
     expect(notifications).toContain("right-0");
 
-    // 用户菜单只有下限宽度,内容(权限摘要)可能把它撑过屏宽,补一个上限。
+    // 用户菜单只有下限宽度,权限摘要可能把它撑过屏宽,同样相对视口定位 + 封顶。
     await click(byTestId(view.host, "topbar-user-trigger"));
     const userMenu = classesOf(byTestId(view.host, "topbar-user-menu"));
+    expect(userMenu).toContain("max-md:fixed");
+    expect(userMenu).toContain("max-md:right-3");
+    expect(userMenu).toContain("max-md:left-auto");
+    expect(userMenu).toContain("max-md:top-14");
     expect(userMenu).toContain("max-md:max-w-[calc(100vw-24px)]");
     expect(userMenu).toContain("min-w-[200px]");
+  });
+
+  it("没有 user 时保留独立的语言入口 —— 否则手机上语言切换无处可去", async () => {
+    installViewport(true);
+    const picked: string[] = [];
+    view = await mount(
+      <EnterpriseTopbarActions
+        locale="zh-CN"
+        localeOptions={localeOptions}
+        onLocaleChange={(locale) => picked.push(locale)}
+        labels={labels}
+        renderLink={renderLink}
+      />,
+    );
+    expect(view.host.querySelector("[data-test-id='topbar-user']")).toBeNull();
+    const switcher = byTestId(view.host, "topbar-language-switcher");
+    await click(switcher.querySelector("button") as HTMLElement);
+    const english = byTestId(view.host, "topbar-language-option-en");
+    expect(english.getAttribute("role")).toBe("menuitemradio");
+    await click(english);
+    expect(picked).toEqual(["en"]);
   });
 });

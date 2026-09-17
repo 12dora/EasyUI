@@ -114,13 +114,50 @@ describe("MobileNav", () => {
     expect(footer.previousElementSibling?.tagName).toBe("NAV");
   });
 
+  it("bar 形态渲染同一个 footer 插槽", async () => {
+    view = await mount(
+      <MobileNav model={model} renderLink={renderLink} {...labels()} footer={<span data-test-id="host-footer">© 2026 示例</span>} />,
+    );
+    await click(byTestId(view.host, "admin-mobile-nav-trigger"));
+    expect(byTestId(document.body, "admin-mobile-nav-footer").textContent).toBe("© 2026 示例");
+  });
+
+  it("页脚槽只做布局,外观与地标由传进来的节点决定", async () => {
+    view = await mount(
+      <MobileNav variant="trigger" model={model} renderLink={renderLink} {...labels()} footer={<span data-test-id="host-footer" />} />,
+    );
+    await click(byTestId(view.host, "admin-mobile-nav-trigger"));
+    const slot = byTestId(document.body, "admin-mobile-nav-footer");
+    const classes = slot.className.split(/\s+/);
+    expect(classes).toContain("shrink-0");
+    // 槽本身不着色、不定字号:传 `<EnterpriseConfiguredFooter bare />` 时排版由它自己带。
+    expect(classes).not.toContain("text-[12px]");
+    expect(classes).not.toContain("text-ink-faint");
+    expect(slot.querySelector("footer")).toBeNull();
+  });
+
   it("没有 footer 时不渲染多余的分隔容器", async () => {
     view = await mount(<MobileNav variant="trigger" model={model} renderLink={renderLink} {...labels()} />);
     await click(byTestId(view.host, "admin-mobile-nav-trigger"));
     expect(document.body.querySelector("[data-test-id='admin-mobile-nav-footer']")).toBeNull();
   });
 
-  // 这条放最后:installReducedMotion 会替换掉全局 matchMedia,让抽屉跳过退场动画立即卸载。
+  // 以下两条放最后:installReducedMotion 会替换掉全局 matchMedia,让抽屉跳过退场动画立即卸载。
+  it("bar 形态走的是同一条抽屉路径:下钻 + pathKey 关闭并重置", async () => {
+    installReducedMotion();
+    view = await mount(<MobileNav model={model} renderLink={renderLink} {...labels()} pathKey="/app" />);
+    await click(byTestId(view.host, "admin-mobile-nav-trigger"));
+    await click(byTestId(document.body, "nav-records"));
+    expect(document.body.querySelector("[data-test-id='nav-records-view']")).not.toBeNull();
+
+    await view.rerender(<MobileNav model={model} renderLink={renderLink} {...labels()} pathKey="/app/exams" />);
+    expect(drawer()).toBeNull();
+
+    await click(byTestId(view.host, "admin-mobile-nav-trigger"));
+    expect(drawer()).not.toBeNull();
+    expect(document.body.querySelector("[data-test-id='nav-records-view']")).toBeNull();
+  });
+
   it("pathKey 变化关闭抽屉并重置下钻状态(trigger 形态同样生效)", async () => {
     installReducedMotion();
     view = await mount(<MobileNav variant="trigger" model={model} renderLink={renderLink} {...labels()} pathKey="/app" />);

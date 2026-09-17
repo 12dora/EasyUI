@@ -470,16 +470,30 @@ const columns = useMemo(() => [
   topbar={
     <Topbar
       testId="admin-topbar"
-      leading={<MobileNav variant="trigger" footer={<EnterpriseConfiguredFooter />} {...navProps} />}
+      leading={
+        <MobileNav
+          variant="trigger"
+          /* 抽屉里用 bare:抽屉本身是 role="dialog",再嵌一个 <footer> 会多出一个 contentinfo 地标 */
+          footer={<EnterpriseConfiguredFooter bare html={footerHtml} fallback={t.footer} />}
+          {...navProps}
+        />
+      }
       brand={<EnterpriseBrandSlot … />}
       actions={<EnterpriseTopbarActions … />}
     />
   }
   sidebar={<Sidebar … />}
   /* 不再传 mobileNav */
-  footer={<EnterpriseConfiguredFooter />}
+  footer={<EnterpriseConfiguredFooter html={footerHtml} fallback={t.footer} />}
 >
 ```
+
+> **页脚要传两遍。** `AppShell` 的页脚包裹层是 `hidden md:block`,手机上不显示;传了
+> `AppShell footer` 的宿主**必须**把同一份文案再传给 `MobileNav footer`(`bar` / `trigger`
+> 两种形态都渲染这个插槽),否则手机上页脚整条消失。抽屉里那份加 `bare`,test id 变成
+> `app-footer-html-inline` / `app-footer-fallback-inline`,便于与页面底部那份分别断言。
+> 抽屉的页脚槽(`admin-mobile-nav-footer`)只是一个透明的 `shrink-0` 布局容器,分隔线与
+> 内边距属于抽屉自己,排版由传进来的节点带。
 
 `MobileNav` 的两种形态共用同一份抽屉实现(`useDrawerController` + `NavDrawer`),所以下钻、
 `pathKey` 变化关闭并重置、焦点陷阱、Esc、断点关闭这些行为在两种形态下完全一致:
@@ -488,19 +502,19 @@ const columns = useMemo(() => [
 | ---- | ---- |
 | `variant="bar"` | 默认,旧行为:汉堡 + 当前分区标题的独立顶栏(`data-test-id="admin-mobile-nav"`)。 |
 | `variant="trigger"` | 只渲染汉堡按钮(`admin-mobile-nav-trigger`,自带 `md:hidden`)+ 抽屉 portal。 |
-| `footer` | 抽屉底部内容(`admin-mobile-nav-footer`),手机上页脚文案的落点。 |
+| `footer` | 抽屉底部内容(`admin-mobile-nav-footer`),手机上页脚文案的落点;两种 variant 都渲染。 |
 
 ### 各组件的手机侧改动
 
 | 组件 | 手机 (< md) | 桌面 (md+) |
 | ---- | ----------- | ---------- |
 | `Topbar` | `px-3` / `gap-2`,高度仍是 `h-14` | `md:px-5` / `md:gap-4`,原值 |
-| `AppShell` | `APP_SHELL_MAIN_PADDING` 竖向留白 `py-4`;`footer` 包裹层 `hidden md:block`(页脚改由抽屉承载) | `md:px-10 md:py-12 2xl:px-12 3xl:px-16`,原值 |
+| `AppShell` | `APP_SHELL_MAIN_PADDING` 竖向留白 `py-4`;`footer` 包裹层 `hidden md:block`(页脚改由抽屉承载,宿主必须同时传 `MobileNav footer`) | `md:px-10 md:py-12 2xl:px-12 3xl:px-16`,原值 |
 | `PageHeader` | `max-md:mb-4 max-md:pb-3`、行间距 `max-md:gap-2`、eyebrow `max-md:hidden`、副标题 `max-md:text-[12px]` | `mb-6 pb-5 gap-4`,原值;H1 仍是 22 → `sm:text-[26px]` |
 | `EnterpriseBrandSlot` | 只剩 logo + 标题(标题 `truncate`),副标题 `hidden … md:block` | 原值 |
-| `Dialog` | 整屏 sheet 的标题行 / 正文 / 页脚留白 `max-md:px-4` + `max-md:py-4`(贴边之后 24px 留白太贵) | `px-6` / `py-5` / `pb-4 pt-5`,原值 |
+| `Dialog` | 整屏 sheet 贴边之后 24px 留白太贵:标题行 `max-md:px-4 max-md:pt-4`(底部本来就是 `pb-4`)、正文 `max-md:px-4 max-md:py-4`、页脚 `max-md:px-4`(`py-4` 已经够) | `px-6` / `py-5` / `pb-4 pt-5`,原值 |
 | `ActionRow` | `max-md:flex-wrap`,长标签的提交按钮不会被挤出 360px 的 sheet | 单行,原值 |
-| `EnterpriseTopbarActions` | 语言切换整组移进用户菜单(`topbar-user-menu-language`,选项仍是 `topbar-language-option-<code>` + `role="menuitemradio"`);头像按钮 `max-md:h-10 max-md:min-w-10`;通知弹层 `max-md:w-[calc(100vw-24px)] max-md:max-w-[360px]`、用户菜单 `max-md:max-w-[calc(100vw-24px)]`,右锚点不再溢出屏幕 | 语言仍是顶栏上的独立入口(通知弹层仍是定宽 `w-[300px]`) |
+| `EnterpriseTopbarActions` | 有 `user` 时语言切换整组移进用户菜单(`topbar-user-menu-language`,选项仍是 `topbar-language-option-<code>` + `role="menuitemradio"`);**没有 `user` 就保留顶栏上的独立入口**,否则语言无处可切。头像按钮 `max-md:h-10 max-md:min-w-10`。两个弹层改成相对视口定位 `max-md:fixed max-md:left-auto max-md:right-3 max-md:top-14`,通知宽度 `max-md:w-[min(300px,calc(100vw-24px))]`、用户菜单 `max-md:max-w-[calc(100vw-24px)]` —— 锚点是按钮那层 `relative` 而不是视口右缘,只放宽宽度会把左边推出屏幕 | 语言是顶栏上的独立入口;弹层仍是 `absolute right-0 top-11` + 定宽 `w-[300px]` |
 | 表格 | 切成卡片列表(`TableCards`,见 `table/`) | 仍是表格 |
 
 视口判定统一走 `primitives/use-media-query` 的 `useIsPhone()`(`useMediaQuery` +

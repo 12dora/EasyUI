@@ -7,10 +7,26 @@ export function EnterpriseFooter({ children, maxWidth }: { children: ReactNode; 
   return <footer className="border-t border-hairline bg-paper-deep"><div className="mx-auto flex items-center px-5 py-3 text-[12px] text-ink-faint" style={{ maxWidth }}>{children}</div></footer>;
 }
 
-/** Shared footer renderer used by every host; the backend remains the source of configured content. */
-export function EnterpriseConfiguredFooter({ html, fallback, maxWidth }: { html?: string | null; fallback: ReactNode; maxWidth?: number }) {
+const FOOTER_LINK_CLASS = "max-w-full [&_a]:text-ink-soft [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-ink";
+
+/**
+ * Shared footer renderer used by every host; the backend remains the source of configured content.
+ *
+ * `bare` 是给「已经有别的容器」的位置用的 —— 具体来说是手机上 `MobileNav` 抽屉底部的页脚槽:
+ * 那里再套一个 `<footer>` 会在抽屉的 `role="dialog"` 里嵌出第二个 contentinfo 地标(读屏会把它
+ * 当成页面级页脚播报),边框 / 内边距也会跟抽屉自己的分隔线叠成双线。`bare` 去掉地标与外框,
+ * 只留文案本身;test id 换成 `-inline` 后缀,这样同一份文案在页面底部与抽屉里能分别断言。
+ */
+export function EnterpriseConfiguredFooter({ html, fallback, maxWidth, bare = false }: { html?: string | null; fallback: ReactNode; maxWidth?: number; bare?: boolean }) {
   const safeHtml = useMemo(() => sanitizeFooterHtml((html ?? "").replaceAll("{year}", String(new Date().getFullYear()))), [html]);
-  return <EnterpriseFooter maxWidth={maxWidth}>{safeHtml ? <span className="max-w-full [&_a]:text-ink-soft [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-ink" data-test-id="app-footer-html" dangerouslySetInnerHTML={{ __html: safeHtml }}/> : <span data-test-id="app-footer-fallback">{fallback}</span>}</EnterpriseFooter>;
+  const suffix = bare ? "-inline" : "";
+  const content = safeHtml ? (
+    <span className={FOOTER_LINK_CLASS} data-test-id={`app-footer-html${suffix}`} dangerouslySetInnerHTML={{ __html: safeHtml }} />
+  ) : (
+    <span data-test-id={`app-footer-fallback${suffix}`}>{fallback}</span>
+  );
+  if (bare) return <div className="min-w-0 text-[12px] text-ink-faint">{content}</div>;
+  return <EnterpriseFooter maxWidth={maxWidth}>{content}</EnterpriseFooter>;
 }
 
 const ALLOWED_TAGS = new Set(["A", "BR", "SPAN", "STRONG", "EM", "B", "I", "SMALL"]);

@@ -42,9 +42,11 @@ describe("Dialog — 手机密度", () => {
     const header = classesOf(frame.querySelector("[data-test-id='app-dialog-close']")?.parentElement);
     expect(header).toContain("max-md:px-4");
     expect(header).toContain("max-md:pt-4");
-    expect(header).toContain("max-md:pb-4");
+    // 底部本来就是 pb-4,不必再写一条手机侧覆盖(写了也是同值,纯噪声)。
+    expect(header).not.toContain("max-md:pb-4");
     expect(header).toContain("px-6");
     expect(header).toContain("pt-5");
+    expect(header).toContain("pb-4");
 
     const body = classesOf(frame.querySelector("[data-test-id='body-text']")?.parentElement);
     expect(body).toContain("max-md:px-4");

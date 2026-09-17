@@ -48,7 +48,15 @@ describe("EnterpriseBrandSlot", () => {
     // The product name is the link's visible text, so the logo must not repeat it.
     expect(logo?.getAttribute("alt")).toBe("");
     expect(logo?.getAttribute("aria-hidden")).toBe("true");
-    expect(view.host.querySelector("[data-test-id='brand-subtitle']")?.textContent).toBe("Enterprise learning");
+    const subtitle = view.host.querySelector("[data-test-id='brand-subtitle']") as HTMLElement;
+    expect(subtitle.textContent).toBe("Enterprise learning");
+    // 手机(< md)上顶栏只留 logo + 标题:副标题从 md 起才显形,不再是 sm。
+    const subtitleClasses = subtitle.className.split(/\s+/);
+    expect(subtitleClasses).toContain("hidden");
+    expect(subtitleClasses).toContain("md:block");
+    expect(subtitleClasses).not.toContain("sm:block");
+    // 标题始终 truncate,窄屏上不会把右侧动作挤出去。
+    expect((view.host.querySelector("[data-test-id='brand-title']") as HTMLElement).className).toContain("truncate");
   });
 
   it("names the link with the product name alone", async () => {

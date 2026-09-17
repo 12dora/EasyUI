@@ -84,6 +84,8 @@ export function EnterpriseTopbarActions(props: EnterpriseTopbarActionsProps) {
   // 与表格切卡片共用同一个断点 hook(SSR / 首帧快照为桌面形态,hydration 后才切)。
   const isPhone = useIsPhone();
   // 手机上语言项并入用户菜单(见 UserAction),顶栏只留铃铛 + 头像;桌面保持三个独立入口。
+  // 没有 user 时用户菜单根本不渲染,这时手机上必须留着独立入口,否则语言切换无处可去。
+  const localeInUserMenu = isPhone && Boolean(props.user);
   const localeSwitch: LocaleSwitch = {
     locale: props.locale,
     localeOptions: props.localeOptions,
@@ -92,7 +94,7 @@ export function EnterpriseTopbarActions(props: EnterpriseTopbarActionsProps) {
 
   return (
     <div ref={rootRef} className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3" data-test-id="admin-topbar-actions">
-      {isPhone ? null : (
+      {localeInUserMenu ? null : (
         <LanguageAction {...localeSwitch} labels={props.labels} open={open === "language"} toggle={() => setOpen(open === "language" ? null : "language")} />
       )}
       {props.notifications ? (
@@ -119,7 +121,7 @@ export function EnterpriseTopbarActions(props: EnterpriseTopbarActionsProps) {
           toggle={() => setOpen(open === "user" ? null : "user")}
           loggingOut={loggingOut}
           onLogout={props.onLogout ? logout : undefined}
-          localeSwitch={isPhone ? localeSwitch : undefined}
+          localeSwitch={localeInUserMenu ? localeSwitch : undefined}
         />
       ) : null}
     </div>
@@ -177,7 +179,7 @@ function NotificationsAction({ items, loading, error, viewAllHref, unreadCount, 
         {badgeCount > 0 ? <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[rgb(var(--signal))] px-1 text-[10px] font-semibold leading-none text-paper" data-test-id="topbar-notifications-badge">{badgeCount > 99 ? "99+" : badgeCount}</span> : null}
       </button>
       {open ? (
-        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.notifications} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-11 z-30 w-[300px] max-md:w-[calc(100vw-24px)] max-md:max-w-[360px] origin-top-right rounded-md border border-hairline bg-paper p-3 shadow-lg shadow-ink/10 focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-notifications-menu">
+        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.notifications} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-11 z-30 w-[300px] max-md:fixed max-md:left-auto max-md:right-3 max-md:top-14 max-md:w-[min(300px,calc(100vw-24px))] origin-top-right rounded-md border border-hairline bg-paper p-3 shadow-lg shadow-ink/10 focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-notifications-menu">
           <div className="flex items-center justify-between gap-2"><div className="text-[13px] font-medium text-ink">{labels.notifications}</div>{items.length ? <button type="button" onClick={onDismissAll} className="text-[12px] text-ink-soft hover:text-[rgb(var(--signal-ink))]" data-test-id="topbar-notifications-clear-all">{labels.notificationsClearAll}</button> : null}</div>
           {loading && !items.length ? <div className="mt-2 text-[12px] text-ink-faint">…</div> : error ? <div className="mt-2 text-[12px] text-[rgb(var(--signal-ink))]">{labels.notificationsLoadFailed}</div> : !items.length ? <div className="mt-1 text-[12px] text-ink-faint">{labels.notificationsEmpty}</div> : <ul className="mt-2 max-h-[320px] space-y-1 overflow-y-auto pr-0.5" data-test-id="topbar-notifications-list">{items.map((item) => <li key={item.id} className="flex items-start justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-ink/[0.03]" data-test-id="topbar-notification-item"><div className="min-w-0">{item.href ? renderLink({ href: item.href, className: "block truncate text-[12px] text-ink hover:underline", testId: "topbar-notification-deeplink", onClick: () => onItemOpen?.(item.id), children: item.title }) : <div className="truncate text-[12px] text-ink">{item.title}</div>}{item.detail ? <div className={`mt-0.5 text-[12px] ${item.urgent ? "text-[rgb(var(--signal-ink))]" : "text-ink-faint"}`}>{item.detail}</div> : null}<RelativeTimestamp value={item.createdAt} absoluteLabel={item.createdAtLabel} locale={locale} className="mt-0.5 block text-[12px] text-ink-faint" testId="topbar-notification-time" /></div>{onDismiss ? <button type="button" onClick={() => onDismiss(item.id)} aria-label={labels.notificationsDismiss} title={labels.notificationsDismiss} className="shrink-0 rounded p-0.5 text-ink-faint hover:text-[rgb(var(--signal))]" data-test-id="topbar-notification-dismiss">×</button> : null}</li>)}</ul>}
           {renderLink({ href: viewAllHref, role: "menuitem", className: "mt-2 block text-center text-[12px] text-ink-soft transition-colors hover:text-ink", testId: "topbar-notifications-view-all", children: labels.notificationsViewAll })}
@@ -199,7 +201,7 @@ function UserAction({ user, labels, securityHref, renderLink, open, toggle, logg
         <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" data-test-id="topbar-user-avatar" />
       </button>
       {open ? (
-        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.userMenu} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[200px] max-md:max-w-[calc(100vw-24px)] origin-top-right rounded-md border border-hairline bg-paper py-1.5 shadow-[0_8px_18px_rgba(17,24,39,0.14)] focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-user-menu">
+        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.userMenu} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[200px] max-md:fixed max-md:left-auto max-md:right-3 max-md:top-14 max-md:max-w-[calc(100vw-24px)] origin-top-right rounded-md border border-hairline bg-paper py-1.5 shadow-[0_8px_18px_rgba(17,24,39,0.14)] focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-user-menu">
           {user.permissionSummary ? <div className="border-b border-hairline-soft px-3 py-2 text-[12px] text-ink-faint" data-test-id="topbar-user-permissions">{user.permissionSummary}</div> : null}
           {/* 手机上顶栏放不下第三个入口:语言切换整组移到这里,仍是同一批 role/test id。 */}
           {localeSwitch ? (

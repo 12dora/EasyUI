@@ -20,8 +20,10 @@ export interface AppShellProps {
    * Rendered as a sibling AFTER the scroll region, so it never scrolls with
    * `<main>`. Omitted from the DOM entirely when not provided.
    *
-   * 只在 md+ 显示:手机上这条钉死的页脚会再吃掉 ~50px 首屏,同样的文案改由
-   * `<MobileNav footer>` 在抽屉底部呈现。
+   * **只在 md+ 显示**(包裹层是 `hidden md:block`):手机上这条钉死的页脚会再吃掉 ~50px 首屏。
+   * 因此传了 `footer` 的宿主**必须**把同一份文案再交给 `<MobileNav footer>`(两种 variant 都支持),
+   * 否则手机上页脚整条消失。抽屉里那份建议用 `<EnterpriseConfiguredFooter bare />`:
+   * 抽屉已经是 `role="dialog"`,再嵌一个 `<footer>` 会多出一个 contentinfo 地标。
    */
   footer?: ReactNode;
   /**

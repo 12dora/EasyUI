@@ -243,7 +243,7 @@ function DialogHeader({
   asideRef?: (el: HTMLElement | null) => void;
 }) {
   return (
-    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-ink/12 px-6 pb-4 pt-5 max-md:px-4 max-md:pb-4 max-md:pt-4">
+    <div className="flex shrink-0 items-start justify-between gap-4 border-b border-ink/12 px-6 pb-4 pt-5 max-md:px-4 max-md:pt-4">
       <div className="min-w-0 flex-1">
         {eyebrow ? <div className="eyebrow mb-1.5">{eyebrow}</div> : null}
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
