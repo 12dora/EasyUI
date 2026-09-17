@@ -4,12 +4,14 @@
  * "Settings" H1 stacked above every settings surface, and an app shell mounted
  * without the configured footer.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { act } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { NAV_PROGRESS_DELAY_MS } from "../shell/NavigationProgress";
 import { EnterpriseAppFrame } from "./app-frame";
 import { EnterpriseConfiguredFooter } from "./footer";
 import { EnterpriseSettingsPageFrame } from "./page-frames";
-import { byTestId, mount, settle, type MountedView } from "./behavior-test-utils";
+import { byTestId, mount, type MountedView } from "./behavior-test-utils";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -18,6 +20,7 @@ let view: MountedView | null = null;
 afterEach(async () => {
   await view?.unmount();
   view = null;
+  vi.useRealTimers();
 });
 
 describe("EnterpriseSettingsPageFrame", () => {
@@ -50,6 +53,7 @@ describe("EnterpriseAppFrame", () => {
   });
 
   it("forwards the navigation-pending props down to AppShell", async () => {
+    vi.useFakeTimers();
     view = await mount(
       <EnterpriseAppFrame pending pendingLabel="加载中" footer={<EnterpriseConfiguredFooter html="" fallback="回退页脚" />}>
         <p>内容</p>
@@ -57,7 +61,7 @@ describe("EnterpriseAppFrame", () => {
     );
     // 延迟 150ms 之后细轨才显形(见 NAV_PROGRESS_DELAY_MS),aria-busy 则是立刻就有。
     expect(view.host.querySelector("main")?.getAttribute("aria-busy")).toBe("true");
-    await settle(220);
+    await act(async () => vi.advanceTimersByTime(NAV_PROGRESS_DELAY_MS));
     expect(byTestId(view.host, "nav-progress").dataset.state).toBe("running");
     expect(byTestId(view.host, "nav-progress").textContent).toBe("加载中");
   });

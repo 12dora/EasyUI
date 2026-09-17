@@ -19,7 +19,10 @@ export const NAV_INTENT_TIMEOUT_MS = 8000;
 export interface NavIntent {
   /** 用来算 `active` 的路径:有意图未落地时是意图路径,否则就是真实 `pathname`。 */
   path: string;
-  /** 从 `onIntent(href)` 起,到 `pathname` 发生任何变化(或超时)为止为真。 */
+  /**
+   * 从 `onIntent(href)` 起,到 `pathname` 发生任何变化(或超时)为止为真。
+   * 点当前页不产生 pending,并撤销尚未落地的旧意图(以最后一次点击为准)。
+   */
   pending: boolean;
   /** 在导航链接的 click 处理里同步调用(面板项则在 `router.push` 之前调用)。 */
   onIntent: (href: string) => void;
@@ -71,7 +74,8 @@ export function useNavIntent(pathname: string): NavIntent {
     (href: string) => {
       const target = intentPathOf(href);
       setIntent((current) => {
-        // 点当前页不产生 pending(顺带撤掉还没落地的旧意图:那次导航的目标已经不是它了)。
+        // 点当前页不产生 pending,并撤销尚未落地的旧意图:以最后一次点击为准
+        // (Next 的 router.push 同样是最后一次赢,旧意图的目标已经不是用户要去的地方了)。
         if (target === pathname) return null;
         return { target, from: pathname, token: (current?.token ?? 0) + 1 };
       });

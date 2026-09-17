@@ -74,6 +74,38 @@ describe("NavigationProgress", () => {
     expect(bar(view.host)).toBeNull();
   });
 
+  it("收尾途中来了第二次导航:延迟窗口从头算起,不顶着正在淡出的死线", async () => {
+    vi.useFakeTimers();
+    view = await mount(<NavigationProgress pending label="加载中" />);
+    await tick(NAV_PROGRESS_DELAY_MS);
+    expect(rail(view.host).dataset.state).toBe("running");
+
+    await view.rerender(<NavigationProgress pending={false} label="加载中" />);
+    expect(rail(view.host).dataset.state).toBe("done");
+
+    await view.rerender(<NavigationProgress pending label="加载中" />);
+    expect(rail(view.host).dataset.state).toBe("idle");
+    expect(bar(view.host)).toBeNull();
+
+    await tick(NAV_PROGRESS_DELAY_MS - 1);
+    expect(rail(view.host).dataset.state).toBe("idle");
+    await tick(1);
+    expect(rail(view.host).dataset.state).toBe("running");
+  });
+
+  it("状态文案不塞在 2px 的裁剪盒子里", async () => {
+    vi.useFakeTimers();
+    view = await mount(<NavigationProgress pending label="加载中" />);
+    await tick(NAV_PROGRESS_DELAY_MS);
+
+    const container = rail(view.host);
+    const hidden = container.querySelector(".easy-visually-hidden");
+    expect(hidden?.textContent).toBe("加载中");
+    // 文案是细轨的兄弟节点,不在 overflow-hidden 的 2px 盒子里。
+    expect(hidden?.parentElement).toBe(container);
+    expect(bar(view.host)?.parentElement?.contains(hidden ?? null)).toBe(false);
+  });
+
   it("秒开导航(150ms 内落地)自始至终不显形", async () => {
     vi.useFakeTimers();
     view = await mount(<NavigationProgress pending />);
@@ -110,6 +142,15 @@ describe("AppShell 的进度条", () => {
     // 细轨是 <main> 的兄弟节点(贴内容列顶边、不随内容滚动)。
     expect(main?.contains(rail(view.host))).toBe(false);
     expect(rail(view.host).parentElement).toBe(main?.parentElement);
+
+    // 导航落地:aria-busy 立刻摘掉,哪怕细轨还在补满淡出。
+    await view.rerender(
+      <AppShell pending={false} pendingLabel="加载中">
+        <p>内容</p>
+      </AppShell>,
+    );
+    expect(view.host.querySelector("main")?.getAttribute("aria-busy")).toBeNull();
+    expect(rail(view.host).dataset.state).toBe("done");
   });
 
   it("不 pending 时没有 aria-busy,细轨保持隐藏", async () => {

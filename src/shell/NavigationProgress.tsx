@@ -33,10 +33,16 @@ export function NavigationProgress({ pending, label }: NavigationProgressProps) 
   const [phase, setPhase] = useState<Phase>("idle");
   const [lastPending, setLastPending] = useState(pending);
 
-  // 渲染期间调整 state:pending 落下时,已显形的进度条补满淡出,没显形过的直接回 idle。
+  // 渲染期间调整 state:
+  //   pending 抬起 —— 一律回到 idle,150ms 的延迟窗口必须从"没显形"重新算起,
+  //     否则上一次导航还在收尾(done)时紧接着的第二次导航会顶着一条正在淡出的死线;
+  //   pending 落下 —— 已显形的补满淡出(done),没显形过的直接回 idle。
   if (lastPending !== pending) {
     setLastPending(pending);
-    if (!pending) setPhase((current) => (current === "running" ? "done" : "idle"));
+    setPhase((current) => {
+      if (pending) return "idle";
+      return current === "running" ? "done" : "idle";
+    });
   }
 
   useEffect(() => {
@@ -59,19 +65,21 @@ export function NavigationProgress({ pending, label }: NavigationProgressProps) 
       data-state={phase}
       role={visible ? "status" : undefined}
       aria-hidden={visible ? undefined : true}
-      className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[2px] overflow-hidden"
+      className="pointer-events-none absolute inset-x-0 top-0 z-20"
     >
-      {visible ? (
-        <>
+      {/* 2px 的可视细轨:纯视觉,overflow-hidden 只裁它自己 —— 状态文案放在它外面,
+          免得读屏文本被这 2px 的裁剪盒子夹住。 */}
+      <div className="h-[2px] overflow-hidden">
+        {visible ? (
           <span
             data-test-id="nav-progress-bar"
             className={`block h-full w-full ${
               phase === "done" ? "easy-nav-progress-done" : "easy-nav-progress-grow"
             }`}
           />
-          {label ? <span className="easy-visually-hidden">{label}</span> : null}
-        </>
-      ) : null}
+        ) : null}
+      </div>
+      {visible && label ? <span className="easy-visually-hidden">{label}</span> : null}
     </div>
   );
 }

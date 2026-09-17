@@ -262,8 +262,9 @@ shell 给的解法是两件小东西,**不要**为此重新引入 route 级 `loa
 | `NavigationProgress` / `NAV_PROGRESS_DELAY_MS` (150) | 内容列顶边 2px 琥珀细轨,迟到 150ms 才显形,落地时补满淡出 |
 
 `NavIntent` 的语义:`onIntent(href)` 同步记下意图 → `pending` 为真,直到 `pathname` 发生
-**任何**变化(导航落地,可能落在重定向目标上)或超时;点当前页是空操作(不产生 pending);
-pending 期间再点一次就换目标并重置计时。钩子纯前端、与路由库无关,初始状态只由 `pathname`
+**任何**变化(导航落地,可能落在重定向目标上)或超时;点当前页不产生 pending,并撤销尚未
+落地的旧意图(以最后一次点击为准 —— Next 的 router.push 也是最后一次赢);pending 期间点
+别的目标就换目标并重置计时。钩子纯前端、与路由库无关,初始状态只由 `pathname`
 推导,不会造成水合不一致。
 
 进度条由 `AppShell` 自己挂:它在 `<main>` 外面的 relative 包裹层里(贴内容列顶边,不随内容

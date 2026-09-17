@@ -74,6 +74,15 @@ describe("useNavIntent", () => {
     expect(snapshot()).toEqual({ path: "/settings", pending: false });
   });
 
+  it("pending 期间点当前页:撤销旧意图,以最后一次点击为准", async () => {
+    view = await mount(<Probe pathname="/orders" />);
+    await intent("/library");
+    expect(snapshot()).toEqual({ path: "/library", pending: true });
+
+    await intent("/orders");
+    expect(snapshot()).toEqual({ path: "/orders", pending: false });
+  });
+
   it("导航中止时超时弹回真实路由", async () => {
     vi.useFakeTimers();
     view = await mount(<Probe pathname="/orders" />);
