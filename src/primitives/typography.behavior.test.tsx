@@ -146,7 +146,7 @@ describe("标签与眉标题", () => {
 
     expect(eyebrow.textContent).toBe("身份与权限");
     // 排版仍然只由 .eyebrow 一处定义:除了间距与手机端隐藏,不许再叠字号 / 字距 / 颜色。
-    expect(eyebrow.className.split(/\s+/).filter((token) => token !== "eyebrow")).toEqual(["mb-1.5", "max-md:hidden"]);
+    expect(eyebrow.className.split(/\s+/).filter((token) => token !== "eyebrow")).toEqual(["mb-1", "max-md:hidden"]);
     expect(meta.className).toContain("text-[12px]");
   });
 });

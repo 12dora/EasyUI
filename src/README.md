@@ -509,8 +509,8 @@ const columns = useMemo(() => [
 | 组件 | 手机 (< md) | 桌面 (md+) |
 | ---- | ----------- | ---------- |
 | `Topbar` | `px-3` / `gap-2`,高度仍是 `h-14` | `md:px-5` / `md:gap-4`,原值 |
-| `AppShell` | `APP_SHELL_MAIN_PADDING` 竖向留白 `py-4`;`footer` 包裹层 `hidden md:block`(页脚改由抽屉承载,宿主必须同时传 `MobileNav footer`) | `md:px-10 md:py-12 2xl:px-12 3xl:px-16`,原值 |
-| `PageHeader` | `max-md:mb-4 max-md:pb-3`、行间距 `max-md:gap-2`、eyebrow `max-md:hidden`、副标题 `max-md:text-[12px]` | `mb-6 pb-5 gap-4`,原值;H1 仍是 22 → `sm:text-[26px]` |
+| `AppShell` | `APP_SHELL_MAIN_PADDING` 竖向留白 `py-4`;`footer` 包裹层 `hidden md:block`(页脚改由抽屉承载,宿主必须同时传 `MobileNav footer`) | `md:px-10 md:py-8 2xl:px-12 3xl:px-16`(竖向 48 → 32:页头上方那条白带太厚,首行内容抬高 16px;横向原值) |
+| `PageHeader` | `max-md:mb-4 max-md:pb-3`、行间距 `max-md:gap-2`、eyebrow `max-md:hidden`、副标题 `max-md:text-[12px]` | `mb-5 pb-4 gap-4`(mb-6 / pb-5 各收一档)、eyebrow `mb-1`;H1 全站同一档 `text-[22px]`(不再 `sm:text-[26px]`) |
 | `EnterpriseBrandSlot` | 只剩 logo + 标题(标题 `truncate`),副标题 `hidden … md:block` | 原值 |
 | `Dialog` | 整屏 sheet 贴边之后 24px 留白太贵:标题行 `max-md:px-4 max-md:pt-4`(底部本来就是 `pb-4`)、正文 `max-md:px-4 max-md:py-4`、页脚 `max-md:px-4`(`py-4` 已经够) | `px-6` / `py-5` / `pb-4 pt-5`,原值 |
 | `ActionRow` | `max-md:flex-wrap`,长标签的提交按钮不会被挤出 360px 的 sheet | 单行,原值 |
@@ -521,6 +521,31 @@ const columns = useMemo(() => [
 `PHONE_MEDIA_QUERY = "(max-width: 767px)"`):`useSyncExternalStore` 订阅 `MediaQueryList`,
 服务端 / 首帧快照固定为 `false`(桌面形态),hydration 之后才切 —— 这样 SSR 与客户端首帧
 一致,不会闪。`EnterpriseTopbarActions` 的语言项归属与表格的卡片/表格切换都以它为准。
+
+## 页头的内联返回 (PageHeader `back`)
+
+详情页的「返回上一层」**不占独立一行**:传 `back={{ href, label, testId? }}`,`PageHeader`
+会在 h1 左边内联一个圆形图标按钮(手机 28px / 桌面 32px 命中区,左向尖角是内联 SVG),
+文案落到 `aria-label` 与 `title`,标题行高度一点没变。单独一条「← 返回 X」白占 20 来像素,
+再叠上外壳那圈上内边距,桌面首屏顶部就是一大块空白 —— 这条 prop 就是为了消掉它。
+
+```tsx
+<PageHeader
+  title={exam.name}
+  back={{ href: `/${locale}/app/exams`, label: t.backToExams, testId: "exam-detail-back" }}
+  renderLink={({ href, className, ariaLabel, title, testId, children }) => (
+    <Link href={href} className={className} aria-label={ariaLabel} title={title} data-test-id={testId}>
+      {children}
+    </Link>
+  )}
+/>
+```
+
+`renderLink` 是可选的(与 shell 的 `RenderNavLink`、enterprise 的 `EnterpriseLinkRenderer`
+同一套路):不传就渲染普通 `<a href>`,EasyUI 自己不 import 任何框架的 `Link`。想在别处
+(比如宿主自己的详情页页眉)复用同一个控件,直接用导出的 `<PageBackLink back renderLink />`。
+
+有 `back` 时 h1 会 `truncate`(它与控件抢同一行的宽度);没有 `back` 时标题照旧换行。
 
 ## Design tokens (theme.css)
 

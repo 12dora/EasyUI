@@ -51,7 +51,7 @@ export interface AppShellProps {
  * grow past ~1400px; hosts that compose their own `<main>` (see EasyTrade's
  * AdminShell) mirror this string so the two frames stay in sync.
  */
-export const APP_SHELL_MAIN_PADDING = "px-4 py-4 md:px-10 md:py-12 2xl:px-12 3xl:px-16";
+export const APP_SHELL_MAIN_PADDING = "px-4 py-4 md:px-10 md:py-8 2xl:px-12 3xl:px-16";
 
 /**
  * EasyUI application frame: sticky topbar over a full-height content region that

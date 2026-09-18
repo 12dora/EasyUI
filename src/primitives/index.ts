@@ -10,7 +10,13 @@ export { InfoTooltip } from "./info-tooltip";
 export { Checkbox } from "./checkbox";
 export { Badge, statusTone, type BadgeTone } from "./badge";
 export { ActiveBadge, EnabledBadge } from "./active-badge";
-export { PageHeader } from "./page-header";
+export {
+  PageHeader,
+  PageBackLink,
+  type PageBackNav,
+  type PageBackLinkRenderArgs,
+  type PageBackLinkRenderer,
+} from "./page-header";
 export { PageLoadingSkeleton } from "./page-loading";
 export { PageState } from "./page-state";
 export { InlineNotice, InlineErrorBanner, type InlineNoticeTone } from "./inline-notice";

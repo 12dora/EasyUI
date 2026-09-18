@@ -46,13 +46,15 @@ describe("Topbar", () => {
 });
 
 describe("AppShell", () => {
-  it("内容区手机竖向留白 16px,桌面留白不变", () => {
+  it("内容区手机竖向留白 16px,桌面收到 32px", () => {
     const classes = APP_SHELL_MAIN_PADDING.split(/\s+/);
     expect(classes).toContain("py-4");
     expect(classes).toContain("px-4");
     expect(classes).not.toContain("py-6");
     expect(classes).toContain("md:px-10");
-    expect(classes).toContain("md:py-12");
+    // 桌面上内边距 48 → 32:页头之上那条白带太厚,首行内容抬高 16px(横向留白不动)。
+    expect(classes).toContain("md:py-8");
+    expect(classes).not.toContain("md:py-12");
     expect(classes).toContain("2xl:px-12");
     expect(classes).toContain("3xl:px-16");
   });
