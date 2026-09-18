@@ -12,6 +12,7 @@ export type { UpstreamHealthLabels } from "./settings-surfaces";
 export * from "./upstream-health-controller";
 export * from "./footer";
 export * from "./general-settings-surface";
+export * from "./appearance-settings-surface";
 export * from "./general-settings-store";
 export * from "./brand-slot";
 export * from "./app-frame";

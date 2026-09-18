@@ -36,6 +36,7 @@ import { filterPatch, sorterSort, type DataTableLabels } from "./data-table";
 import { TableCards } from "./table-cards";
 import { sortKeyOf, type TableCardsSort } from "./table-cards-columns";
 import { TABLE_SCROLL, type MobileColumn } from "./table-columns";
+import { tableSizeOf, useTableDensity, type TableDensity } from "./table-density";
 import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "./table-query";
 
 /** Local pager options. `false` (instead of this object) renders every row, unpaginated. */
@@ -69,6 +70,11 @@ export interface ClientTableProps<T extends object> {
    * 卡片里的检索 / 筛选 / 排序 / 分页与表头同一份状态,所以来回切换不会丢页码或关键字。
    */
   mobile?: "cards" | "table";
+  /**
+   * 行高档位。缺省跟随 `TableDensityProvider`(没挂 Provider 时是 `"compact"`);
+   * 显式给值就压过上下文 —— 极少数表(对账矩阵一类)才需要固定一档。
+   */
+  density?: TableDensity;
 }
 
 export function ClientTable<T extends object>({
@@ -84,8 +90,10 @@ export function ClientTable<T extends object>({
   pagination = {},
   actionsKey,
   mobile = "cards",
+  density,
 }: ClientTableProps<T>) {
   const [paging, setPaging] = useClientPaging(rows, columns, pageSizeOf(pagination));
+  const context = useTableDensity();
   // 排序状态提到这一层:卡片里选的排序,转回桌面表格后还得算数(页码同理)。
   const [sort, setSort] = useState<TableCardsSort | null>(null);
   const phone = useIsPhone();
@@ -126,7 +134,7 @@ export function ClientTable<T extends object>({
   return (
     <div data-test-id={testId}>
       <Table<T>
-        size="middle"
+        size={tableSizeOf(density ?? context.density)}
         scroll={TABLE_SCROLL}
         rowKey={rowKey}
         loading={loading}

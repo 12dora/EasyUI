@@ -1,3 +1,4 @@
+import type { EnterpriseAppearanceSettingsLabels } from "./appearance-settings-surface";
 import type { EnterpriseGeneralSettingsLabels } from "./general-settings-surface";
 import type { EnterpriseLoginControllerLabels, EnterpriseOidcCompleteLabels } from "./auth-controller";
 import type { EnterpriseAccessSettingsLabels } from "./access-settings-surface";
@@ -18,7 +19,7 @@ export interface EnterpriseCatalogBrand {
 export interface EnterpriseStaticLabelCatalog {
   locale: EnterpriseCatalogLocale;
   metadata: { title: string; description: string };
-  navigation: { menu: string; close: string; backToMain: string; settings: string; security: string; access: string; upstream: string; general: string; dashboard: string; backToSecurity: string };
+  navigation: { menu: string; close: string; backToMain: string; settings: string; security: string; access: string; upstream: string; general: string; appearance: string; dashboard: string; backToSecurity: string };
   common: { permissionDenied: string; loading: string; retry: string; notAvailable: string; permissionCount: (count: number) => string };
   shell: EnterpriseShellLabels;
   login: EnterpriseLoginControllerLabels;
@@ -29,6 +30,8 @@ export interface EnterpriseStaticLabelCatalog {
   delivery: EnterpriseDeliveryStatusLabels;
   notifications: { title: string; description: string; empty: string; loadFailed: string; retry: string; dismiss: string };
   generalSettings: EnterpriseGeneralSettingsLabels;
+  /** 「外观」设置页(表格密度);见 `EnterpriseAppearanceSettingsSurface`。 */
+  appearanceSettings: EnterpriseAppearanceSettingsLabels;
   /** User-menu identity line; see `resolveEnterpriseIdentityLabel`. */
   identity: { admin: string; user: string; guest: string };
   /** Full-page zero-grant landing; see `EnterprisePermissionOnboarding`. */
@@ -288,7 +291,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
   return {
     locale: "zh-CN",
     metadata: { title: brand.appName, description: brand.appDescription },
-    navigation: { menu: "菜单", close, backToMain: "返回主菜单", settings: "设置", security: "安全", access: "工作账号与访问", upstream: "系统服务", general: "通用", dashboard: "工作台", backToSecurity: "返回安全设置" },
+    navigation: { menu: "菜单", close, backToMain: "返回主菜单", settings: "设置", security: "安全", access: "工作账号与访问", upstream: "系统服务", general: "通用", appearance: "外观", dashboard: "工作台", backToSecurity: "返回安全设置" },
     common: { permissionDenied, loading, retry, notAvailable: "—", permissionCount: (count) => `${count} 项权限` },
     shell: { switchLanguage: "切换语言", notifications: "通知", notificationsEmpty: "暂无通知", notificationsLoadFailed: "通知加载失败", notificationsClearAll: "全部清除", notificationsViewAll: "查看全部", notificationsDismiss: "忽略", userMenu: "用户菜单", securitySettings: "安全设置", logout: "退出登录", loggingOut: "正在退出" },
     login: {
@@ -358,7 +361,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "通知中心", description: "查看并处理当前账号的企业通知。", empty: "暂无通知", loadFailed: "通知加载失败", retry, dismiss: "忽略" },
-    generalSettings: generalSettingsChinese(retry), ...identityAndOnboardingChinese(),
+    generalSettings: generalSettingsChinese(retry), appearanceSettings: appearanceSettingsChinese(), ...identityAndOnboardingChinese(),
     public: { loginEyebrow: "企业账号", loggedOutTitle: "已退出登录", loggedOutDescription: "当前会话已结束。", loginAgain: "重新登录", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "正在完成工作账号登录…", missingTitle: "登录未完成", missingDescription: "工作账号登录未完成，请重新登录。", back: "返回登录" },
   };
@@ -375,7 +378,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
   return {
     locale: "en",
     metadata: { title: brand.appName, description: brand.appDescription },
-    navigation: { menu: "Menu", close, backToMain: "Back to main menu", settings: "Settings", security: "Security", access: "Work account & access", upstream: "System services", general: "General", dashboard: "Workbench", backToSecurity: "Back to security settings" },
+    navigation: { menu: "Menu", close, backToMain: "Back to main menu", settings: "Settings", security: "Security", access: "Work account & access", upstream: "System services", general: "General", appearance: "Appearance", dashboard: "Workbench", backToSecurity: "Back to security settings" },
     common: { permissionDenied, loading, retry, notAvailable: "—", permissionCount: (count) => `${count} permissions` },
     shell: { switchLanguage: "Switch language", notifications: "Notifications", notificationsEmpty: "No notifications", notificationsLoadFailed: "Failed to load notifications", notificationsClearAll: "Clear all", notificationsViewAll: "View all", notificationsDismiss: "Dismiss", userMenu: "User menu", securitySettings: "Security settings", logout: "Log out", loggingOut: "Logging out" },
     login: {
@@ -445,7 +448,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "Notification center", description: "Review and dismiss notifications for this account.", empty: "No notifications", loadFailed: "Failed to load notifications", retry, dismiss: "Dismiss" },
-    generalSettings: generalSettingsEnglish(retry), ...identityAndOnboardingEnglish(),
+    generalSettings: generalSettingsEnglish(retry), appearanceSettings: appearanceSettingsEnglish(), ...identityAndOnboardingEnglish(),
     public: { loginEyebrow: "Enterprise account", loggedOutTitle: "You’re signed out", loggedOutDescription: "The current session has ended.", loginAgain: "Sign in again", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "Completing work-account sign-in…", missingTitle: "Sign-in didn’t finish", missingDescription: "Work-account sign-in didn’t finish. Please try again.", back: "Back to sign in" },
   };
@@ -491,6 +494,14 @@ function generalSettingsChinese(retry: string): EnterpriseGeneralSettingsLabels 
 
 function generalSettingsEnglish(retry: string): EnterpriseGeneralSettingsLabels {
   return { title: "General", description: "Application name, subtitle, logo and footer.", loading: "Loading general settings", loadFailed: "Failed to load general settings", retry, localeTabs: { "zh-CN": "中文", en: "English" }, appTitle: "Application name", appTitleHint: "Leave blank to use the default name.", subtitle: "Subtitle", subtitleHint: "Leave blank to use the default subtitle.", footerHtml: "Footer", footerHtmlHint: "A few text tags and links are allowed; {year} is replaced with the current year.", logo: "Logo", logoHint: "PNG, JPEG or WebP, up to 128 KB.", logoUpload: "Upload logo", logoRemove: "Remove", logoDefaultCaption: "Using default logo", logoCustomCaption: "Custom logo", logoInvalid: "Only PNG, JPEG or WebP images are supported.", logoTooLarge: "The image is larger than 128 KB. Choose a smaller file.", save: "Save", saving: "Saving", saved: "General settings saved", saveFailed: "Failed to save general settings" };
+}
+
+function appearanceSettingsChinese(): EnterpriseAppearanceSettingsLabels {
+  return { title: "外观", description: "列表与表格的显示密度。", densityTitle: "表格密度", densityHint: "紧凑行更省屏幕，宽松行更易点按。设置随账号保存，在任何设备上一致。", densityCompact: "紧凑", densityComfortable: "宽松", saving: "正在保存", saveFailed: "外观设置保存失败，请重试" };
+}
+
+function appearanceSettingsEnglish(): EnterpriseAppearanceSettingsLabels {
+  return { title: "Appearance", description: "Row density for lists and tables.", densityTitle: "Table density", densityHint: "Compact rows fit more on screen; comfortable rows are easier to tap. Saved to your account and applied on every device.", densityCompact: "Compact", densityComfortable: "Comfortable", saving: "Saving", saveFailed: "Failed to save appearance settings. Try again." };
 }
 
 function authorizationChinese(close: string, loading: string): EnterpriseAccessSettingsLabels["authorization"] {

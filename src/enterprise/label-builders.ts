@@ -6,6 +6,7 @@ import type { EnterpriseSecurityOperationsLabels } from "./security-workspace";
 import type { EnterpriseUpstreamHealthControllerLabels } from "./upstream-health-controller";
 import type { EnterpriseShellLabels } from "./models";
 import type { EnterpriseIdentityLabels } from "./identity-label";
+import type { EnterpriseAppearanceSettingsLabels } from "./appearance-settings-surface";
 import type { EnterpriseGeneralSettingsLabels } from "./general-settings-surface";
 import type { EnterprisePermissionOnboardingLabels } from "./permission-onboarding";
 
@@ -18,5 +19,6 @@ export const defineEnterpriseDeliveryStatusLabels = (labels: EnterpriseDeliveryS
 export const defineEnterpriseUpstreamLabels = (labels: EnterpriseUpstreamHealthControllerLabels) => labels;
 export const defineEnterpriseShellLabels = (labels: EnterpriseShellLabels) => labels;
 export const defineEnterpriseGeneralSettingsLabels = (labels: EnterpriseGeneralSettingsLabels) => labels;
+export const defineEnterpriseAppearanceSettingsLabels = (labels: EnterpriseAppearanceSettingsLabels) => labels;
 export const defineEnterpriseIdentityLabels = (labels: EnterpriseIdentityLabels) => labels;
 export const defineEnterprisePermissionOnboardingLabels = (labels: EnterprisePermissionOnboardingLabels) => labels;

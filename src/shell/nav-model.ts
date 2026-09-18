@@ -47,6 +47,16 @@ export interface NavGroup {
   key: string;
   nodes: readonly NavNode[];
   divider?: boolean;
+  /**
+   * Optional group title, rendered as a small eyebrow above the group's items
+   * (desktop sidebar and mobile drawer alike).
+   *
+   * A title is what tells two adjacent clusters apart — a rule alone says
+   * "something changed here" without saying what. Prefer it over `divider` for
+   * a named section; a group that carries both draws the rule *above* the
+   * title, never between the title and its items.
+   */
+  label?: ReactNode;
 }
 
 export interface NavModel {

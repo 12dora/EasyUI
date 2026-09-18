@@ -81,6 +81,16 @@ export {
 } from "./table-columns";
 
 export {
+  DEFAULT_TABLE_DENSITY,
+  TableDensityProvider,
+  tableSizeOf,
+  useTableDensity,
+  type TableDensity,
+  type TableDensityProviderProps,
+  type TableDensityValue,
+} from "./table-density";
+
+export {
   TableCards,
   DEFAULT_TABLE_CARDS_LABELS,
   type TableCardsLabels,

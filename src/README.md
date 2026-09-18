@@ -331,6 +331,7 @@ them here and supplies only its router, its copy and its row actions.
 | Columns | `searchColumn`, `filterColumn`, `sortColumn`, `withEllipsis`, `withClientSort`, `clientSearchColumn`, `clientQueryState`, `sortOrderFor` |
 | People (pure) | `matchesPersonQuery`, `normalizeQuery`, `PersonQuerySubject` |
 | Tables | `DataTable`, `ClientTable`, `DataTableShell`, `useAnimatedExpand` |
+| Density | `TableDensityProvider`, `useTableDensity`, `tableSizeOf`, `DEFAULT_TABLE_DENSITY`, `TableDensity`(见下文「表格密度」) |
 | onChange helpers | `changePatch`, `filterPatch`, `sorterSort` |
 | Provider | `EasyAntdProvider`, `EasyAntdProviderZh`, `EasyAntdProviderEn`, `EasyAntdConfig`, `EASY_ANTD_THEME_TOKEN`, `createEasyAntdTheme` |
 
@@ -453,6 +454,57 @@ const columns = useMemo(() => [
 <DataTable testId="bank-table" rowKey="id" columns={columns} page={page} query={table} labels={t.table}
            actions={{ title: t.actions, render: (row) => <RowMenu row={row} /> }} />
 ```
+
+## 表格密度 (table density + 外观设置页)
+
+行高是一份**跨页面的账号偏好**,不是某一张表的 prop:同一个人在列表页之间来回切,
+行高必须处处一致。所以密度走上下文,宿主在外壳上挂一次,两种表格各自读它。
+
+| 导出 | 出处 | 作用 |
+| --- | --- | --- |
+| `TableDensity` | `@easy-enterprise/ui/table` | `"compact"` / `"comfortable"` |
+| `DEFAULT_TABLE_DENSITY` | 同上 | 全局默认 `"compact"` |
+| `TableDensityProvider` | 同上 | 受控:`value` + `onChange`(+ `saving`) |
+| `useTableDensity()` | 同上 | `{ density, setDensity, saving }` |
+| `tableSizeOf(density)` | 同上 | 档位 → antd `size`(`small` / `middle`) |
+| `EnterpriseAppearanceSettingsSurface` | `@easy-enterprise/ui/enterprise` | 「外观」设置页,只有「表格密度」一张卡片 |
+
+约定,不是选项:
+
+- **Provider 是受控的,套件不碰存储。** 偏好存在用户账号里(服务端),换台机器也一致;
+  套件自己读写 localStorage 只会造出第二个事实源。宿主负责乐观更新、失败回滚与提示,
+  `saving` 回传给设置页显示状态。
+- **没挂 Provider 时是 `"compact"`。** 没接这套偏好的宿主拿到的是全站默认观感,
+  而不是 antd 的 `middle`。
+- **`density` prop 压过上下文。** 极少数必须固定一档的表(对账矩阵一类)才用它。
+- **设置页不持有自己的 state。** `EnterpriseAppearanceSettingsSurface` 读写的就是那份
+  上下文,所以「设置页改完」与「列表页行高」天然同源。文案按本包惯例从 props 注入
+  (`EnterpriseAppearanceSettingsLabels`,`createEnterpriseLabelCatalog` 里有 zh / en)。
+
+宿主怎么接(EasyLearning 的口径):
+
+```tsx
+// 外壳:身份里带着账号偏好,写回走 PATCH /auth/preferences
+<TableDensityProvider value={identity.tableDensity} saving={saving} onChange={saveDensity}>
+  {children}
+</TableDensityProvider>
+
+// 设置页 /app/settings/appearance
+<EnterpriseAppearanceSettingsSurface labels={t.appearanceSettings} />
+```
+
+## 侧栏分组标题 (NavGroup `label`)
+
+`NavGroup` 除了 `divider` 还有一个可选的 `label`:给分组一行小标题,桌面侧栏与手机抽屉
+同时生效(两端都走 `NavGroupList`)。两块业务只靠一条线隔开时,用户读不出线的上下是
+两回事 —— 有名字的分区就给名字,`divider` 留给"同一类里再断一下"。
+
+```ts
+{ key: "manage", label: t.nav.groupManage, nodes: [...] }
+```
+
+标题渲染成条目列表上方的一行 eyebrow,条目仍在原来的 `<ol>` 里(选中标记与内边距不变);
+分隔线画在标题**之上**,不会夹在标题与它的条目之间。没给 `label` 的分组 DOM 一个字不变。
 
 ## 移动端 (phones, < md)
 

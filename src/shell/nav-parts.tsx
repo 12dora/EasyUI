@@ -126,7 +126,14 @@ export function PanelBackButton({
   );
 }
 
-/** Render one group's nodes as an <ol> of links + panel entries. */
+/**
+ * Render one group's nodes as an <ol> of links + panel entries.
+ *
+ * With `group.label` the list is wrapped in a `<section>` carrying the group's
+ * spacing / divider classes, and the title becomes an eyebrow above the items —
+ * the items keep their own flat list, so the marker and the item paddings are
+ * untouched. Without a label the markup is exactly what it always was.
+ */
 export function NavGroupList({
   group,
   className = "",
@@ -142,8 +149,8 @@ export function NavGroupList({
   onNavigate?: () => void;
   markerLayoutId?: string;
 }) {
-  return (
-    <ol className={`flex flex-col gap-0.5 ${className}`}>
+  const items = (
+    <ol className={`flex flex-col gap-0.5 ${group.label === undefined ? className : ""}`}>
       {group.nodes.map((node) =>
         node.kind === "link" ? (
           <NavLinkItem
@@ -163,6 +170,16 @@ export function NavGroupList({
         ),
       )}
     </ol>
+  );
+  if (group.label === undefined) return items;
+  return (
+    <section className={className} data-test-id={`nav-group-${group.key}`}>
+      {/* 套件自己的 eyebrow 样式(theme.css):12px 是全包的排版下限,分组标题不搞例外。 */}
+      <p className="eyebrow px-3 pb-1" data-test-id={`nav-group-label-${group.key}`}>
+        {group.label}
+      </p>
+      {items}
+    </section>
   );
 }
 

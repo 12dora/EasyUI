@@ -30,6 +30,7 @@ import { EmptyState } from "../primitives/empty-state";
 import { useIsPhone } from "../primitives/use-media-query";
 import { TableCards, type TableCardsLabels, type TableCardsPagination } from "./table-cards";
 import { TABLE_SCROLL, type TableHeaderLabels } from "./table-columns";
+import { tableSizeOf, useTableDensity, type TableDensity } from "./table-density";
 import {
   DEFAULT_PAGE_SIZE,
   PAGE_SIZE_OPTIONS,
@@ -90,6 +91,11 @@ export interface DataTableProps<T extends object> {
    * 只有个位数窄列、或者行与行之间必须对齐着比的表(对账、金额矩阵)才值得 `"table"`。
    */
   mobile?: "cards" | "table";
+  /**
+   * 行高档位。缺省跟随 `TableDensityProvider`(没挂 Provider 时是 `"compact"`);
+   * 显式给值就压过上下文。
+   */
+  density?: TableDensity;
 }
 
 export function DataTable<T extends object>({
@@ -107,9 +113,11 @@ export function DataTable<T extends object>({
   pageSizeOptions,
   pagination,
   mobile = "cards",
+  density,
 }: DataTableProps<T>) {
   useClampedPage(page, query);
   const phone = useIsPhone();
+  const context = useTableDensity();
   const allColumns = actions ? [...columns, actionsColumn(actions)] : columns;
   if (phone && mobile === "cards") {
     return (
@@ -130,7 +138,7 @@ export function DataTable<T extends object>({
   return (
     <div data-test-id={testId}>
       <Table<T>
-        size="middle"
+        size={tableSizeOf(density ?? context.density)}
         scroll={TABLE_SCROLL}
         rowKey={rowKey}
         loading={loading}
