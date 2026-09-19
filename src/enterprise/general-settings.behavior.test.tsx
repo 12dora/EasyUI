@@ -34,6 +34,7 @@ const LOADED: EnterpriseGeneralSettingsValue = {
   footerHtmlZh: "<strong>页脚</strong>",
   footerHtmlEn: "<strong>Footer</strong>",
   logoDataUrl: "data:image/png;base64,AAAA",
+  showFooter: true,
 };
 
 function makeAdapter(value: EnterpriseGeneralSettingsValue = LOADED): EnterpriseGeneralSettingsAdapter {
@@ -128,10 +129,22 @@ describe("EnterpriseGeneralSettingsSurface", () => {
       footerHtmlZh: "<span>中文页脚</span>",
       footerHtmlEn: "<span>English footer</span>",
       logoDataUrl: "data:image/png;base64,AAAA",
+      showFooter: true,
     });
     expect(updates).toHaveLength(1);
     expect(updates[0]?.titleEn).toBe("Learning Center");
     window.removeEventListener(ENTERPRISE_GENERAL_UPDATED_EVENT, listener);
+  });
+
+  it("carries the footer switch through a save instead of resetting it", async () => {
+    // 「外观」页把页脚关掉之后,管理员再来「通用」改标题:这次 PUT 不能把页脚又打开。
+    const adapter = makeAdapter({ ...LOADED, showFooter: false });
+    view = await mount(<EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} />);
+    await settle(20);
+    await fill(byTestId(view.host, "general-title-zh") as HTMLInputElement, "学习中心");
+    await click(byTestId(view.host, "app-settings-save"));
+    await settle(20);
+    expect(adapter.save).toHaveBeenCalledWith(expect.objectContaining({ titleZh: "学习中心", showFooter: false }));
   });
 
   it("rejects a logo above 128 KiB with the size label and keeps the stored logo", async () => {

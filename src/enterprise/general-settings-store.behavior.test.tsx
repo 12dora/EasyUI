@@ -12,7 +12,9 @@ import {
   resetEnterpriseGeneralSettings,
   resolveEnterpriseBrand,
   resolveEnterpriseFooterHtml,
+  resolveEnterpriseShowFooter,
   useEnterpriseGeneralSettings,
+  useEnterpriseShowFooter,
 } from "./general-settings-store";
 import { mount, settle, type MountedView } from "./behavior-test-utils";
 
@@ -208,5 +210,52 @@ describe("useEnterpriseGeneralSettings", () => {
     await settle(20);
     expect(second).toHaveBeenCalledTimes(1);
     expect(view.host.textContent).toBe("学习工作台");
+  });
+});
+
+function ShowFooterProbe({ load }: { load: () => Promise<EnterpriseGeneralSettingsValue> }) {
+  const showFooter = useEnterpriseShowFooter(load);
+  return <p data-test-id="footer-probe">{showFooter ? "show" : "hide"}</p>;
+}
+
+describe("showFooter (global footer switch)", () => {
+  it("treats a missing field, unknown settings and an explicit true as show", () => {
+    expect(resolveEnterpriseShowFooter(null)).toBe(true);
+    expect(resolveEnterpriseShowFooter(EMPTY)).toBe(true);
+    expect(resolveEnterpriseShowFooter({ ...EMPTY, showFooter: true })).toBe(true);
+    expect(resolveEnterpriseShowFooter({ ...EMPTY, showFooter: false })).toBe(false);
+  });
+
+  it("normalises a loaded value without the field to showFooter: true", async () => {
+    let seen: EnterpriseGeneralSettingsValue | null = null;
+    function Capture() {
+      const { settings } = useEnterpriseGeneralSettings(load);
+      seen = settings;
+      return null;
+    }
+    const load = vi.fn().mockResolvedValue(SETTINGS);
+    view = await mount(<Capture />);
+    await settle(20);
+    expect(seen).toEqual({ ...SETTINGS, showFooter: true });
+  });
+
+  it("stays shown while loading and when the load fails", async () => {
+    const load = vi.fn().mockRejectedValue(new Error("offline"));
+    view = await mount(<ShowFooterProbe load={load} />);
+    expect(view.host.textContent).toBe("show");
+    await settle(20);
+    expect(view.host.textContent).toBe("show");
+  });
+
+  it("hides the footer as soon as a save primes showFooter: false", async () => {
+    const load = vi.fn().mockResolvedValue({ ...SETTINGS, showFooter: true });
+    view = await mount(<ShowFooterProbe load={load} />);
+    await settle(20);
+    expect(view.host.textContent).toBe("show");
+    await act(async () => primeEnterpriseGeneralSettings({ ...SETTINGS, showFooter: false }));
+    expect(view.host.textContent).toBe("hide");
+    // A primed value without the field is normalised back to "show".
+    await act(async () => primeEnterpriseGeneralSettings(SETTINGS));
+    expect(view.host.textContent).toBe("show");
   });
 });

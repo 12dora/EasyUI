@@ -560,14 +560,29 @@ const columns = useMemo(() => [
 
 | 组件 | 手机 (< md) | 桌面 (md+) |
 | ---- | ----------- | ---------- |
-| `Topbar` | `px-3` / `gap-2`,高度仍是 `h-14` | `md:px-5` / `md:gap-4`,原值 |
-| `AppShell` | `APP_SHELL_MAIN_PADDING` 竖向留白 `py-4`;`footer` 包裹层 `hidden md:block`(页脚改由抽屉承载,宿主必须同时传 `MobileNav footer`) | `md:px-10 md:py-8 2xl:px-12 3xl:px-16`(竖向 48 → 32:页头上方那条白带太厚,首行内容抬高 16px;横向原值) |
+| `Topbar` | `px-3` / `gap-2`;行高 `h-12`(48px,两端同值) | `md:px-5` / `md:gap-4`;行高同样 48px(原 56px)。行内按 48px 配平:图标按钮 36px(`h-9 w-9`)、logo 32px(`h-8`)、头像 32px(`UserAvatar size="xs"`,按钮 36px 命中区)、汉堡 36px |
+| `AppShell` | `APP_SHELL_MAIN_PADDING` 顶部留白 12px、底部 `pb-4`;`footer` 包裹层 `hidden md:block`(页脚改由抽屉承载,宿主必须同时传 `MobileNav footer`) | 顶部留白 16px、底部 `md:pb-8`,`md:px-10 2xl:px-12 3xl:px-16`(顶栏与首行内容之间的白带收紧:手机 16 → 12、桌面 32 → 16;底部与横向原值)。顶部留白由 `--app-shell-main-pt` 驱动,见下文「内容区顶部留白」 |
 | `PageHeader` | `max-md:mb-4 max-md:pb-3`、行间距 `max-md:gap-2`、eyebrow `max-md:hidden`、副标题 `max-md:text-[12px]` | `mb-5 pb-4 gap-4`(mb-6 / pb-5 各收一档)、eyebrow `mb-1`;H1 全站同一档 `text-[22px]`(不再 `sm:text-[26px]`) |
 | `EnterpriseBrandSlot` | 只剩 logo + 标题(标题 `truncate`),副标题 `hidden … md:block` | 原值 |
 | `Dialog` | 整屏 sheet 贴边之后 24px 留白太贵:标题行 `max-md:px-4 max-md:pt-4`(底部本来就是 `pb-4`)、正文 `max-md:px-4 max-md:py-4`、页脚 `max-md:px-4`(`py-4` 已经够) | `px-6` / `py-5` / `pb-4 pt-5`,原值 |
 | `ActionRow` | `max-md:flex-wrap`,长标签的提交按钮不会被挤出 360px 的 sheet | 单行,原值 |
-| `EnterpriseTopbarActions` | 有 `user` 时语言切换整组移进用户菜单(`topbar-user-menu-language`,选项仍是 `topbar-language-option-<code>` + `role="menuitemradio"`);**没有 `user` 就保留顶栏上的独立入口**,否则语言无处可切。头像按钮 `max-md:h-10 max-md:min-w-10`。两个弹层改成相对视口定位 `max-md:fixed max-md:left-auto max-md:right-3 max-md:top-14`,通知宽度 `max-md:w-[min(300px,calc(100vw-24px))]`、用户菜单 `max-md:max-w-[calc(100vw-24px)]` —— 锚点是按钮那层 `relative` 而不是视口右缘,只放宽宽度会把左边推出屏幕 | 语言是顶栏上的独立入口;弹层仍是 `absolute right-0 top-11` + 定宽 `w-[300px]` |
+| `EnterpriseTopbarActions` | 有 `user` 时语言切换整组移进用户菜单(`topbar-user-menu-language`,选项仍是 `topbar-language-option-<code>` + `role="menuitemradio"`);**没有 `user` 就保留顶栏上的独立入口**,否则语言无处可切。头像按钮 `h-9 max-md:min-w-9`。两个弹层改成相对视口定位 `max-md:fixed max-md:left-auto max-md:right-3 max-md:top-12`(48px 顶栏正下方),通知宽度 `max-md:w-[min(300px,calc(100vw-24px))]`、用户菜单 `max-md:max-w-[calc(100vw-24px)]` —— 锚点是按钮那层 `relative` 而不是视口右缘,只放宽宽度会把左边推出屏幕 | 语言是顶栏上的独立入口;弹层是 `absolute right-0 top-10`(36px 按钮 + 4px)+ 定宽 `w-[300px]` |
 | 表格 | 切成卡片列表(`TableCards`,见 `table/`) | 仍是表格 |
+
+### 内容区顶部留白
+
+`APP_SHELL_MAIN_PADDING` 的顶部留白是 **12px(手机)/ 16px(md+)**,底部 16 / 32px 不变。
+顶部这一档不是写死的 `pt-*`,而是 CSS 变量 `--app-shell-main-pt`,由同一串 class 定义在
+`<main>` 上(`[--app-shell-main-pt:12px] md:[--app-shell-main-pt:16px] pt-[var(--app-shell-main-pt)]`),
+`<main>` 里的所有节点都能继承到。需要与之对齐的吸顶页头(例如用 `before:` 伪元素盖住顶部留白带、
+或 `top` 取负的留白)直接读变量,不要再抄一对断点值:
+
+```tsx
+<div className="sticky top-0 before:absolute before:inset-x-0 before:bottom-full before:h-[var(--app-shell-main-pt)] before:bg-paper">
+```
+
+JS 侧同值导出:`APP_SHELL_MAIN_PADDING_TOP_PX`(`{ base: 12, md: 16 }`)与变量名
+`APP_SHELL_MAIN_PADDING_TOP_VAR`。自己拼 `<main>` 的宿主照抄 `APP_SHELL_MAIN_PADDING` 即可同时拿到变量。
 
 视口判定统一走 `primitives/use-media-query` 的 `useIsPhone()`(`useMediaQuery` +
 `PHONE_MEDIA_QUERY = "(max-width: 767px)"`):`useSyncExternalStore` 订阅 `MediaQueryList`,

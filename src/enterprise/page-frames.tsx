@@ -9,6 +9,12 @@ export interface EnterprisePublicShellProps {
   topbar: ReactNode;
   children: ReactNode;
   footer: ReactNode;
+  /**
+   * The global footer switch (设置 → 外观), usually
+   * `resolveEnterpriseShowFooter(settings)`. `false` renders no footer wrapper and
+   * the content region grows into the freed height. Default `true`.
+   */
+  showFooter?: boolean;
   contentAs?: "main" | "div";
 }
 
@@ -21,13 +27,19 @@ export interface EnterprisePublicShellProps {
  * so the footer stays pinned to the bottom of the viewport instead of sitting at
  * the bottom of a long document where it scrolls out of view.
  */
-export function EnterprisePublicShell({ topbar, children, footer, contentAs = "main" }: EnterprisePublicShellProps) {
+export function EnterprisePublicShell({
+  topbar,
+  children,
+  footer,
+  showFooter = true,
+  contentAs = "main",
+}: EnterprisePublicShellProps) {
   const Content = contentAs;
   return (
     <div className="flex h-dvh flex-col overflow-hidden" data-enterprise-surface="public-shell">
       {topbar}
       <Content className="min-h-0 flex-1 overflow-y-auto">{children}</Content>
-      <div className="shrink-0">{footer}</div>
+      {showFooter && footer ? <div className="shrink-0">{footer}</div> : null}
     </div>
   );
 }

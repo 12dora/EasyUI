@@ -15,6 +15,7 @@ interface EnterpriseGeneralSettingsValue {
   subtitleZh: string; subtitleEn: string;
   footerHtmlZh: string; footerHtmlEn: string;
   logoDataUrl: string | null;
+  showFooter?: boolean;   // 全局「显示页脚」开关;缺省 = true
 }
 ```
 
@@ -29,6 +30,11 @@ interface EnterpriseGeneralSettingsValue {
   表单在上传前就按 MIME 类型与文件大小拦一次(`logoInvalid` / `logoTooLarge`),后端仍然是权威。
   读取文件是异步的:读取期间**保存按钮不可用**,读完自动恢复;期间换一张图或点「移除」,先前那次
   读取的结果会被丢弃,不会把已经换掉或清空的 logo 又装回去。
+
+- `showFooter`:JSON 字段 `showFooter: boolean`,默认 `true`;**字段缺失一律按 `true`**(旧后端不发
+  这个字段)。它在「设置 → 外观」里改(见 §2.2),但与品牌字段同属这一份通用设置、走同一个 PUT。
+  本包在读入(`useEnterpriseGeneralSettings`)、写回缓存(`primeEnterpriseGeneralSettings`)与
+  通用页保存时都会补成布尔值;通用页保存**原样带上**当前的 `showFooter`,不会把外观页关掉的页脚又打开。
 
 ## 2. 设置页:`EnterpriseGeneralSettingsSurface`
 
@@ -130,6 +136,36 @@ interface EnterprisePermissionDeniedPageProps {
 `inline`(默认)画一条 `InlineNotice`(`data-test-id="permission-denied"`);`toast` 画整页的空状态
 (标题 + 说明 + 返回按钮),两种模式都**不弹 toast、不跳转**。文案由宿主提供,不要写成技术口径。
 
+## 2.2 「外观」页的全局开关:显示页脚
+
+```tsx
+<EnterpriseAppearanceSettingsSurface
+  labels={t.appearanceSettings}
+  canManageGlobal={permissions.has("settings.app_setting.update")}
+  generalSettingsAdapter={generalSettingsAdapter}   // 与「通用」页同一个 adapter
+/>
+```
+
+```ts
+interface EnterpriseAppearanceSettingsSurfaceProps {
+  labels: EnterpriseAppearanceSettingsLabels;
+  canManageGlobal?: boolean;                               // 默认 false
+  generalSettingsAdapter?: EnterpriseGeneralSettingsAdapter;
+}
+```
+
+- 表格密度卡片照旧是**每个用户**的偏好。
+- 只有 `canManageGlobal` 为真**且**给了 `generalSettingsAdapter` 时才渲染「显示页脚」卡片
+  (`data-test-id="appearance-global-section"`,开关 `appearance-show-footer-switch`);否则整块不画,
+  也不发请求。权限由宿主判定(`settings.app_setting.update`),后端 PUT 仍是权威。
+- 卡片挂载时自己 `adapter.load()` 一份**最新**的通用设置(不用共享缓存:缓存可能早于另一位管理员
+  刚改的品牌);切换即保存 —— `adapter.save({ ...loaded, showFooter: next })`,整份值 PUT 回去,
+  成功后 `primeEnterpriseGeneralSettings(saved)` + `adapter.onSaved?.(saved)` + toast;外壳立刻收起 /
+  放出页脚,不用刷新。失败 toast 报错,开关保持原位。读取失败时开关禁用,旁边给「重试」
+  (`appearance-global-retry`)。
+- 新文案(`EnterpriseAppearanceSettingsLabels`,catalog 已给 zh / en):`showFooter`(显示页脚 /
+  Show footer)、`showFooterHint`、`globalLoadFailed`、`retry`、`globalSaved`、`globalSaveFailed`。
+
 ## 3. 共享读取:`useEnterpriseGeneralSettings` 与两个解析函数
 
 ```ts
@@ -153,6 +189,12 @@ const footerHtml = resolveEnterpriseFooterHtml(settings, locale);
   `registerEnterpriseDefaultBrandLogo(src)`,或者给设置页传 `defaultLogoSrc`。
   `useEnterpriseDefaultBrandLogo()` 首帧一律返回 `null`(SSR 与水合一致),值在 effect 里补上。
 - `resetEnterpriseGeneralSettings()` 同时清掉这个默认 Logo;下一次品牌解析会重新登记。
+- `resolveEnterpriseShowFooter(settings)`:`settings` 为 `null`(加载中 / 失败)或缺字段都返回
+  `true`,只有明确的 `showFooter: false` 返回 `false`。已经调了 `useEnterpriseGeneralSettings` 的外壳
+  直接用它;只要这个布尔值的地方可以用 `useEnterpriseShowFooter(load)`(同一份缓存、同一次 GET)。
+- **首帧**:未知时默认显示页脚。关掉页脚的站点若不想看到「先有页脚再消失」的闪动,宿主应当在
+  SSR 阶段取到通用设置,并在客户端首帧前 `primeEnterpriseGeneralSettings(value)` 交接(与品牌名
+  同一套做法)。
 - `resolveEnterpriseFooterHtml` 没配置时返回 `undefined`,让 `EnterpriseConfiguredFooter` 画回退文案。
   `{year}` 始终是 `EnterpriseConfiguredFooter` 的渲染期替换,不会写进存储值。
 
@@ -190,7 +232,26 @@ alt 会让链接的可访问名播报两次。副标题 `hidden sm:block`,窄屏
 </EnterpriseAppFrame>
 ```
 
-就是 `AppShell`,但 `footer` 从可选改成**必填**。若干宿主都出现过「构造了页脚节点却忘了传给
+就是 `AppShell`,但 `footer` 从可选改成**必填**。
+
+全局开关用 `showFooter`(默认 `true`)关掉,**不要**靠不传 `footer`:
+
+```tsx
+const { settings } = useEnterpriseGeneralSettings(loadGeneralSettings);
+const showFooter = resolveEnterpriseShowFooter(settings);
+
+<EnterpriseAppFrame
+  showFooter={showFooter}
+  footer={<EnterpriseConfiguredFooter html={footerHtml} fallback={t.public.footer} />}
+  mobileNav={<MobileNav footer={showFooter ? <EnterpriseConfiguredFooter bare html={footerHtml} fallback={t.public.footer} /> : undefined} … />}
+  …
+/>
+```
+
+`showFooter={false}` 时 `AppShell` 不画页脚包裹层,`main` 是 `flex-1`,工作区自动吃掉那一截高度。
+手机抽屉里的页脚由 `MobileNav footer` 单独控制(不传就不画那条 `border-t` 区域),宿主要按同一个
+布尔值决定传不传。公开页外壳 `EnterprisePublicShell` 同样有 `showFooter?: boolean`(默认 `true`),
+为 `false` 时只剩顶栏 + 内容区。若干宿主都出现过「构造了页脚节点却忘了传给
 `AppShell`」的登录页有页脚、进了应用就没有的问题,类型层面堵住它比每个宿主各自记着更可靠。
 `AppShell.footer?` 保持可选,给 EasyTrade 那种自己写 `fixed` 框架的宿主用。
 

@@ -361,7 +361,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "通知中心", description: "查看并处理当前账号的企业通知。", empty: "暂无通知", loadFailed: "通知加载失败", retry, dismiss: "忽略" },
-    generalSettings: generalSettingsChinese(retry), appearanceSettings: appearanceSettingsChinese(), ...identityAndOnboardingChinese(),
+    generalSettings: generalSettingsChinese(retry), appearanceSettings: appearanceSettingsChinese(retry), ...identityAndOnboardingChinese(),
     public: { loginEyebrow: "企业账号", loggedOutTitle: "已退出登录", loggedOutDescription: "当前会话已结束。", loginAgain: "重新登录", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "正在完成工作账号登录…", missingTitle: "登录未完成", missingDescription: "工作账号登录未完成，请重新登录。", back: "返回登录" },
   };
@@ -448,7 +448,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "Notification center", description: "Review and dismiss notifications for this account.", empty: "No notifications", loadFailed: "Failed to load notifications", retry, dismiss: "Dismiss" },
-    generalSettings: generalSettingsEnglish(retry), appearanceSettings: appearanceSettingsEnglish(), ...identityAndOnboardingEnglish(),
+    generalSettings: generalSettingsEnglish(retry), appearanceSettings: appearanceSettingsEnglish(retry), ...identityAndOnboardingEnglish(),
     public: { loginEyebrow: "Enterprise account", loggedOutTitle: "You’re signed out", loggedOutDescription: "The current session has ended.", loginAgain: "Sign in again", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "Completing work-account sign-in…", missingTitle: "Sign-in didn’t finish", missingDescription: "Work-account sign-in didn’t finish. Please try again.", back: "Back to sign in" },
   };
@@ -496,12 +496,12 @@ function generalSettingsEnglish(retry: string): EnterpriseGeneralSettingsLabels 
   return { title: "General", description: "Application name, subtitle, logo and footer.", loading: "Loading general settings", loadFailed: "Failed to load general settings", retry, localeTabs: { "zh-CN": "中文", en: "English" }, appTitle: "Application name", appTitleHint: "Leave blank to use the default name.", subtitle: "Subtitle", subtitleHint: "Leave blank to use the default subtitle.", footerHtml: "Footer", footerHtmlHint: "A few text tags and links are allowed; {year} is replaced with the current year.", logo: "Logo", logoHint: "PNG, JPEG or WebP, up to 128 KB.", logoUpload: "Upload logo", logoRemove: "Remove", logoDefaultCaption: "Using default logo", logoCustomCaption: "Custom logo", logoInvalid: "Only PNG, JPEG or WebP images are supported.", logoTooLarge: "The image is larger than 128 KB. Choose a smaller file.", save: "Save", saving: "Saving", saved: "General settings saved", saveFailed: "Failed to save general settings" };
 }
 
-function appearanceSettingsChinese(): EnterpriseAppearanceSettingsLabels {
-  return { title: "外观", description: "列表与表格的显示密度。", densityTitle: "表格密度", densityHint: "紧凑行更省屏幕，宽松行更易点按。设置随账号保存，在任何设备上一致。", densityCompact: "紧凑", densityComfortable: "宽松", saving: "正在保存", saveFailed: "外观设置保存失败，请重试" };
+function appearanceSettingsChinese(retry: string): EnterpriseAppearanceSettingsLabels {
+  return { title: "外观", description: "列表与表格的显示密度。", densityTitle: "表格密度", densityHint: "紧凑行更省屏幕，宽松行更易点按。设置随账号保存，在任何设备上一致。", densityCompact: "紧凑", densityComfortable: "宽松", saving: "正在保存", saveFailed: "外观设置保存失败，请重试", showFooter: "显示页脚", showFooterHint: "全局设置，对所有用户生效。关闭后所有用户均不显示页脚，工作区相应增高。", globalLoadFailed: "全局外观设置加载失败", retry, globalSaved: "全局外观设置已保存", globalSaveFailed: "全局外观设置保存失败，请重试" };
 }
 
-function appearanceSettingsEnglish(): EnterpriseAppearanceSettingsLabels {
-  return { title: "Appearance", description: "Row density for lists and tables.", densityTitle: "Table density", densityHint: "Compact rows fit more on screen; comfortable rows are easier to tap. Saved to your account and applied on every device.", densityCompact: "Compact", densityComfortable: "Comfortable", saving: "Saving", saveFailed: "Failed to save appearance settings. Try again." };
+function appearanceSettingsEnglish(retry: string): EnterpriseAppearanceSettingsLabels {
+  return { title: "Appearance", description: "Row density for lists and tables.", densityTitle: "Table density", densityHint: "Compact rows fit more on screen; comfortable rows are easier to tap. Saved to your account and applied on every device.", densityCompact: "Compact", densityComfortable: "Comfortable", saving: "Saving", saveFailed: "Failed to save appearance settings. Try again.", showFooter: "Show footer", showFooterHint: "Global setting for all users. When off, no one sees the footer and the workspace grows to use the space.", globalLoadFailed: "Failed to load global appearance settings", retry, globalSaved: "Global appearance settings saved", globalSaveFailed: "Failed to save global appearance settings. Try again." };
 }
 
 function authorizationChinese(close: string, loading: string): EnterpriseAccessSettingsLabels["authorization"] {

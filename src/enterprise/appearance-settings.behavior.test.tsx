@@ -4,11 +4,19 @@
  * 回到题库,行高还是老样子。这里钉住设置页读写的确实是 `TableDensityProvider` 那一份,
  * 并且写回在途时有状态可见。
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TableDensityProvider } from "../table/table-density";
 import { EnterpriseAppearanceSettingsSurface, type EnterpriseAppearanceSettingsLabels } from "./appearance-settings-surface";
-import { byTestId, click, mount, type MountedView } from "./behavior-test-utils";
+import { byTestId, click, mount, settle, type MountedView } from "./behavior-test-utils";
+import type { EnterpriseGeneralSettingsAdapter, EnterpriseGeneralSettingsValue } from "./general-settings-surface";
+import {
+  ENTERPRISE_GENERAL_UPDATED_EVENT,
+  resetEnterpriseGeneralSettings,
+  resolveEnterpriseShowFooter,
+} from "./general-settings-store";
+import { createEnterpriseLabelCatalog } from "./label-catalog";
+import { toastBus } from "../toast";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -21,6 +29,12 @@ const LABELS: EnterpriseAppearanceSettingsLabels = {
   densityComfortable: "宽松",
   saving: "正在保存",
   saveFailed: "外观设置保存失败，请重试",
+  showFooter: "显示页脚",
+  showFooterHint: "关闭后所有用户均不显示页脚。",
+  globalLoadFailed: "全局外观设置加载失败",
+  retry: "重试",
+  globalSaved: "全局外观设置已保存",
+  globalSaveFailed: "全局外观设置保存失败，请重试",
 };
 
 let view: MountedView | null = null;
@@ -77,5 +91,137 @@ describe("EnterpriseAppearanceSettingsSurface", () => {
     );
     await click(option(view.host, "comfortable"));
     expect(byTestId(view.host, "appearance-settings-page")).toBeTruthy();
+  });
+});
+
+const GENERAL: EnterpriseGeneralSettingsValue = {
+  titleZh: "学习工作台",
+  titleEn: "EasyLearning",
+  subtitleZh: "企业学习",
+  subtitleEn: "Enterprise learning",
+  footerHtmlZh: "<span>页脚</span>",
+  footerHtmlEn: "<span>Footer</span>",
+  logoDataUrl: "data:image/png;base64,AAAA",
+  showFooter: true,
+};
+
+function makeAdapter(value: EnterpriseGeneralSettingsValue = GENERAL) {
+  return {
+    load: vi.fn().mockResolvedValue(value),
+    save: vi.fn().mockImplementation((next: EnterpriseGeneralSettingsValue) => Promise.resolve(next)),
+  } satisfies EnterpriseGeneralSettingsAdapter;
+}
+
+function footerSwitch(host: ParentNode): HTMLButtonElement {
+  return byTestId(host, "appearance-show-footer-switch") as HTMLButtonElement;
+}
+
+describe("global footer switch (admin only)", () => {
+  beforeEach(() => {
+    resetEnterpriseGeneralSettings();
+    toastBus.clear();
+  });
+  afterEach(() => {
+    resetEnterpriseGeneralSettings();
+    toastBus.clear();
+  });
+
+  it("is hidden from users who cannot change global settings", async () => {
+    const adapter = makeAdapter();
+    view = await mount(
+      <TableDensityProvider value="compact" onChange={() => undefined}>
+        <EnterpriseAppearanceSettingsSurface labels={LABELS} generalSettingsAdapter={adapter} />
+      </TableDensityProvider>,
+    );
+    await settle(20);
+    expect(view.host.querySelector("[data-test-id='appearance-global-section']")).toBeNull();
+    expect(view.host.querySelector("[data-test-id='appearance-show-footer-switch']")).toBeNull();
+    // A non-admin must not even trigger the read.
+    expect(adapter.load).not.toHaveBeenCalled();
+    // The per-user density card is still there.
+    expect(byTestId(view.host, "appearance-density-toggle")).toBeTruthy();
+  });
+
+  it("shows the switch to an administrator, reflecting the stored value", async () => {
+    view = await mount(
+      <TableDensityProvider value="compact" onChange={() => undefined}>
+        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={makeAdapter({ ...GENERAL, showFooter: false })} />
+      </TableDensityProvider>,
+    );
+    await settle(20);
+    expect(footerSwitch(view.host).getAttribute("aria-checked")).toBe("false");
+    expect(byTestId(view.host, "appearance-global-section").textContent).toContain("显示页脚");
+  });
+
+  it("treats a stored value without the field as on", async () => {
+    const { showFooter: _omitted, ...legacy } = GENERAL;
+    view = await mount(
+      <TableDensityProvider value="compact" onChange={() => undefined}>
+        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={makeAdapter(legacy)} />
+      </TableDensityProvider>,
+    );
+    await settle(20);
+    expect(footerSwitch(view.host).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("saves the whole general value with only showFooter changed and primes the shell", async () => {
+    const adapter = makeAdapter();
+    const updates: EnterpriseGeneralSettingsValue[] = [];
+    const listener = (event: Event) => updates.push((event as CustomEvent<EnterpriseGeneralSettingsValue>).detail);
+    window.addEventListener(ENTERPRISE_GENERAL_UPDATED_EVENT, listener);
+    view = await mount(
+      <TableDensityProvider value="compact" onChange={() => undefined}>
+        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
+      </TableDensityProvider>,
+    );
+    await settle(20);
+    await click(footerSwitch(view.host));
+    await settle(20);
+    window.removeEventListener(ENTERPRISE_GENERAL_UPDATED_EVENT, listener);
+    expect(adapter.save).toHaveBeenCalledTimes(1);
+    expect(adapter.save).toHaveBeenCalledWith({ ...GENERAL, showFooter: false });
+    expect(updates).toHaveLength(1);
+    expect(resolveEnterpriseShowFooter(updates[0] ?? null)).toBe(false);
+    expect(footerSwitch(view.host).getAttribute("aria-checked")).toBe("false");
+    expect(toastBus.getSnapshot().map((item) => item.message)).toContain("全局外观设置已保存");
+  });
+
+  it("keeps the switch where it was and reports the failure when the save is rejected", async () => {
+    const adapter = makeAdapter();
+    adapter.save.mockRejectedValue(new Error("forbidden"));
+    view = await mount(
+      <TableDensityProvider value="compact" onChange={() => undefined}>
+        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
+      </TableDensityProvider>,
+    );
+    await settle(20);
+    await click(footerSwitch(view.host));
+    await settle(20);
+    expect(footerSwitch(view.host).getAttribute("aria-checked")).toBe("true");
+    expect(toastBus.getSnapshot().map((item) => item.message)).toContain("全局外观设置保存失败，请重试");
+  });
+
+  it("offers a retry when the global settings cannot be read, with the switch disabled", async () => {
+    const adapter = makeAdapter();
+    adapter.load.mockRejectedValueOnce(new Error("offline"));
+    view = await mount(
+      <TableDensityProvider value="compact" onChange={() => undefined}>
+        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
+      </TableDensityProvider>,
+    );
+    await settle(20);
+    expect(footerSwitch(view.host).disabled).toBe(true);
+    await click(byTestId(view.host, "appearance-global-retry"));
+    await settle(20);
+    expect(footerSwitch(view.host).disabled).toBe(false);
+    expect(view.host.querySelector("[data-test-id='appearance-global-load-failed']")).toBeNull();
+  });
+
+  it("ships zh + en copy in the label catalog", () => {
+    const zh = createEnterpriseLabelCatalog("zh-CN", { appName: "测试", appDescription: "测试" }, "business").appearanceSettings;
+    const en = createEnterpriseLabelCatalog("en", { appName: "Test", appDescription: "Test" }, "business").appearanceSettings;
+    expect(zh.showFooter).toBe("显示页脚");
+    expect(en.showFooter).toBe("Show footer");
+    expect(zh.showFooterHint).toContain("所有用户");
   });
 });

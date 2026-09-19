@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NAV_PROGRESS_DELAY_MS } from "../shell/NavigationProgress";
 import { EnterpriseAppFrame } from "./app-frame";
 import { EnterpriseConfiguredFooter } from "./footer";
-import { EnterpriseSettingsPageFrame } from "./page-frames";
+import { EnterprisePublicShell, EnterpriseSettingsPageFrame } from "./page-frames";
 import { byTestId, mount, type MountedView } from "./behavior-test-utils";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -117,6 +117,51 @@ describe("EnterpriseAppFrame", () => {
       <EnterpriseAppFrame footer={<EnterpriseConfiguredFooter html="" fallback="回退页脚" />}>
         <p>内容</p>
       </EnterpriseAppFrame>,
+    );
+    expect(byTestId(view.host, "app-footer-fallback").textContent).toBe("回退页脚");
+  });
+});
+
+describe("global footer switch (showFooter)", () => {
+  it("EnterpriseAppFrame renders no footer and no wrapper when showFooter is false", async () => {
+    view = await mount(
+      <EnterpriseAppFrame showFooter={false} footer={<EnterpriseConfiguredFooter html="" fallback="回退页脚" />}>
+        <p>内容</p>
+      </EnterpriseAppFrame>,
+    );
+    expect(view.host.querySelector("footer")).toBeNull();
+    expect(view.host.querySelector("[data-test-id='app-footer-fallback']")).toBeNull();
+    expect(view.host.querySelector(".md\\:block")).toBeNull();
+    expect(view.host.textContent).toContain("内容");
+  });
+
+  it("EnterpriseAppFrame keeps the footer by default", async () => {
+    view = await mount(
+      <EnterpriseAppFrame footer={<EnterpriseConfiguredFooter html="" fallback="回退页脚" />}>
+        <p>内容</p>
+      </EnterpriseAppFrame>,
+    );
+    expect(byTestId(view.host, "app-footer-fallback").textContent).toBe("回退页脚");
+  });
+
+  it("EnterprisePublicShell drops the footer wrapper when showFooter is false", async () => {
+    view = await mount(
+      <EnterprisePublicShell topbar={<header>顶栏</header>} showFooter={false} footer={<EnterpriseConfiguredFooter html="" fallback="回退页脚" />}>
+        <p>登录</p>
+      </EnterprisePublicShell>,
+    );
+    const shell = view.host.querySelector("[data-enterprise-surface='public-shell']") as HTMLElement;
+    expect(view.host.querySelector("footer")).toBeNull();
+    // topbar + content only: the content region (flex-1) takes the whole remaining height.
+    expect(shell.children).toHaveLength(2);
+    expect(shell.lastElementChild?.tagName).toBe("MAIN");
+  });
+
+  it("EnterprisePublicShell keeps the footer by default", async () => {
+    view = await mount(
+      <EnterprisePublicShell topbar={<header>顶栏</header>} footer={<EnterpriseConfiguredFooter html="" fallback="回退页脚" />}>
+        <p>登录</p>
+      </EnterprisePublicShell>,
     );
     expect(byTestId(view.host, "app-footer-fallback").textContent).toBe("回退页脚");
   });

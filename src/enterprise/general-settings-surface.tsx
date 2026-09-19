@@ -20,6 +20,12 @@ export interface EnterpriseGeneralSettingsValue {
   footerHtmlEn: string;
   /** `data:image/(png|jpeg|webp);base64,…`, or null for "use the host default". */
   logoDataUrl: string | null;
+  /**
+   * Global switch (设置 → 外观): render the footer for every user. Missing is
+   * treated as `true`, so older backends and hand-built values keep the footer;
+   * read it through `resolveEnterpriseShowFooter`, never with a bare truthiness check.
+   */
+  showFooter?: boolean;
 }
 
 export interface EnterpriseGeneralSettingsAdapter {
@@ -71,6 +77,7 @@ const EMPTY_VALUE: EnterpriseGeneralSettingsValue = {
   footerHtmlZh: "",
   footerHtmlEn: "",
   logoDataUrl: null,
+  showFooter: true,
 };
 
 function normalize(value: EnterpriseGeneralSettingsValue): EnterpriseGeneralSettingsValue {
@@ -82,6 +89,9 @@ function normalize(value: EnterpriseGeneralSettingsValue): EnterpriseGeneralSett
     footerHtmlZh: value.footerHtmlZh ?? "",
     footerHtmlEn: value.footerHtmlEn ?? "",
     logoDataUrl: value.logoDataUrl ? value.logoDataUrl : null,
+    // Not edited on this page, but it rides along in the one PUT: dropping it
+    // here would silently turn the footer back on (or off) with every save.
+    showFooter: value.showFooter !== false,
   };
 }
 

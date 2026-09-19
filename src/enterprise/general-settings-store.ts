@@ -28,6 +28,7 @@ const BLANK_SETTINGS: EnterpriseGeneralSettingsValue = {
   footerHtmlZh: "",
   footerHtmlEn: "",
   logoDataUrl: null,
+  showFooter: true,
 };
 
 // Module-level cache + single in-flight promise: the general settings are one
@@ -51,6 +52,11 @@ function nonEmpty(value: string | null | undefined): string | null {
   return text.length > 0 ? value ?? null : null;
 }
 
+/** Missing `showFooter` means "show": older backends never send the field. */
+function withShowFooter(value: EnterpriseGeneralSettingsValue): EnterpriseGeneralSettingsValue {
+  return value.showFooter === true || value.showFooter === false ? value : { ...value, showFooter: true };
+}
+
 /** Hand a freshly known value to every mounted consumer. */
 function announce(value: EnterpriseGeneralSettingsValue): void {
   for (const subscriber of [...subscribers]) subscriber(value);
@@ -69,9 +75,10 @@ function invalidateInFlight(): void {
 
 /** Seed (or replace) the shared cache — used by settings pages after a save and by SSR handoff. */
 export function primeEnterpriseGeneralSettings(value: EnterpriseGeneralSettingsValue): void {
-  cachedSettings = value;
+  const next = withShowFooter(value);
+  cachedSettings = next;
   invalidateInFlight();
-  publish(value);
+  publish(next);
 }
 
 /**
@@ -98,8 +105,9 @@ export function useEnterpriseGeneralSettings(
     // whichever consumer's `load()` wins, everybody gets the answer.
     subscribers.add(apply);
     const onUpdated = (event: Event) => {
-      const detail = (event as CustomEvent<EnterpriseGeneralSettingsValue>).detail;
-      if (!detail) return;
+      const raw = (event as CustomEvent<EnterpriseGeneralSettingsValue>).detail;
+      if (!raw) return;
+      const detail = withShowFooter(raw);
       cachedSettings = detail;
       invalidateInFlight();
       apply(detail);
@@ -113,8 +121,9 @@ export function useEnterpriseGeneralSettings(
       // a primed value wins over anything that was already in flight.
       const request = generation;
       void inFlight.then(
-        (value) => {
+        (loaded) => {
           if (request !== generation) return;
+          const value = withShowFooter(loaded);
           cachedSettings = value;
           inFlight = null;
           announce(value);
@@ -230,4 +239,25 @@ export function resolveEnterpriseFooterHtml(
 ): string | undefined {
   const source = settings ?? BLANK_SETTINGS;
   return nonEmpty(locale === "en" ? source.footerHtmlEn : source.footerHtmlZh) ?? undefined;
+}
+
+/**
+ * Whether the footer is rendered at all (global switch in 设置 → 外观).
+ *
+ * `null` settings (still loading, or the load failed) and a missing field both
+ * resolve to `true`: the footer is the safe default, and hosts that SSR-prime
+ * the general settings never paint it when it is switched off.
+ */
+export function resolveEnterpriseShowFooter(settings: EnterpriseGeneralSettingsValue | null): boolean {
+  return settings?.showFooter !== false;
+}
+
+/**
+ * Convenience for shells: the resolved footer switch from the shared general
+ * settings read (same cache, same single GET as the brand and footer HTML).
+ * Hosts that already call `useEnterpriseGeneralSettings` should use
+ * `resolveEnterpriseShowFooter(settings)` on that result instead.
+ */
+export function useEnterpriseShowFooter(load: () => Promise<EnterpriseGeneralSettingsValue>): boolean {
+  return resolveEnterpriseShowFooter(useEnterpriseGeneralSettings(load).settings);
 }
