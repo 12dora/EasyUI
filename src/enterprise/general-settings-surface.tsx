@@ -89,10 +89,19 @@ function normalize(value: EnterpriseGeneralSettingsValue): EnterpriseGeneralSett
     footerHtmlZh: value.footerHtmlZh ?? "",
     footerHtmlEn: value.footerHtmlEn ?? "",
     logoDataUrl: value.logoDataUrl ? value.logoDataUrl : null,
-    // Not edited on this page, but it rides along in the one PUT: dropping it
-    // here would silently turn the footer back on (or off) with every save.
     showFooter: value.showFooter !== false,
   };
+}
+
+/**
+ * The PUT body of this page: every field it edits, and deliberately NOT
+ * `showFooter`. That switch lives on 外观; the backend keeps the stored value
+ * when the field is omitted, so a draft loaded before another administrator
+ * flipped the footer cannot flip it back on Save.
+ */
+function toSavePayload(value: EnterpriseGeneralSettingsValue): EnterpriseGeneralSettingsValue {
+  const { showFooter: _notEditedHere, ...payload } = normalize(value);
+  return payload;
 }
 
 interface GeneralSettingsController {
@@ -133,7 +142,9 @@ function useGeneralSettingsController(
   const save = useCallback(async (current: EnterpriseGeneralSettingsValue) => {
     setSaving(true);
     try {
-      const next = normalize(await adapter.save(normalize(current)));
+      // The response is the stored row, `showFooter` included, so priming the
+      // store with it keeps the shell's footer state authoritative.
+      const next = normalize(await adapter.save(toSavePayload(current)));
       setValue(next);
       // Seed the shared cache and announce the change so every mounted shell
       // (topbar brand, footer) re-renders without a reload.

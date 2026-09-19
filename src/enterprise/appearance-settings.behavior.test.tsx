@@ -225,3 +225,48 @@ describe("global footer switch (admin only)", () => {
     expect(zh.showFooterHint).toContain("所有用户");
   });
 });
+
+describe("global footer switch: stale page safety", () => {
+  beforeEach(() => {
+    resetEnterpriseGeneralSettings();
+    toastBus.clear();
+  });
+  afterEach(() => {
+    resetEnterpriseGeneralSettings();
+    toastBus.clear();
+  });
+
+  it("re-reads the general settings right before the PUT so a stale page cannot restore the old brand", async () => {
+    // 外观页一直开着;期间另一位管理员在「通用」改了标题和 logo。此时切换页脚,
+    // PUT 必须带上最新的品牌,而不是页面打开时读到的那份。
+    const rebranded: EnterpriseGeneralSettingsValue = { ...GENERAL, titleZh: "学习中心", logoDataUrl: null };
+    const adapter = makeAdapter();
+    view = await mount(
+      <TableDensityProvider value="compact" onChange={() => undefined}>
+        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
+      </TableDensityProvider>,
+    );
+    await settle(20);
+    adapter.load.mockResolvedValue(rebranded);
+    await click(footerSwitch(view.host));
+    await settle(20);
+    expect(adapter.load).toHaveBeenCalledTimes(2);
+    expect(adapter.save).toHaveBeenCalledWith({ ...rebranded, showFooter: false });
+  });
+
+  it("does not PUT when the pre-save read fails", async () => {
+    const adapter = makeAdapter();
+    view = await mount(
+      <TableDensityProvider value="compact" onChange={() => undefined}>
+        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
+      </TableDensityProvider>,
+    );
+    await settle(20);
+    adapter.load.mockRejectedValueOnce(new Error("offline"));
+    await click(footerSwitch(view.host));
+    await settle(20);
+    expect(adapter.save).not.toHaveBeenCalled();
+    expect(footerSwitch(view.host).getAttribute("aria-checked")).toBe("true");
+    expect(toastBus.getSnapshot().map((item) => item.message)).toContain("全局外观设置保存失败，请重试");
+  });
+});

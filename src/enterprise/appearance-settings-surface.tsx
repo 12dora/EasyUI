@@ -11,8 +11,8 @@
  * 显示宽松、列表仍然紧凑的两张皮。
  * 2. 显示页脚(只有管理员,即宿主判定持有 `settings.app_setting.update` 时才画)。它是
  *    **全局设置**,存在通用设置(`/api/v1/app-settings/general` 的 `showFooter`)里:
- *    这里先 `load()` 一份最新的通用设置,切换时把**整份**值连同新的 `showFooter` PUT
- *    回去(不会把品牌字段重置成旧值),成功后 `primeEnterpriseGeneralSettings` 让外壳
+ *    切换时**紧接着 PUT 之前**再 `load()` 一份最新的通用设置,把它连同新的
+ *    `showFooter` 整份 PUT 回去(页面开着期间别人改的品牌字段不会被旧值盖掉),成功后 `primeEnterpriseGeneralSettings` 让外壳
  *    立刻收起 / 放出页脚。
  *
  * 文案按本包一贯的做法从 props 注入(`EnterpriseAppearanceSettingsLabels`,
@@ -145,9 +145,8 @@ function useGlobalAppearanceController(
   const [value, setValue] = useState<EnterpriseGeneralSettingsValue | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
-  // A fresh read, not the shared cache: the PUT carries the whole general value,
-  // and a cache primed at first paint could predate another administrator's
-  // brand edit — saving the switch would then quietly put the old brand back.
+  // A fresh read for the switch position (the shared cache may be stale); the
+  // save re-reads again right before its PUT, see `setShowFooter`.
   const reload = useCallback(async () => {
     setLoadFailed(false);
     try {
@@ -165,7 +164,11 @@ function useGlobalAppearanceController(
       if (!value) return;
       setSaving(true);
       try {
-        const saved = await adapter.save({ ...value, showFooter: next });
+        // Re-read right before the PUT: the body is the whole general value, and
+        // the copy loaded when this page opened may predate another
+        // administrator's title / logo edit — sending it would restore the old brand.
+        const fresh = await adapter.load();
+        const saved = await adapter.save({ ...fresh, showFooter: next });
         setValue(saved);
         // The shell reads the shared store: seeding it hides / shows the footer now.
         primeEnterpriseGeneralSettings(saved);

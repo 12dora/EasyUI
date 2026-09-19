@@ -33,8 +33,10 @@ interface EnterpriseGeneralSettingsValue {
 
 - `showFooter`:JSON 字段 `showFooter: boolean`,默认 `true`;**字段缺失一律按 `true`**(旧后端不发
   这个字段)。它在「设置 → 外观」里改(见 §2.2),但与品牌字段同属这一份通用设置、走同一个 PUT。
-  本包在读入(`useEnterpriseGeneralSettings`)、写回缓存(`primeEnterpriseGeneralSettings`)与
-  通用页保存时都会补成布尔值;通用页保存**原样带上**当前的 `showFooter`,不会把外观页关掉的页脚又打开。
+  本包在读入(`useEnterpriseGeneralSettings`)与写回缓存(`primeEnterpriseGeneralSettings`)时都会补成
+  布尔值。**通用页的 PUT 不带 `showFooter`**(后端缺省即保留存量值),所以通用页开着期间别人在外观页
+  关掉的页脚不会被这次保存重新打开;保存后用服务端响应(含 `showFooter`)写回缓存。
+  后端契约因此要求:PUT 缺 `showFooter` = 保留原值。
 
 ## 2. 设置页:`EnterpriseGeneralSettingsSurface`
 
@@ -158,8 +160,9 @@ interface EnterpriseAppearanceSettingsSurfaceProps {
 - 只有 `canManageGlobal` 为真**且**给了 `generalSettingsAdapter` 时才渲染「显示页脚」卡片
   (`data-test-id="appearance-global-section"`,开关 `appearance-show-footer-switch`);否则整块不画,
   也不发请求。权限由宿主判定(`settings.app_setting.update`),后端 PUT 仍是权威。
-- 卡片挂载时自己 `adapter.load()` 一份**最新**的通用设置(不用共享缓存:缓存可能早于另一位管理员
-  刚改的品牌);切换即保存 —— `adapter.save({ ...loaded, showFooter: next })`,整份值 PUT 回去,
+- 卡片挂载时自己 `adapter.load()` 一份通用设置用来显示开关位置;切换即保存 —— **紧接着 PUT 之前再
+  `adapter.load()` 一次**,然后 `adapter.save({ ...fresh, showFooter: next })`,整份值 PUT 回去(页面开着
+  期间别人改的标题 / logo 不会被旧值盖掉;这次预读失败就不 PUT,按保存失败处理),
   成功后 `primeEnterpriseGeneralSettings(saved)` + `adapter.onSaved?.(saved)` + toast;外壳立刻收起 /
   放出页脚,不用刷新。失败 toast 报错,开关保持原位。读取失败时开关禁用,旁边给「重试」
   (`appearance-global-retry`)。

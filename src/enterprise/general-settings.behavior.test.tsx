@@ -34,7 +34,6 @@ const LOADED: EnterpriseGeneralSettingsValue = {
   footerHtmlZh: "<strong>页脚</strong>",
   footerHtmlEn: "<strong>Footer</strong>",
   logoDataUrl: "data:image/png;base64,AAAA",
-  showFooter: true,
 };
 
 function makeAdapter(value: EnterpriseGeneralSettingsValue = LOADED): EnterpriseGeneralSettingsAdapter {
@@ -129,22 +128,10 @@ describe("EnterpriseGeneralSettingsSurface", () => {
       footerHtmlZh: "<span>中文页脚</span>",
       footerHtmlEn: "<span>English footer</span>",
       logoDataUrl: "data:image/png;base64,AAAA",
-      showFooter: true,
     });
     expect(updates).toHaveLength(1);
     expect(updates[0]?.titleEn).toBe("Learning Center");
     window.removeEventListener(ENTERPRISE_GENERAL_UPDATED_EVENT, listener);
-  });
-
-  it("carries the footer switch through a save instead of resetting it", async () => {
-    // 「外观」页把页脚关掉之后,管理员再来「通用」改标题:这次 PUT 不能把页脚又打开。
-    const adapter = makeAdapter({ ...LOADED, showFooter: false });
-    view = await mount(<EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} />);
-    await settle(20);
-    await fill(byTestId(view.host, "general-title-zh") as HTMLInputElement, "学习中心");
-    await click(byTestId(view.host, "app-settings-save"));
-    await settle(20);
-    expect(adapter.save).toHaveBeenCalledWith(expect.objectContaining({ titleZh: "学习中心", showFooter: false }));
   });
 
   it("rejects a logo above 128 KiB with the size label and keeps the stored logo", async () => {
@@ -483,5 +470,30 @@ describe("general settings copy", () => {
     const en = createEnterpriseLabelCatalog("en", { appName: "Test", appDescription: "Test" }, "business").generalSettings;
     expect([zh.logoDefaultCaption, zh.logoCustomCaption]).toEqual(["当前使用默认 Logo", "自定义 Logo"]);
     expect([en.logoDefaultCaption, en.logoCustomCaption]).toEqual(["Using default logo", "Custom logo"]);
+  });
+});
+
+describe("EnterpriseGeneralSettingsSurface and the 外观 footer switch", () => {
+  it("never sends showFooter, so a stale draft cannot turn the footer back on", async () => {
+    // 通用页打开时页脚还开着;随后另一位管理员在「外观」把页脚关了。这里再保存标题,
+    // PUT 里不能带 showFooter(后端缺省即保留存量值),外壳要跟着服务端响应走。
+    const adapter = makeAdapter({ ...LOADED, showFooter: true });
+    adapter.save = vi.fn().mockImplementation((next: EnterpriseGeneralSettingsValue) =>
+      Promise.resolve({ ...next, showFooter: false }),
+    );
+    const updates: EnterpriseGeneralSettingsValue[] = [];
+    const listener = (event: Event) => updates.push((event as CustomEvent<EnterpriseGeneralSettingsValue>).detail);
+    window.addEventListener(ENTERPRISE_GENERAL_UPDATED_EVENT, listener);
+    view = await mount(<EnterpriseGeneralSettingsSurface adapter={adapter} labels={labels} />);
+    await settle(20);
+    await fill(byTestId(view.host, "general-title-zh") as HTMLInputElement, "学习中心");
+    await click(byTestId(view.host, "app-settings-save"));
+    await settle(20);
+    window.removeEventListener(ENTERPRISE_GENERAL_UPDATED_EVENT, listener);
+    const payload = vi.mocked(adapter.save).mock.calls[0]?.[0];
+    expect(payload?.titleZh).toBe("学习中心");
+    expect(payload && "showFooter" in payload).toBe(false);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.showFooter).toBe(false);
   });
 });
