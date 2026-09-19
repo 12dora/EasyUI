@@ -36,7 +36,7 @@ export interface EnterpriseAppearanceSettingsLabels {
   /** 卡片标题,例如「表格密度」。 */
   densityTitle: string;
   /** 卡片下方一句说明。 */
-  densityHint: string;
+  densityHint?: string;
   densityCompact: string;
   densityComfortable: string;
   /** 写回账号偏好时的状态字。 */
@@ -46,7 +46,7 @@ export interface EnterpriseAppearanceSettingsLabels {
   /** 开关文案,例如「显示页脚」。 */
   showFooter: string;
   /** 开关下方一句说明:这是影响所有用户的全局设置。 */
-  showFooterHint: string;
+  showFooterHint?: string;
   /** 读取全局设置失败的提示语。 */
   globalLoadFailed: string;
   /** 重试按钮。 */

@@ -167,7 +167,7 @@ interface EnterpriseAppearanceSettingsSurfaceProps {
   放出页脚,不用刷新。失败 toast 报错,开关保持原位。读取失败时开关禁用,旁边给「重试」
   (`appearance-global-retry`)。
 - 新文案(`EnterpriseAppearanceSettingsLabels`,catalog 已给 zh / en):`showFooter`(显示页脚 /
-  Show footer)、`showFooterHint`、`globalLoadFailed`、`retry`、`globalSaved`、`globalSaveFailed`。
+  Show footer)、`showFooterHint`(可选,默认目录不提供)、`globalLoadFailed`、`retry`、`globalSaved`、`globalSaveFailed`。
 
 ## 3. 共享读取:`useEnterpriseGeneralSettings` 与两个解析函数
 

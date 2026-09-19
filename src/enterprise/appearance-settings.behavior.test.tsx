@@ -222,7 +222,8 @@ describe("global footer switch (admin only)", () => {
     const en = createEnterpriseLabelCatalog("en", { appName: "Test", appDescription: "Test" }, "business").appearanceSettings;
     expect(zh.showFooter).toBe("显示页脚");
     expect(en.showFooter).toBe("Show footer");
-    expect(zh.showFooterHint).toContain("所有用户");
+    expect(zh.showFooterHint).toBeUndefined();
+    expect(zh.densityHint).toBeUndefined();
   });
 });
 
