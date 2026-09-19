@@ -13,7 +13,7 @@ const MARKER = "easyui-mobilenav-active-marker";
 const DRAWER_MS = Math.round(DURATION.base * 1000);
 
 const TRIGGER_CLASS =
-  "flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-ink/[0.04] hover:text-ink -ml-1.5";
+  "flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-soft transition-colors hover:bg-ink/[0.04] hover:text-ink -ml-1.5";
 
 function prefersReducedMotion(): boolean {
   return (

@@ -3,9 +3,11 @@
  * 供顶栏身份菜单与权限引导页等共用。
  */
 
-type AvatarSize = "sm" | "md" | "lg";
+type AvatarSize = "xs" | "sm" | "md" | "lg";
 
 const SIZE_CLASS: Record<AvatarSize, string> = {
+  /** 32px:48px 顶栏里的头像(按钮本身 36px 命中区)。 */
+  xs: "h-8 w-8 text-[12px]",
   sm: "h-9 w-9 text-[12px]",
   md: "h-10 w-10 text-[13px]",
   lg: "h-14 w-14 text-[16px]",

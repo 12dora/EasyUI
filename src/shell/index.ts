@@ -7,7 +7,13 @@
  * NavigationProgress.tsx(内容列顶边的延迟进度条)。
  */
 
-export { AppShell, APP_SHELL_MAIN_PADDING, type AppShellProps } from "./AppShell";
+export {
+  AppShell,
+  APP_SHELL_MAIN_PADDING,
+  APP_SHELL_MAIN_PADDING_TOP_PX,
+  APP_SHELL_MAIN_PADDING_TOP_VAR,
+  type AppShellProps,
+} from "./AppShell";
 export { Topbar, type TopbarProps } from "./Topbar";
 export { Sidebar, type SidebarProps } from "./Sidebar";
 export { MobileNav, type MobileNavProps } from "./MobileNav";

@@ -40,15 +40,15 @@ export function EnterpriseBrandSlot({ href, title, subtitle, logoSrc, testId, re
           src={logoSrc}
           alt=""
           aria-hidden="true"
-          width={56}
-          height={34}
+          width={52}
+          height={32}
           decoding="async"
-          className="h-9 w-auto shrink-0 object-contain"
+          className="h-8 w-auto shrink-0 object-contain"
           data-test-id={testId ? `${testId}-logo` : undefined}
         />
       ) : null}
       <div className="min-w-0">
-        <div className="truncate text-[16px] font-semibold text-ink" data-test-id={testId ? `${testId}-title` : undefined}>
+        <div className="truncate text-[16px] font-semibold leading-5 text-ink" data-test-id={testId ? `${testId}-title` : undefined}>
           {title}
         </div>
         {subtitle ? (
@@ -56,7 +56,7 @@ export function EnterpriseBrandSlot({ href, title, subtitle, logoSrc, testId, re
              a visible qualifier, not part of "where does this link go".
              手机(< md)上只留 logo + 标题,副标题让位给右侧动作。 */
           <p
-            className="hidden text-[12px] text-ink-faint md:block"
+            className="hidden text-[12px] leading-4 text-ink-faint md:block"
             aria-hidden="true"
             data-test-id={testId ? `${testId}-subtitle` : undefined}
           >

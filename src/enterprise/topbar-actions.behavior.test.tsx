@@ -111,7 +111,9 @@ describe("EnterpriseTopbarActions — 桌面", () => {
     expect(classes).toContain("w-[300px]");
     expect(classes).toContain("absolute");
     expect(classes).toContain("right-0");
-    expect(classes).toContain("top-11");
+    // 36px 按钮 + 4px 间隙。
+    expect(classes).toContain("top-10");
+    expect(classes).not.toContain("top-11");
     // 桌面上不许出现无断点的 fixed —— 那会让弹层脱离顶栏锚点。
     expect(classes).not.toContain("fixed");
   });
@@ -124,9 +126,10 @@ describe("EnterpriseTopbarActions — 手机", () => {
     expect(view.host.querySelector("[data-test-id='topbar-language-switcher']")).toBeNull();
     const trigger = byTestId(view.host, "topbar-user-trigger");
     expect(trigger.getAttribute("aria-label")).toBe("账户菜单");
-    // 手机上头像按钮至少 40×40 的点击区。
-    expect(trigger.className).toContain("max-md:h-10");
-    expect(trigger.className).toContain("max-md:min-w-10");
+    // 48px 顶栏里头像按钮是 36×36 的点击区(≥ 32px 下限),头像本身 32px。
+    expect(trigger.className.split(/\s+/)).toContain("h-9");
+    expect(trigger.className).toContain("max-md:min-w-9");
+    expect(trigger.className).not.toContain("max-md:h-10");
     expect(byTestId(view.host, "topbar-user-avatar")).toBeTruthy();
   });
 
@@ -156,13 +159,14 @@ describe("EnterpriseTopbarActions — 手机", () => {
     view = await mount(renderActions());
 
     // 锚点是铃铛按钮那层 relative,不是视口右缘:只放宽宽度反而会把左边推出屏幕。
-    // 手机上改成 fixed + right-3 + top-14(顶栏 h-14 正下方),宽度取 min(300, 视口-24)。
+    // 手机上改成 fixed + right-3 + top-12(顶栏 h-12 正下方),宽度取 min(300, 视口-24)。
     await click(byTestId(view.host, "topbar-notifications").querySelector("button") as HTMLElement);
     const notifications = classesOf(byTestId(view.host, "topbar-notifications-menu"));
     expect(notifications).toContain("max-md:fixed");
     expect(notifications).toContain("max-md:right-3");
     expect(notifications).toContain("max-md:left-auto");
-    expect(notifications).toContain("max-md:top-14");
+    expect(notifications).toContain("max-md:top-12");
+    expect(notifications).not.toContain("max-md:top-14");
     expect(notifications).toContain("max-md:w-[min(300px,calc(100vw-24px))]");
     // 旧的「只放宽宽度」写法必须消失,它正是溢出的来源。
     expect(notifications).not.toContain("max-md:max-w-[360px]");
@@ -178,7 +182,8 @@ describe("EnterpriseTopbarActions — 手机", () => {
     expect(userMenu).toContain("max-md:fixed");
     expect(userMenu).toContain("max-md:right-3");
     expect(userMenu).toContain("max-md:left-auto");
-    expect(userMenu).toContain("max-md:top-14");
+    expect(userMenu).toContain("max-md:top-12");
+    expect(userMenu).not.toContain("max-md:top-14");
     expect(userMenu).toContain("max-md:max-w-[calc(100vw-24px)]");
     expect(userMenu).toContain("min-w-[200px]");
   });

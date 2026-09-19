@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { byTestId, mount, type MountedView } from "../enterprise/behavior-test-utils";
-import { AppShell, APP_SHELL_MAIN_PADDING } from "./AppShell";
+import { AppShell, APP_SHELL_MAIN_PADDING, APP_SHELL_MAIN_PADDING_TOP_PX, APP_SHELL_MAIN_PADDING_TOP_VAR } from "./AppShell";
 import { Topbar } from "./Topbar";
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -20,7 +20,7 @@ afterEach(async () => {
 });
 
 describe("Topbar", () => {
-  it("手机上收窄内边距与间距,高度与桌面值不变", async () => {
+  it("手机上收窄内边距与间距;行高两端都是 48px", async () => {
     view = await mount(<Topbar brand={<span>品牌</span>} actions={<span>动作</span>} testId="topbar" />);
     const row = byTestId(view.host, "topbar").firstElementChild as HTMLElement;
     const classes = row.className.split(/\s+/);
@@ -30,7 +30,9 @@ describe("Topbar", () => {
     // 桌面侧(原值)
     expect(classes).toContain("md:px-5");
     expect(classes).toContain("md:gap-4");
-    expect(classes).toContain("h-14");
+    // 56 → 48:原高度在小屏上太占首屏。
+    expect(classes).toContain("h-12");
+    expect(classes).not.toContain("h-14");
     // 旧的无断点写法必须消失,否则手机上仍按桌面留白。
     expect(classes).not.toContain("px-5");
     expect(classes).not.toContain("gap-4");
@@ -46,17 +48,22 @@ describe("Topbar", () => {
 });
 
 describe("AppShell", () => {
-  it("内容区手机竖向留白 16px,桌面收到 32px", () => {
+  it("内容区顶部留白收紧到 12px / 桌面 16px,底部留白不变", () => {
     const classes = APP_SHELL_MAIN_PADDING.split(/\s+/);
-    expect(classes).toContain("py-4");
     expect(classes).toContain("px-4");
-    expect(classes).not.toContain("py-6");
     expect(classes).toContain("md:px-10");
-    // 桌面上内边距 48 → 32:页头之上那条白带太厚,首行内容抬高 16px(横向留白不动)。
-    expect(classes).toContain("md:py-8");
-    expect(classes).not.toContain("md:py-12");
     expect(classes).toContain("2xl:px-12");
     expect(classes).toContain("3xl:px-16");
+    // 顶部留白走 CSS 变量,<main> 里的吸顶页头用同一个变量对齐,不再各自抄断点。
+    expect(classes).toContain(`[${APP_SHELL_MAIN_PADDING_TOP_VAR}:12px]`);
+    expect(classes).toContain(`md:[${APP_SHELL_MAIN_PADDING_TOP_VAR}:16px]`);
+    expect(classes).toContain(`pt-[var(${APP_SHELL_MAIN_PADDING_TOP_VAR})]`);
+    expect(APP_SHELL_MAIN_PADDING_TOP_PX).toEqual({ base: 12, md: 16 });
+    // 底部留白保持原值。
+    expect(classes).toContain("pb-4");
+    expect(classes).toContain("md:pb-8");
+    // 旧的上下同值写法必须消失,否则顶部仍是 16 / 32px。
+    for (const legacy of ["py-4", "md:py-8", "py-6", "md:py-12", "md:pt-8"]) expect(classes).not.toContain(legacy);
   });
 
   it("页脚只在 md+ 出现(手机改由抽屉底部承载)", async () => {
@@ -79,7 +86,8 @@ describe("AppShell", () => {
       </AppShell>,
     );
     const main = view.host.querySelector("main") as HTMLElement;
-    expect(main.className).toContain("py-4");
+    expect(main.className).toContain("pb-4");
+    expect(main.className).toContain(`pt-[var(${APP_SHELL_MAIN_PADDING_TOP_VAR})]`);
     expect(main.parentElement?.nextElementSibling).toBeNull();
   });
 });

@@ -155,12 +155,12 @@ function LanguageAction({ locale, localeOptions, onLocaleChange, labels, open, t
   const menu = useTopbarMenuFocus(open);
   return (
     <div className="relative" data-test-id="topbar-language-switcher">
-      <button ref={menu.triggerRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} aria-label={labels.switchLanguage} title={labels.switchLanguage} className="flex h-10 w-10 items-center justify-center text-ink-soft transition-colors hover:text-ink">
+      <button ref={menu.triggerRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} aria-label={labels.switchLanguage} title={labels.switchLanguage} className="flex h-9 w-9 items-center justify-center text-ink-soft transition-colors hover:text-ink">
         <GlobeIcon />
       </button>
       {/* FE-PERF-04: PopoverSurface is CSS-enter only — no motion/react on the public shell path. */}
       {open ? (
-        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.switchLanguage} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-11 z-30 min-w-[132px] origin-top-right rounded-md border border-hairline bg-paper p-1 shadow-lg shadow-ink/10 focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-language-menu">
+        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.switchLanguage} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-10 z-30 min-w-[132px] origin-top-right rounded-md border border-hairline bg-paper p-1 shadow-lg shadow-ink/10 focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-language-menu">
           <LocaleOptions locale={locale} localeOptions={localeOptions} onLocaleChange={onLocaleChange} rowClassName="rounded px-3 py-2" />
         </PopoverSurface>
       ) : null}
@@ -174,12 +174,12 @@ function NotificationsAction({ items, loading, error, viewAllHref, unreadCount, 
   const badgeCount = typeof unreadCount === "number" ? unreadCount : items.length;
   return (
     <div className="relative" data-test-id="topbar-notifications">
-      <button ref={menu.triggerRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} aria-label={labels.notifications} title={labels.notifications} className="relative flex h-10 w-10 items-center justify-center text-ink-soft transition-colors hover:text-ink">
+      <button ref={menu.triggerRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} aria-label={labels.notifications} title={labels.notifications} className="relative flex h-9 w-9 items-center justify-center text-ink-soft transition-colors hover:text-ink">
         <BellIcon />
-        {badgeCount > 0 ? <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[rgb(var(--signal))] px-1 text-[10px] font-semibold leading-none text-paper" data-test-id="topbar-notifications-badge">{badgeCount > 99 ? "99+" : badgeCount}</span> : null}
+        {badgeCount > 0 ? <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[rgb(var(--signal))] px-1 text-[10px] font-semibold leading-none text-paper" data-test-id="topbar-notifications-badge">{badgeCount > 99 ? "99+" : badgeCount}</span> : null}
       </button>
       {open ? (
-        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.notifications} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-11 z-30 w-[300px] max-md:fixed max-md:left-auto max-md:right-3 max-md:top-14 max-md:w-[min(300px,calc(100vw-24px))] origin-top-right rounded-md border border-hairline bg-paper p-3 shadow-lg shadow-ink/10 focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-notifications-menu">
+        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.notifications} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-10 z-30 w-[300px] max-md:fixed max-md:left-auto max-md:right-3 max-md:top-12 max-md:w-[min(300px,calc(100vw-24px))] origin-top-right rounded-md border border-hairline bg-paper p-3 shadow-lg shadow-ink/10 focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-notifications-menu">
           <div className="flex items-center justify-between gap-2"><div className="text-[13px] font-medium text-ink">{labels.notifications}</div>{items.length ? <button type="button" onClick={onDismissAll} className="text-[12px] text-ink-soft hover:text-[rgb(var(--signal-ink))]" data-test-id="topbar-notifications-clear-all">{labels.notificationsClearAll}</button> : null}</div>
           {loading && !items.length ? <div className="mt-2 text-[12px] text-ink-faint">…</div> : error ? <div className="mt-2 text-[12px] text-[rgb(var(--signal-ink))]">{labels.notificationsLoadFailed}</div> : !items.length ? <div className="mt-1 text-[12px] text-ink-faint">{labels.notificationsEmpty}</div> : <ul className="mt-2 max-h-[320px] space-y-1 overflow-y-auto pr-0.5" data-test-id="topbar-notifications-list">{items.map((item) => <li key={item.id} className="flex items-start justify-between gap-2 rounded-md px-2 py-1.5 hover:bg-ink/[0.03]" data-test-id="topbar-notification-item"><div className="min-w-0">{item.href ? renderLink({ href: item.href, className: "block truncate text-[12px] text-ink hover:underline", testId: "topbar-notification-deeplink", onClick: () => onItemOpen?.(item.id), children: item.title }) : <div className="truncate text-[12px] text-ink">{item.title}</div>}{item.detail ? <div className={`mt-0.5 text-[12px] ${item.urgent ? "text-[rgb(var(--signal-ink))]" : "text-ink-faint"}`}>{item.detail}</div> : null}<RelativeTimestamp value={item.createdAt} absoluteLabel={item.createdAtLabel} locale={locale} className="mt-0.5 block text-[12px] text-ink-faint" testId="topbar-notification-time" /></div>{onDismiss ? <button type="button" onClick={() => onDismiss(item.id)} aria-label={labels.notificationsDismiss} title={labels.notificationsDismiss} className="shrink-0 rounded p-0.5 text-ink-faint hover:text-[rgb(var(--signal))]" data-test-id="topbar-notification-dismiss">×</button> : null}</li>)}</ul>}
           {renderLink({ href: viewAllHref, role: "menuitem", className: "mt-2 block text-center text-[12px] text-ink-soft transition-colors hover:text-ink", testId: "topbar-notifications-view-all", children: labels.notificationsViewAll })}
@@ -193,15 +193,15 @@ function UserAction({ user, labels, securityHref, renderLink, open, toggle, logg
   const menu = useTopbarMenuFocus(open);
   return (
     <div className="relative" data-test-id="topbar-user">
-      <button ref={menu.triggerRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} aria-label={labels.userMenu} title={user.name} className="flex items-center gap-2.5 rounded-md px-1.5 py-1 transition-colors hover:bg-ink/[0.04] max-md:h-10 max-md:min-w-10 max-md:justify-center" data-test-id="topbar-user-trigger">
+      <button ref={menu.triggerRef} type="button" onClick={toggle} aria-haspopup="menu" aria-expanded={open} aria-label={labels.userMenu} title={user.name} className="flex h-9 items-center gap-2.5 rounded-md px-1.5 transition-colors hover:bg-ink/[0.04] max-md:min-w-9 max-md:justify-center" data-test-id="topbar-user-trigger">
         <span className="hidden min-w-0 flex-col items-end leading-tight sm:flex" data-test-id="topbar-user-identity">
           <span className="max-w-[150px] truncate text-[13px] font-semibold text-ink" data-test-id="topbar-user-name">{user.name}</span>
           <span className="text-[12px] text-ink-faint" data-test-id="topbar-user-role">{user.identity}</span>
         </span>
-        <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="sm" data-test-id="topbar-user-avatar" />
+        <UserAvatar name={user.name} avatarUrl={user.avatarUrl} size="xs" data-test-id="topbar-user-avatar" />
       </button>
       {open ? (
-        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.userMenu} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[200px] max-md:fixed max-md:left-auto max-md:right-3 max-md:top-14 max-md:max-w-[calc(100vw-24px)] origin-top-right rounded-md border border-hairline bg-paper py-1.5 shadow-[0_8px_18px_rgba(17,24,39,0.14)] focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-user-menu">
+        <PopoverSurface ref={menu.menuRef} role="menu" aria-label={labels.userMenu} tabIndex={-1} onKeyDown={menu.onKeyDown} className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[200px] max-md:fixed max-md:left-auto max-md:right-3 max-md:top-12 max-md:max-w-[calc(100vw-24px)] origin-top-right rounded-md border border-hairline bg-paper py-1.5 shadow-[0_8px_18px_rgba(17,24,39,0.14)] focus:outline-none" data-animation="topbar-popover" data-test-id="topbar-user-menu">
           {user.permissionSummary ? <div className="border-b border-hairline-soft px-3 py-2 text-[12px] text-ink-faint" data-test-id="topbar-user-permissions">{user.permissionSummary}</div> : null}
           {/* 手机上顶栏放不下第三个入口:语言切换整组移到这里,仍是同一批 role/test id。 */}
           {localeSwitch ? (

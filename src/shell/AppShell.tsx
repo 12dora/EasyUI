@@ -46,12 +46,34 @@ export interface AppShellProps {
 }
 
 /**
+ * Top padding of the scrollable content column, in px (phone / md+). The gap
+ * between the topbar and the first row of content is deliberately tight — a
+ * thick white band there only wastes the first screen.
+ */
+export const APP_SHELL_MAIN_PADDING_TOP_PX = { base: 12, md: 16 } as const;
+
+/**
+ * Same value as a CSS custom property, set on `<main>` itself by
+ * `APP_SHELL_MAIN_PADDING` and therefore inherited by everything inside it.
+ * Sticky page chrome that must cover the top padding band (e.g. a detail
+ * header's `before:` mask, or `top: calc(-1 * …)`) reads it instead of
+ * hard-coding a breakpoint pair: `before:h-[var(--app-shell-main-pt)]`.
+ */
+export const APP_SHELL_MAIN_PADDING_TOP_VAR = "--app-shell-main-pt";
+
+/**
  * Horizontal/vertical rhythm of the scrollable content column. The step up at
  * the wide breakpoints keeps content off the bezel once `<main>` is free to
  * grow past ~1400px; hosts that compose their own `<main>` (see EasyTrade's
  * AdminShell) mirror this string so the two frames stay in sync.
+ *
+ * Top padding is 12px / md+ 16px (see `APP_SHELL_MAIN_PADDING_TOP_PX`) and is
+ * driven by `--app-shell-main-pt`, which this string also defines — so a host
+ * `<main>` that mirrors it gets the variable for free. Bottom padding stays
+ * 16px / md+ 32px so the last row does not sit on the footer.
  */
-export const APP_SHELL_MAIN_PADDING = "px-4 py-4 md:px-10 md:py-8 2xl:px-12 3xl:px-16";
+export const APP_SHELL_MAIN_PADDING =
+  "px-4 [--app-shell-main-pt:12px] pt-[var(--app-shell-main-pt)] pb-4 md:px-10 md:[--app-shell-main-pt:16px] md:pb-8 2xl:px-12 3xl:px-16";
 
 /**
  * EasyUI application frame: sticky topbar over a full-height content region that
