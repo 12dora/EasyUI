@@ -27,6 +27,7 @@ export { FormGrid, FormSection } from "./form-grid";
 export { ActionRow, DialogFormActions } from "./action-row";
 export { Form } from "./form";
 export { Section } from "./section";
+export { GatedBody } from "./gated-body";
 export { Dialog, DialogHeaderAside } from "./dialog";
 export {
   UnsavedChangesProvider,

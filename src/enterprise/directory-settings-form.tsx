@@ -3,11 +3,12 @@
 import type { ReactNode } from "react";
 import { Badge, type BadgeTone } from "../primitives/badge";
 import { Button } from "../primitives/button";
-import { Checkbox } from "../primitives/checkbox";
 import { Field, Input, Select } from "../primitives/field";
 import { FormGrid } from "../primitives/form-grid";
+import { GatedBody } from "../primitives/gated-body";
 import { InlineNotice } from "../primitives/inline-notice";
 import { Section } from "../primitives/section";
+import { Switch } from "../primitives/switch";
 import { formatEnterpriseTimestamp, type EnterpriseTimestampFormatter } from "./format-timestamp";
 import { EnterpriseSecretField } from "./shared-settings";
 import type { EnterpriseWriteOnlySecret } from "./integration-configuration-forms";
@@ -172,87 +173,41 @@ export function EnterpriseDirectorySettingsForm({
       description={labels.description}
       flush
       actions={
-        !disabled ? (
-          <>
-            {onTest ? (
-              <Button variant="outline" size="sm" loading={testing} onClick={() => void onTest()} data-test-id="directory-connection-test">
-                {labels.connectionTest}
+        <>
+          {!disabled ? (
+            <>
+              {onTest ? (
+                <Button variant="outline" size="sm" loading={testing} onClick={() => void onTest()} data-test-id="directory-connection-test">
+                  {labels.connectionTest}
+                </Button>
+              ) : null}
+              {onSync ? (
+                <Button variant="outline" size="sm" loading={syncing} onClick={() => void onSync()} data-test-id="directory-sync-now">
+                  {labels.syncNow}
+                </Button>
+              ) : null}
+              <Button variant="primary" size="sm" loading={saving} onClick={() => void onSave()} data-test-id="directory-save">
+                {labels.save}
               </Button>
-            ) : null}
-            {onSync ? (
-              <Button variant="outline" size="sm" loading={syncing} onClick={() => void onSync()} data-test-id="directory-sync-now">
-                {labels.syncNow}
-              </Button>
-            ) : null}
-            <Button variant="primary" size="sm" loading={saving} onClick={() => void onSave()} data-test-id="directory-save">
-              {labels.save}
-            </Button>
-          </>
-        ) : null
+            </>
+          ) : null}
+          {/* Block-level master switch. It lives outside GatedBody so the block can be
+              switched back on once it is off, and is only disabled when the viewer cannot
+              manage the settings. The card title is its visible name, hence aria-label only. */}
+          <Switch
+            checked={value.enabled}
+            disabled={disabled}
+            aria-label={labels.enabled}
+            onChange={(next) => onChange({ enabled: next })}
+            data-test-id="directory-enabled"
+          />
+        </>
       }
     >
       <div className="space-y-4" data-test-id="directory-settings-form">
-        <Checkbox
-          label={labels.enabled}
-          checked={value.enabled}
-          disabled={disabled}
-          onChange={(event) => onChange({ enabled: event.target.checked })}
-          data-test-id="directory-enabled"
-        />
-        <FormGrid columns={2}>
-          <Field label={labels.baseUrl} htmlFor="enterprise-directory-base-url">
-            <Input
-              id="enterprise-directory-base-url"
-              value={value.baseUrl ?? ""}
-              disabled={disabled}
-              className="font-mono"
-              onChange={(event) => onChange({ baseUrl: event.target.value })}
-            />
-          </Field>
-          <Field label={labels.appKey} htmlFor="enterprise-directory-app-key">
-            <Input
-              id="enterprise-directory-app-key"
-              value={value.appKey ?? ""}
-              disabled={disabled}
-              className="font-mono"
-              onChange={(event) => onChange({ appKey: event.target.value })}
-            />
-          </Field>
-          <EnterpriseSecretField
-            id="enterprise-directory-credential"
-            label={labels.credential}
-            keepHint={labels.credentialHint}
-            clearLabel={labels.clearSecret}
-            configuredHint={value.hasCredential ? labels.configured : labels.notConfigured}
-            value={credential.value}
-            clear={credential.clear}
-            disabled={disabled}
-            onValueChange={(secret) => onCredentialChange({ value: secret, clear: false })}
-            onClearChange={(clear) => onCredentialChange({ value: clear ? "" : credential.value, clear })}
-            testId="directory-credential"
-          />
-          <Field label={labels.authMode} htmlFor="enterprise-directory-auth-mode">
-            <Select
-              id="enterprise-directory-auth-mode"
-              value={value.authMode}
-              disabled={disabled}
-              onChange={(event) => onChange({ authMode: event.target.value as EnterpriseDirectoryAuthMode })}
-            >
-              <option value="static_app_token">{labels.authModes.static_app_token}</option>
-              <option value="oauth_client_credentials">{labels.authModes.oauth_client_credentials}</option>
-            </Select>
-          </Field>
-          <Field label={labels.syncInterval} htmlFor="enterprise-directory-interval">
-            <Input
-              id="enterprise-directory-interval"
-              type="number"
-              value={String(value.syncIntervalMinutes ?? 0)}
-              disabled={disabled}
-              className="font-mono"
-              onChange={(event) => onChange({ syncIntervalMinutes: Number.parseInt(event.target.value, 10) || 0 })}
-            />
-          </Field>
-        </FormGrid>
+        {/* Feedback for the header actions, so it stays outside the gate: switching the
+            block off and saving that is a supported flow, and its result must stay
+            readable and in the accessibility tree while the body is inert. */}
         {operationResult ? (
           <InlineNotice
             tone={operationResult.ok ? "success" : "error"}
@@ -260,15 +215,95 @@ export function EnterpriseDirectorySettingsForm({
             data-test-id="directory-operation-result"
           />
         ) : null}
-        <EnterpriseDirectorySyncStatusBlock
-          labels={labels}
-          lastSync={value.lastSync}
-          locale={locale}
-          formatTimestamp={formatTimestamp}
-          timeZone={timeZone}
-        />
+        <GatedBody off={!value.enabled} className="space-y-4">
+          <DirectoryFields
+            labels={labels}
+            value={value}
+            credential={credential}
+            disabled={disabled}
+            onChange={onChange}
+            onCredentialChange={onCredentialChange}
+          />
+          <EnterpriseDirectorySyncStatusBlock
+            labels={labels}
+            lastSync={value.lastSync}
+            locale={locale}
+            formatTimestamp={formatTimestamp}
+            timeZone={timeZone}
+          />
+        </GatedBody>
       </div>
     </Section>
+  );
+}
+
+/** The connection fields. Each field keeps its own `disabled` (the caller's read-only rule). */
+function DirectoryFields({
+  labels,
+  value,
+  credential,
+  disabled,
+  onChange,
+  onCredentialChange,
+}: Pick<
+  EnterpriseDirectorySettingsFormProps,
+  "labels" | "value" | "credential" | "disabled" | "onChange" | "onCredentialChange"
+>) {
+  return (
+    <FormGrid columns={2}>
+      <Field label={labels.baseUrl} htmlFor="enterprise-directory-base-url">
+        <Input
+          id="enterprise-directory-base-url"
+          value={value.baseUrl ?? ""}
+          disabled={disabled}
+          className="font-mono"
+          onChange={(event) => onChange({ baseUrl: event.target.value })}
+        />
+      </Field>
+      <Field label={labels.appKey} htmlFor="enterprise-directory-app-key">
+        <Input
+          id="enterprise-directory-app-key"
+          value={value.appKey ?? ""}
+          disabled={disabled}
+          className="font-mono"
+          onChange={(event) => onChange({ appKey: event.target.value })}
+        />
+      </Field>
+      <EnterpriseSecretField
+        id="enterprise-directory-credential"
+        label={labels.credential}
+        keepHint={labels.credentialHint}
+        clearLabel={labels.clearSecret}
+        configuredHint={value.hasCredential ? labels.configured : labels.notConfigured}
+        value={credential.value}
+        clear={credential.clear}
+        disabled={disabled}
+        onValueChange={(secret) => onCredentialChange({ value: secret, clear: false })}
+        onClearChange={(clear) => onCredentialChange({ value: clear ? "" : credential.value, clear })}
+        testId="directory-credential"
+      />
+      <Field label={labels.authMode} htmlFor="enterprise-directory-auth-mode">
+        <Select
+          id="enterprise-directory-auth-mode"
+          value={value.authMode}
+          disabled={disabled}
+          onChange={(event) => onChange({ authMode: event.target.value as EnterpriseDirectoryAuthMode })}
+        >
+          <option value="static_app_token">{labels.authModes.static_app_token}</option>
+          <option value="oauth_client_credentials">{labels.authModes.oauth_client_credentials}</option>
+        </Select>
+      </Field>
+      <Field label={labels.syncInterval} htmlFor="enterprise-directory-interval">
+        <Input
+          id="enterprise-directory-interval"
+          type="number"
+          value={String(value.syncIntervalMinutes ?? 0)}
+          disabled={disabled}
+          className="font-mono"
+          onChange={(event) => onChange({ syncIntervalMinutes: Number.parseInt(event.target.value, 10) || 0 })}
+        />
+      </Field>
+    </FormGrid>
   );
 }
 

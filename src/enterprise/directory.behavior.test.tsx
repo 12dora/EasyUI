@@ -85,7 +85,7 @@ describe("directory settings section", () => {
   it("renders the directory form only when the adapter provides the directory methods", async () => {
     const supported = await mountSurface(makeAdapter());
     expect(byTestId(supported.host, "directory-settings-section")).toBeTruthy();
-    expect((byTestId(supported.host, "directory-enabled") as HTMLInputElement).checked).toBe(true);
+    expect(byTestId(supported.host, "directory-enabled").getAttribute("aria-checked")).toBe("true");
     expect(byTestId(supported.host, "directory-last-sync-empty").textContent).toContain(directoryLabels.lastSyncNever);
     await supported.unmount();
     view = null;
@@ -94,6 +94,45 @@ describe("directory settings section", () => {
       makeAdapter({ loadDirectorySettings: undefined, saveDirectorySettings: undefined, testDirectory: undefined, syncDirectory: undefined }),
     );
     expect(bare.host.querySelector("[data-test-id='directory-settings-section']")).toBeNull();
+  });
+
+  it("switches the whole block from the card header and greys the body when it is off", async () => {
+    const adapter = makeAdapter();
+    const mounted = await mountSurface(adapter);
+
+    const toggle = byTestId(mounted.host, "directory-enabled") as HTMLButtonElement;
+    expect(toggle.getAttribute("role")).toBe("switch");
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    expect(toggle.getAttribute("aria-label")).toBe(directoryLabels.enabled);
+
+    // The gated body is always the last child of the form: the operation notice, when
+    // there is one, is prepended outside the gate.
+    const body = byTestId(mounted.host, "directory-settings-form").lastElementChild as HTMLElement;
+    expect(body.hasAttribute("inert")).toBe(false);
+
+    await click(toggle);
+    await settle();
+
+    // Off: the body is out of reach and greyed out, but the switch itself must stay
+    // operable — it lives outside the gated body — or the block could never come back.
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    expect(body.hasAttribute("inert")).toBe(true);
+    expect(body.className).toContain("opacity-50");
+    expect(toggle.disabled).toBe(false);
+
+    // Save is a header action too, so the disabled state is savable.
+    await click(byTestId(mounted.host, "directory-save"));
+    await settle();
+    expect(adapter.saveDirectorySettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: false }),
+      undefined,
+    );
+
+    // …and the answer to that save stays out of the inert subtree, or a screen reader
+    // would never hear whether switching the block off actually saved.
+    const notice = byTestId(mounted.host, "directory-operation-result");
+    expect(body.contains(notice)).toBe(false);
+    expect(notice.closest("[inert]")).toBeNull();
   });
 
   it("keeps the credential write-only: blank sends nothing, a typed value is passed through once", async () => {
@@ -114,6 +153,10 @@ describe("directory settings section", () => {
     expect((byTestId(mounted.host, "directory-credential").querySelector("input") as HTMLInputElement).value).toBe("");
   });
 
+});
+
+/** The last-run report: a run that wrote nothing must never read as "sync done". */
+describe("directory last-run report", () => {
   it("explains in plain words that a non-authoritative run wrote nothing", async () => {
     const result: EnterpriseDirectorySyncResult = {
       status: "not_authoritative",
