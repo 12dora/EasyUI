@@ -98,10 +98,10 @@
     },
     "src/enterprise/authorization-workspace.tsx::EnterpriseAuthorizationWorkspace": {
       "complexity": [
-        58
+        48
       ],
       "max-lines-per-function": [
-        226
+        219
       ]
     },
     "src/enterprise/authorization-workspace.tsx::normalizeEnterpriseManifest": {

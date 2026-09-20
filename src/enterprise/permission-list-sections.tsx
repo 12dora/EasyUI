@@ -48,14 +48,27 @@ export function scopeLabel(scope: string, labels: AuthorizationWorkspaceLabels) 
   return scope;
 }
 
-/** Risk level: high risk gets the warning badge so it is scannable, standard stays plain text. */
+/**
+ * Risk level: plain text on every level, the colour carries the meaning — a tag
+ * here competed with the 状态 badge in the neighbouring column and read as a
+ * second status. 高风险 takes the kit's amber **text** token
+ * (`--status-pending-ink`, the same tone the replaced `Badge tone="amber"`
+ * carried): the fill token `--status-pending` is 3.19:1 on paper and fails AA
+ * for words, while the ink variant is 7.09:1 on paper / 6.78:1 on paper-deep.
+ * Red (`--signal-ink`) is reserved for errors and destructive actions — a
+ * high-risk permission is neither. 标准 and unknown levels stay `text-ink`.
+ */
 function RiskCell({ level, labels }: { level: string; labels: AuthorizationWorkspaceLabels }) {
-  if (level === "high") return <Badge tone="amber">{labels.riskHigh || level}</Badge>;
-  return <>{level === "standard" ? labels.riskStandard || level : level}</>;
+  if (level === "high") return <span className="text-[rgb(var(--status-pending-ink))]">{labels.riskHigh || level}</span>;
+  return <span className="text-ink">{level === "standard" ? labels.riskStandard || level : level}</span>;
 }
 
-/** Grant row: human name first, permission code underneath; code alone when unresolved. */
-function GrantIdentity({ code, name }: { code: string; name?: string }) {
+/**
+ * The shared 权限 cell for both lists: human name first, permission code
+ * underneath; code alone when unresolved — never a dash, the code is the fact
+ * the reader can act on.
+ */
+function PermissionIdentity({ code, name }: { code: string; name?: string }) {
   if (!name) return <span className="font-mono">{code}</span>;
   return (
     <span className="flex min-w-0 flex-col gap-0.5">
@@ -84,17 +97,19 @@ export function EnterpriseMyGrantsSection({
   }, [catalog, locale]);
   return (
     <Section title={labels.myGrantsTitle} description={labels.myGrantsDescription}>
+      {/* Same shape as 权限目录 below: header row, 权限 column merging name + code,
+          header pinned to the top of the capped viewport. */}
       <div className={grants.length ? SCROLL_VIEWPORT : SCROLL_VIEWPORT_UNCAPPED} data-test-id="authz-my-grants-scroll">
         <div data-data-grid="authz-my-grants">
           <HairlineGrid<EnterpriseCurrentGrant>
             className="w-full"
-            showHeader={false}
             rowKey={(grant) => `${grant.permissionCode}:${grant.dataScope}`}
             dataSource={grants}
             empty={labels.empty}
+            headerCellClassName={grants.length ? "sticky top-0 z-10 bg-paper" : undefined}
             columns={[
-              { key: "code", render: (_, grant) => <GrantIdentity code={grant.permissionCode} name={permissionNames.get(grant.permissionCode)}/> },
-              { key: "scope", render: (_, grant) => <Badge tone="neutral">{scopeLabel(grant.dataScope, labels)}</Badge> },
+              { key: "code", title: labels.permission || labels.permissionCode, onHeaderCell: hairlineHeaderCell, render: (_, grant) => <PermissionIdentity code={grant.permissionCode} name={permissionNames.get(grant.permissionCode)}/> },
+              { key: "scope", title: labels.scopes, onHeaderCell: hairlineHeaderCell, render: (_, grant) => <Badge tone="neutral">{scopeLabel(grant.dataScope, labels)}</Badge> },
             ]}
           />
         </div>
@@ -125,8 +140,7 @@ export function EnterprisePermissionCatalogSection({
             empty={labels.empty}
             headerCellClassName={catalog.length ? "sticky top-0 z-10 bg-paper" : undefined}
             columns={[
-              { key: "code", title: labels.permissionCode, dataIndex: "code", onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-mono" }) },
-              { key: "name", title: labels.permissionName, onHeaderCell: hairlineHeaderCell, render: (_, item) => (locale.startsWith("zh") ? item.nameZh : item.nameEn) || labels.notAvailable },
+              { key: "code", title: labels.permission || labels.permissionCode, onHeaderCell: hairlineHeaderCell, render: (_, item) => <PermissionIdentity code={item.code} name={(locale.startsWith("zh") ? item.nameZh : item.nameEn) || undefined}/> },
               { key: "scopes", title: labels.scopes, onHeaderCell: hairlineHeaderCell, render: (_, item) => item.supportedScopes.map((scope) => scopeLabel(scope, labels)).join(labels.roleGroupSeparator) || labels.notAvailable },
               { key: "risk", title: labels.risk, onHeaderCell: hairlineHeaderCell, render: (_, item) => <RiskCell level={item.riskLevel} labels={labels}/> },
               { key: "status", title: labels.status, onHeaderCell: hairlineHeaderCell, render: (_, item) => <StateBadge value={item.active} labels={labels}/> },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "../primitives/button";
 import { Dialog } from "../primitives/dialog";
 import { Field, Input } from "../primitives/field";
@@ -8,8 +8,9 @@ import { InlineNotice } from "../primitives/inline-notice";
 import { InfoTooltip } from "../primitives/info-tooltip";
 import { Section } from "../primitives/section";
 import { AsyncStateTransition } from "../primitives/async-state-transition";
-import { formatEnterpriseTimestamp, type EnterpriseTimestampFormatter } from "./format-timestamp";
-import { HairlineGrid, hairlineHeaderCell } from "./hairline-grid";
+import { Fact, ManifestSection, SnapshotsSection } from "./authorization-detail-sections";
+import type { EnterpriseTimestampFormatter } from "./format-timestamp";
+import { HairlineGrid } from "./hairline-grid";
 import { EnterpriseMyGrantsSection, EnterprisePermissionCatalogSection, StateBadge } from "./permission-list-sections";
 import { EnterpriseIntegrationFactGrid } from "./shared-settings";
 import { EnterpriseAuthorizationWorkspaceSkeleton } from "./surface-helpers";
@@ -90,6 +91,10 @@ export interface AuthorizationWorkspaceLabels {
    * this catalog by hand keep compiling.
    */
   riskStandard?: string; riskHigh?: string;
+  /** 「权限」列的表头:名称与权限代码合成一列,不再各占一列。缺省回落到 permissionCode。 */
+  permission?: string;
+  /** 用户授权一键刷新:逐个刷新当前列出的用户。缺省回落到 refresh。 */
+  refreshAll?: string;
   snapshotsTitle: string; snapshotsDescription: string; user: string; grants: string; roles: string; fetchedAt: string; refresh: string; refreshing: string; expired: string;
   manifestTitle: string; manifestDescription: string; version: string; capabilities: string; permissions: string;
   loading: string; loadFailed: string; empty: string;
@@ -320,14 +325,7 @@ export function EnterpriseAuthorizationWorkspace({
             />
           ) : null}
           {!restrictedViewer && canManage && adapter.loadManifest ? (
-            <Section title={labels.manifestTitle} description={labels.manifestDescription}>
-              <div className="grid gap-2 rounded-md border border-hairline bg-paper p-4 sm:grid-cols-3">
-                <Fact label={labels.appKey} value={String(manifest?.appKey ?? labels.notAvailable)} empty={labels.notAvailable}/>
-                <Fact label={labels.version} value={String(manifest?.version ?? labels.notAvailable)} empty={labels.notAvailable}/>
-                <Fact label={labels.capabilities} value={manifest?.capabilities?.join(", ") || labels.notAvailable} empty={labels.notAvailable}/>
-                <Fact label={labels.permissions} value={String(manifest?.permissions?.length ?? 0)} empty={labels.notAvailable}/>
-              </div>
-            </Section>
+            <ManifestSection manifest={manifest} labels={labels}/>
           ) : null}
         </>
       ) : null}
@@ -361,22 +359,6 @@ export function EnterpriseAuthorizationWorkspace({
   );
 }
 
-function Fact({ label, value, empty }: { label: string; value: ReactNode; empty?: string }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1 border-b border-hairline-soft py-2 text-[12px] sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-      <span className="shrink-0 text-ink-faint">{label}</span>
-      <span className="min-w-0 break-all text-left font-mono text-ink sm:text-right">{value || empty}</span>
-    </div>
-  );
-}
-
-type FormatOpts = {
-  locale: string;
-  empty: string;
-  formatTimestamp?: EnterpriseTimestampFormatter;
-  timeZone?: string;
-};
-
 function downloadManifest(manifest: EnterpriseManifestOverview | null, fileName: string) {
   if (!manifest || typeof document === "undefined") return;
   const url = URL.createObjectURL(new Blob([`${JSON.stringify(manifest, null, 2)}\n`], { type: "application/json" }));
@@ -385,70 +367,6 @@ function downloadManifest(manifest: EnterpriseManifestOverview | null, fileName:
   link.download = fileName;
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function SnapshotsSection({
-  items,
-  labels,
-  canManage,
-  refreshing,
-  onRefresh,
-  formatOpts,
-}: {
-  items: readonly EnterprisePermissionSnapshot[];
-  labels: AuthorizationWorkspaceLabels;
-  canManage: boolean;
-  refreshing: string | null;
-  onRefresh: (userId: string) => Promise<void>;
-  formatOpts: FormatOpts;
-}) {
-  const [target, setTarget] = useState<EnterprisePermissionSnapshot | null>(null);
-  return (
-    <Section title={labels.snapshotsTitle} description={labels.snapshotsDescription}>
-      <div className="overflow-x-auto" data-test-id="authz-snapshots">
-        <HairlineGrid<EnterprisePermissionSnapshot>
-          className="w-full min-w-[700px]"
-          rowKey={(item) => item.userId}
-          dataSource={items}
-          empty={labels.empty}
-          columns={[
-            { key: "user", title: labels.user, onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-medium" }), render: (_, item) => item.displayName || labels.notAvailable },
-            { key: "roles", title: labels.roles, onHeaderCell: hairlineHeaderCell, render: (_, item) => item.roleGroups?.join(labels.roleGroupSeparator) || labels.notAvailable },
-            { key: "grants", title: labels.grants, dataIndex: "grantCount", onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-mono" }) },
-            { key: "fetchedAt", title: labels.fetchedAt, onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-mono" }), render: (_, item) => formatEnterpriseTimestamp(item.fetchedAt, formatOpts) },
-            { key: "status", title: labels.status, onHeaderCell: hairlineHeaderCell, render: (_, item) => <StateBadge value={!item.expired} labels={labels}/> },
-            ...(canManage
-              ? [{
-                  key: "actions",
-                  onHeaderCell: hairlineHeaderCell,
-                  onCell: () => ({ className: "text-right" }),
-                  render: (_: unknown, item: EnterprisePermissionSnapshot) => (
-                    <Button variant="ghost" size="sm" loading={refreshing === item.userId} onClick={() => setTarget(item)} data-test-id={`authz-snapshot-refresh-${item.userId}`}>
-                      {refreshing === item.userId ? labels.refreshing : labels.refresh}
-                    </Button>
-                  ),
-                }]
-              : []),
-          ]}
-        />
-      </div>
-      <Dialog
-        open={Boolean(target)}
-        onClose={() => setTarget(null)}
-        title={labels.refresh}
-        closeLabel={labels.close}
-        size="sm"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setTarget(null)}>{labels.cancel}</Button>
-            <Button variant="primary" onClick={() => { if (target) void onRefresh(target.userId).then(() => setTarget(null)); }} data-test-id="authz-snapshot-refresh-confirm">{labels.confirm}</Button>
-          </>
-        }
-      >
-        <p>{target?.displayName}</p>
-      </Dialog>
-    </Section>
-  );
 }
 
 export function EnterpriseDescriptorKeysTable({

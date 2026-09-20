@@ -115,7 +115,7 @@ describe("business-permission lists — localized values", () => {
     expect(byTestId(host, "authz-permission-catalog").textContent).toContain("DEPARTMENT");
   });
 
-  it("localizes risk levels and badges the high-risk one", async () => {
+  it("localizes risk levels and colours the high-risk one instead of tagging it", async () => {
     const host = (await mountWorkspace(
       [
         permission({ code: "order.read", riskLevel: "standard" }),
@@ -131,8 +131,18 @@ describe("business-permission lists — localized values", () => {
     expect(table.textContent).not.toContain("standard");
     // Unknown levels still surface their raw value.
     expect(table.textContent).toContain("critical");
-    const highBadge = [...table.querySelectorAll("span")].find((node) => node.textContent === labels.riskHigh);
-    expect(highBadge?.className).toContain("amber");
+    // 高风险 is plain text in the amber *ink* token — the fill token fails AA on
+    // this bare surface, and a pill here read as a second 状态 column.
+    const high = [...table.querySelectorAll("span")].find((node) => node.textContent === labels.riskHigh);
+    expect(high?.className).toContain("text-[rgb(var(--status-pending-ink))]");
+    expect(high?.className).not.toContain("--status-pending))");
+    expect(high?.className).not.toContain("amber");
+    expect(high?.className).not.toContain("border");
+    // Standard / unknown levels carry no colour of their own.
+    for (const value of [labels.riskStandard, "critical"]) {
+      const cell = [...table.querySelectorAll("span")].find((node) => node.textContent === value);
+      expect(cell?.className).toBe("text-ink");
+    }
   });
 
   it("shows the catalog name with the code beneath it on a grant row", async () => {
@@ -167,6 +177,56 @@ describe("business-permission lists — localized values", () => {
   });
 });
 
+/**
+ * 我的授权 and 权限目录 are read as one table by the people who use them: same
+ * header row, and one 权限 column carrying the human name over the code rather
+ * than a bare 权限代码 column plus a separate 名称 column.
+ */
+describe("business-permission lists — one shared table shape", () => {
+  const headers = (scope: Element) => [...scope.querySelectorAll("th")].map((th) => th.textContent);
+
+  it("gives both lists the same header row, with 权限 merged from name + code", async () => {
+    const host = (await mountWorkspace(
+      [permission({ code: "order.read", nameEn: "View orders" })],
+      [{ permissionCode: "order.read", dataScope: "SELF" }],
+    )).host;
+
+    expect(headers(byTestId(host, "authz-my-grants-scroll"))).toEqual([labels.permission, labels.scopes]);
+    expect(headers(byTestId(host, "authz-permission-catalog"))).toEqual([
+      labels.permission,
+      labels.scopes,
+      labels.risk,
+      labels.status,
+    ]);
+  });
+
+  it("drops the separate 名称 column and stacks the code under the name in the catalog too", async () => {
+    const host = (await mountWorkspace([permission({ code: "order.read", nameEn: "View orders" })], [])).host;
+
+    const table = byTestId(host, "authz-permission-catalog");
+    expect(headers(table)).not.toContain(labels.permissionName);
+    // `.ant-table-row` skips rc-table's aria-hidden measure row.
+    const row = table.querySelector("tbody tr.ant-table-row");
+    // Name and code share one cell: 4 cells, not 5.
+    expect(row?.querySelectorAll("td").length).toBe(4);
+    const identity = row?.querySelector("td");
+    expect(identity?.textContent).toContain("View orders");
+    expect(identity?.textContent).toContain("order.read");
+    // The code keeps the mono/faint treatment; the whole cell is not mono.
+    expect(identity?.className).not.toContain("font-mono");
+    const code = [...(identity?.querySelectorAll("span") ?? [])].find((node) => node.textContent === "order.read");
+    expect(code?.className).toContain("font-mono");
+  });
+
+  it("falls back to the bare code in the catalog when the entry carries no name", async () => {
+    const host = (await mountWorkspace([permission({ code: "order.export", nameEn: "", nameZh: "" })], [])).host;
+
+    const table = byTestId(host, "authz-permission-catalog");
+    expect(table.textContent).toContain("order.export");
+    expect(table.textContent).not.toContain(labels.notAvailable);
+  });
+});
+
 describe("business-permission lists — fixed-height viewport", () => {
   it("caps both lists with a scrollable viewport once they have rows", async () => {
     const host = (await mountWorkspace(
@@ -187,19 +247,26 @@ describe("business-permission lists — fixed-height viewport", () => {
     // Horizontal scrolling survives: the table keeps its min-width.
     expect(catalogViewport.querySelector(".min-w-\\[680px\\]")).toBeTruthy();
 
-    const header = byTestId(host, "authz-permission-catalog").querySelector("th");
-    expect(header?.className).toContain("sticky");
-    expect(header?.className).toContain("top-0");
-    // …and it sticks to the capped viewport, not to some inner overflow box.
-    expect(nearestScrollAncestor(header!)).toBe(catalogViewport);
+    // Both lists now have a header row, so both pin it to their own viewport.
+    for (const testId of ["authz-my-grants-scroll", "authz-permission-catalog-scroll"]) {
+      const viewport = byTestId(host, testId);
+      const header = viewport.querySelector("th");
+      expect(header?.className).toContain("sticky");
+      expect(header?.className).toContain("top-0");
+      // …and it sticks to the capped viewport, not to some inner overflow box.
+      expect(nearestScrollAncestor(header!)).toBe(viewport);
+    }
   });
 
   it("leaves the empty state uncapped so it is not boxed into 320px", async () => {
     const host = (await mountWorkspace([], [])).host;
 
     for (const testId of ["authz-my-grants-scroll", "authz-permission-catalog-scroll"]) {
-      expect(byTestId(host, testId).className).not.toContain("max-h-");
+      const viewport = byTestId(host, testId);
+      expect(viewport.className).not.toContain("max-h-");
+      // The header is still printed — there is nothing to pin it to.
+      expect(viewport.querySelector("th")).toBeTruthy();
+      expect(viewport.querySelector("th")?.className).not.toContain("sticky");
     }
-    expect(byTestId(host, "authz-permission-catalog").querySelector("th")?.className).not.toContain("sticky");
   });
 });
