@@ -5,11 +5,12 @@
  *
  * 两张卡片:
  *
- * 1. 视觉效果(每个用户都有)。目前只有一行:**行距** —— 它既管列表行高,也管全站
- * 表单里 input 之间的纵向节奏(见 `table/table-density.tsx`)。这是一份**账号偏好**,
- * 宿主把当前值与写回口挂在 `TableDensityProvider` 上,这张页面只读写那份上下文,
- * 自己既不取数也不落盘。于是「设置页改一下」与「所有页面的松紧」天然是同一个事实源,
- * 不会出现设置页显示宽松、列表仍然紧凑的两张皮。
+ * 1. 视觉效果(每个用户都有)。两行,两份**互相独立**的账号偏好:**表格** 管列表行高
+ * (`table/table-density.tsx`),**行距** 管全站表单里 input 之间的纵向节奏
+ * (`../row-spacing.tsx`)。档位与文案一样,但各存各的、各自写回。宿主把当前值与
+ * 写回口挂在 `TableDensityProvider` / `RowSpacingProvider` 上,这张页面只读写那两份
+ * 上下文,自己既不取数也不落盘。于是「设置页改一下」与「所有页面的松紧」天然是同一个
+ * 事实源,不会出现设置页显示宽松、列表仍然紧凑的两张皮。
  * 2. 显示页脚(只有管理员,即宿主判定持有 `settings.app_setting.update` 时才画)。它是
  *    **全局设置**,存在通用设置(`/api/v1/app-settings/general` 的 `showFooter`)里:
  *    切换时**紧接着 PUT 之前**再 `load()` 一份最新的通用设置,把它连同新的
@@ -27,7 +28,8 @@ import { Field } from "../primitives/field";
 import { Switch } from "../primitives/switch";
 import { PageHeader } from "../primitives/page-header";
 import { SegmentedToggle, type SegmentedToggleOption } from "../primitives/segmented-toggle";
-import { useTableDensity, type TableDensity } from "../table/table-density";
+import { useRowSpacing } from "../row-spacing";
+import { useTableDensity } from "../table/table-density";
 import type { EnterpriseGeneralSettingsAdapter, EnterpriseGeneralSettingsValue } from "./general-settings-surface";
 import { primeEnterpriseGeneralSettings, resolveEnterpriseShowFooter } from "./general-settings-store";
 
@@ -36,7 +38,9 @@ export interface EnterpriseAppearanceSettingsLabels {
   description: string;
   /** 卡片标题,例如「视觉效果」。 */
   visualTitle: string;
-  /** 设置行的标签,例如「行距」。 */
+  /** 表格行高那一行的标签,例如「表格」。 */
+  tableDensity: string;
+  /** 表单行距那一行的标签,例如「行距」。 */
   rowSpacing: string;
   densityCompact: string;
   densityComfortable: string;
@@ -72,7 +76,13 @@ export interface EnterpriseAppearanceSettingsSurfaceProps {
   generalSettingsAdapter?: EnterpriseGeneralSettingsAdapter;
 }
 
-function densityOptions(labels: EnterpriseAppearanceSettingsLabels): readonly SegmentedToggleOption<TableDensity>[] {
+/**
+ * 两行共用的档位类型。表格密度与行距是两份独立偏好,但档位集合与文案完全一样,
+ * 所以这一行的控件只写一次(`DensityRow`),各自传自己的值与写回口。
+ */
+type DensityChoice = "compact" | "comfortable";
+
+function densityOptions(labels: EnterpriseAppearanceSettingsLabels): readonly SegmentedToggleOption<DensityChoice>[] {
   return [
     { value: "compact", label: labels.densityCompact },
     { value: "comfortable", label: labels.densityComfortable },
@@ -118,32 +128,75 @@ function SettingRow({ label, children }: { label: ReactNode; children: ReactNode
   );
 }
 
+/**
+ * 「视觉效果」里的一行档位设置:左标签、右分段控件,写回在途时控件旁边挂一句状态。
+ *
+ * 表格与行距共用这一段标记 —— 它们的差别只有"读哪份上下文、写哪个 test id",
+ * 所以差别全部从 props 进来,markup 只此一份。
+ */
+function DensityRow({
+  label,
+  labels,
+  value,
+  saving,
+  testIdPrefix,
+  onChange,
+}: {
+  label: string;
+  labels: EnterpriseAppearanceSettingsLabels;
+  value: DensityChoice;
+  saving: boolean;
+  testIdPrefix: string;
+  onChange: (next: DensityChoice) => void | Promise<void>;
+}) {
+  return (
+    <SettingRow label={label}>
+      <SegmentedToggle<DensityChoice>
+        value={value}
+        options={densityOptions(labels)}
+        ariaLabel={label}
+        dataTestId={`${testIdPrefix}-toggle`}
+        dataOptionAttribute="data-density"
+        onChange={(next) => {
+          if (next === value) return;
+          // 写回失败的回滚与提示是宿主的事(它才知道用什么提示通道);
+          // 这里只保证一次未捕获的 rejection 不会冒到控制台。
+          void Promise.resolve(onChange(next)).catch(() => undefined);
+        }}
+      />
+      {saving ? (
+        <span className="text-[12px] text-ink-faint" data-test-id={`${testIdPrefix}-saving`}>
+          {labels.saving}
+        </span>
+      ) : null}
+    </SettingRow>
+  );
+}
+
+/** 两行档位,各读各的上下文:表格行高一行、表单行距一行,保存状态也各算各的。 */
 function DensitySection({ labels }: { labels: EnterpriseAppearanceSettingsLabels }) {
   const { density, setDensity, saving } = useTableDensity();
+  const { rowSpacing, setRowSpacing, saving: rowSpacingSaving } = useRowSpacing();
   return (
     <div className="rounded-md border border-hairline bg-paper p-4" data-test-id="appearance-density-section">
       <p className="text-[14px] font-semibold text-ink" data-test-id="appearance-visual-title">{labels.visualTitle}</p>
       <div className="mt-4 space-y-[var(--ui-gap-md,16px)]">
-        <SettingRow label={labels.rowSpacing}>
-          <SegmentedToggle<TableDensity>
-            value={density}
-            options={densityOptions(labels)}
-            ariaLabel={labels.rowSpacing}
-            dataTestId="appearance-density-toggle"
-            dataOptionAttribute="data-density"
-            onChange={(next) => {
-              if (next === density) return;
-              // 写回失败的回滚与提示是宿主的事(它才知道用什么提示通道);
-              // 这里只保证一次未捕获的 rejection 不会冒到控制台。
-              void Promise.resolve(setDensity(next)).catch(() => undefined);
-            }}
-          />
-          {saving ? (
-            <span className="text-[12px] text-ink-faint" data-test-id="appearance-density-saving">
-              {labels.saving}
-            </span>
-          ) : null}
-        </SettingRow>
+        <DensityRow
+          label={labels.tableDensity}
+          labels={labels}
+          value={density}
+          saving={saving}
+          testIdPrefix="appearance-density"
+          onChange={setDensity}
+        />
+        <DensityRow
+          label={labels.rowSpacing}
+          labels={labels}
+          value={rowSpacing}
+          saving={rowSpacingSaving}
+          testIdPrefix="appearance-row-spacing"
+          onChange={setRowSpacing}
+        />
       </div>
     </div>
   );

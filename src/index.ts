@@ -8,6 +8,7 @@
  *   - control geometry tokens (form-control height / radius contract)
  *   - motion tokens (easing curves / durations / MOTION.* presets)
  *   - toast bus + `toast.*` API
+ *   - row spacing (the account-level form-rhythm preference)
  *   - primitives/ (Button, Field, Badge, Dialog, PageHeader, …)
  *   - shell/ (AppShell, Sidebar, Topbar)
  */
@@ -15,6 +16,7 @@
 export * from "./control-tokens";
 export * from "./motion";
 export * from "./toast";
+export * from "./row-spacing";
 export * from "./primitives";
 export * from "./shell";
 export * from "./enterprise";

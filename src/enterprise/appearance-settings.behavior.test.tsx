@@ -1,13 +1,16 @@
 // @vitest-environment happy-dom
 /**
- * 用户风险:行距偏好如果由设置页自己持有一份 state,列表页就不会跟着变 —— 用户改完
- * 回到题库,行高还是老样子。这里钉住设置页读写的确实是 `TableDensityProvider` 那一份,
- * 并且写回在途时有状态可见;另外钉住卡片的形状:一个「视觉效果」标题 + 一行「行距」,
- * 以后加第二行设置时不至于把这一行拆回去。
+ * 用户风险:观感偏好如果由设置页自己持有一份 state,列表页与表单就不会跟着变 ——
+ * 用户改完回到题库,还是老样子。这里钉住设置页读写的确实是宿主挂的那两份上下文
+ * (`TableDensityProvider` / `RowSpacingProvider`),并且写回在途时有状态可见;
+ * 另外钉住卡片的形状:一个「视觉效果」标题 + 两行独立的档位(表格、行距),
+ * 两行互不串台 —— 表格在保存时不该让行距那行也转圈。
  */
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TableDensityProvider } from "../table/table-density";
+import { RowSpacingProvider, type RowSpacing } from "../row-spacing";
+import { TableDensityProvider, type TableDensity } from "../table/table-density";
 import { EnterpriseAppearanceSettingsSurface, type EnterpriseAppearanceSettingsLabels } from "./appearance-settings-surface";
 import { byTestId, click, mount, settle, type MountedView } from "./behavior-test-utils";
 import type { EnterpriseGeneralSettingsAdapter, EnterpriseGeneralSettingsValue } from "./general-settings-surface";
@@ -25,6 +28,7 @@ const LABELS: EnterpriseAppearanceSettingsLabels = {
   title: "外观",
   description: "列表与表格的显示密度。",
   visualTitle: "视觉效果",
+  tableDensity: "表格",
   rowSpacing: "行距",
   densityCompact: "紧凑",
   densityComfortable: "宽松",
@@ -45,74 +49,116 @@ afterEach(async () => {
   view = null;
 });
 
-function option(host: ParentNode, density: string): HTMLElement {
-  const element = byTestId(host, "appearance-density-toggle").querySelector(`[data-density='${density}']`);
-  if (!(element instanceof HTMLElement)) throw new Error(`missing option ${density}`);
+/** 某一行(`appearance-density` / `appearance-row-spacing`)里的某一个档位按钮。 */
+function option(host: ParentNode, row: string, density: string): HTMLElement {
+  const element = byTestId(host, `${row}-toggle`).querySelector(`[data-density='${density}']`);
+  if (!(element instanceof HTMLElement)) throw new Error(`missing option ${row}/${density}`);
   return element;
 }
 
+/** 两份偏好各挂各的 Provider,和宿主的做法一致。 */
+function withProviders(
+  node: ReactNode,
+  options: {
+    density?: TableDensity;
+    onDensityChange?: (next: TableDensity) => void | Promise<void>;
+    densitySaving?: boolean;
+    rowSpacing?: RowSpacing;
+    onRowSpacingChange?: (next: RowSpacing) => void | Promise<void>;
+    rowSpacingSaving?: boolean;
+  } = {},
+) {
+  return (
+    <TableDensityProvider
+      value={options.density ?? "compact"}
+      saving={options.densitySaving ?? false}
+      onChange={options.onDensityChange ?? (() => undefined)}
+    >
+      <RowSpacingProvider
+        value={options.rowSpacing ?? "compact"}
+        saving={options.rowSpacingSaving ?? false}
+        onChange={options.onRowSpacingChange ?? (() => undefined)}
+      >
+        {node}
+      </RowSpacingProvider>
+    </TableDensityProvider>
+  );
+}
+
 describe("EnterpriseAppearanceSettingsSurface", () => {
-  it("卡片是「视觉效果」标题 + 一行「行距」,两个档位都在这一行里", async () => {
-    view = await mount(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} />
-      </TableDensityProvider>,
-    );
+  it("卡片是「视觉效果」标题 + 两行档位:表格、行距", async () => {
+    view = await mount(withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} />));
     const card = byTestId(view.host, "appearance-density-section");
     // 标题是卡片标题,不是 Field 的 label —— 它不该挂在 <label> 上。
     expect(byTestId(card, "appearance-visual-title").textContent).toBe("视觉效果");
     expect(card.querySelector("label")).toBeNull();
 
-    const toggle = byTestId(card, "appearance-density-toggle");
-    // 「行距」与控件在同一行:标签在左、控件在右,垂直居中,窄屏可换行。
-    const row = toggle.parentElement?.parentElement as HTMLElement;
-    expect(row.textContent).toContain("行距");
-    expect(row.className).toContain("items-center");
-    expect(row.className).toContain("justify-between");
-    expect(row.className).toContain("flex-wrap");
-    expect(toggle.getAttribute("aria-label")).toBe("行距");
-    expect(Array.from(toggle.querySelectorAll("[data-density]")).map((node) => node.textContent)).toEqual(["紧凑", "宽松"]);
+    for (const [row, label] of [["appearance-density", "表格"], ["appearance-row-spacing", "行距"]] as const) {
+      const toggle = byTestId(card, `${row}-toggle`);
+      // 标签与控件在同一行:标签在左、控件在右,垂直居中,窄屏可换行。
+      const line = toggle.parentElement?.parentElement as HTMLElement;
+      expect(line.textContent).toContain(label);
+      expect(line.className).toContain("items-center");
+      expect(line.className).toContain("justify-between");
+      expect(line.className).toContain("flex-wrap");
+      expect(toggle.getAttribute("aria-label")).toBe(label);
+      expect(Array.from(toggle.querySelectorAll("[data-density]")).map((node) => node.textContent)).toEqual(["紧凑", "宽松"]);
+    }
   });
 
-  it("选中项来自上下文,不是页面自己的 state", async () => {
+  it("两行的选中项各来自自己的上下文,不是页面自己的 state", async () => {
     view = await mount(
-      <TableDensityProvider value="comfortable" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} />, { density: "comfortable", rowSpacing: "compact" }),
     );
-    expect(option(view.host, "comfortable").getAttribute("aria-pressed")).toBe("true");
-    expect(option(view.host, "compact").getAttribute("aria-pressed")).toBe("false");
+    expect(option(view.host, "appearance-density", "comfortable").getAttribute("aria-pressed")).toBe("true");
+    expect(option(view.host, "appearance-density", "compact").getAttribute("aria-pressed")).toBe("false");
+    // 行距是另一份偏好:表格调成宽松,它不该跟着动。
+    expect(option(view.host, "appearance-row-spacing", "compact").getAttribute("aria-pressed")).toBe("true");
+    expect(option(view.host, "appearance-row-spacing", "comfortable").getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("改档把新值交给宿主的写回口;点当前档不重复写", async () => {
-    const written: string[] = [];
+  it("每一行把新值交给自己的写回口;点当前档不重复写", async () => {
+    const density: string[] = [];
+    const rowSpacing: string[] = [];
     view = await mount(
-      <TableDensityProvider value="compact" onChange={(next) => { written.push(next); }}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} />, {
+        onDensityChange: (next) => { density.push(next); },
+        onRowSpacingChange: (next) => { rowSpacing.push(next); },
+      }),
     );
-    await click(option(view.host, "compact"));
-    expect(written).toEqual([]);
-    await click(option(view.host, "comfortable"));
-    expect(written).toEqual(["comfortable"]);
+    await click(option(view.host, "appearance-density", "compact"));
+    await click(option(view.host, "appearance-row-spacing", "compact"));
+    expect(density).toEqual([]);
+    expect(rowSpacing).toEqual([]);
+
+    await click(option(view.host, "appearance-density", "comfortable"));
+    expect(density).toEqual(["comfortable"]);
+    expect(rowSpacing).toEqual([]);
+
+    await click(option(view.host, "appearance-row-spacing", "comfortable"));
+    expect(rowSpacing).toEqual(["comfortable"]);
+    expect(density).toEqual(["comfortable"]);
   });
 
-  it("写回在途时显示保存状态", async () => {
-    view = await mount(
-      <TableDensityProvider value="compact" saving onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} />
-      </TableDensityProvider>,
-    );
+  it("保存状态各算各的:表格在写回时行距那行不转圈,反之亦然", async () => {
+    view = await mount(withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} />, { densitySaving: true }));
     expect(byTestId(view.host, "appearance-density-saving").textContent).toBe("正在保存");
+    expect(view.host.querySelector("[data-test-id='appearance-row-spacing-saving']")).toBeNull();
+
+    await view.rerender(withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} />, { rowSpacingSaving: true }));
+    expect(byTestId(view.host, "appearance-row-spacing-saving").textContent).toBe("正在保存");
+    expect(view.host.querySelector("[data-test-id='appearance-density-saving']")).toBeNull();
   });
 
   it("写回失败不冒泡成未捕获的 rejection", async () => {
     view = await mount(
-      <TableDensityProvider value="compact" onChange={() => Promise.reject(new Error("offline"))}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} />, {
+        onDensityChange: () => Promise.reject(new Error("offline")),
+        onRowSpacingChange: () => Promise.reject(new Error("offline")),
+      }),
     );
-    await click(option(view.host, "comfortable"));
+    await click(option(view.host, "appearance-density", "comfortable"));
+    await click(option(view.host, "appearance-row-spacing", "comfortable"));
     expect(byTestId(view.host, "appearance-settings-page")).toBeTruthy();
   });
 });
@@ -152,9 +198,7 @@ describe("global footer switch (admin only)", () => {
   it("is hidden from users who cannot change global settings", async () => {
     const adapter = makeAdapter();
     view = await mount(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} generalSettingsAdapter={adapter} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} generalSettingsAdapter={adapter} />),
     );
     await settle(20);
     expect(view.host.querySelector("[data-test-id='appearance-global-section']")).toBeNull();
@@ -167,9 +211,7 @@ describe("global footer switch (admin only)", () => {
 
   it("shows the switch to an administrator, reflecting the stored value", async () => {
     view = await mount(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={makeAdapter({ ...GENERAL, showFooter: false })} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={makeAdapter({ ...GENERAL, showFooter: false })} />),
     );
     await settle(20);
     expect(footerSwitch(view.host).getAttribute("aria-checked")).toBe("false");
@@ -179,9 +221,7 @@ describe("global footer switch (admin only)", () => {
   it("treats a stored value without the field as on", async () => {
     const { showFooter: _omitted, ...legacy } = GENERAL;
     view = await mount(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={makeAdapter(legacy)} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={makeAdapter(legacy)} />),
     );
     await settle(20);
     expect(footerSwitch(view.host).getAttribute("aria-checked")).toBe("true");
@@ -193,9 +233,7 @@ describe("global footer switch (admin only)", () => {
     const listener = (event: Event) => updates.push((event as CustomEvent<EnterpriseGeneralSettingsValue>).detail);
     window.addEventListener(ENTERPRISE_GENERAL_UPDATED_EVENT, listener);
     view = await mount(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />),
     );
     await settle(20);
     await click(footerSwitch(view.host));
@@ -213,9 +251,7 @@ describe("global footer switch (admin only)", () => {
     const adapter = makeAdapter();
     adapter.save.mockRejectedValue(new Error("forbidden"));
     view = await mount(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />),
     );
     await settle(20);
     await click(footerSwitch(view.host));
@@ -228,9 +264,7 @@ describe("global footer switch (admin only)", () => {
     const adapter = makeAdapter();
     adapter.load.mockRejectedValueOnce(new Error("offline"));
     view = await mount(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />),
     );
     await settle(20);
     expect(footerSwitch(view.host).disabled).toBe(true);
@@ -265,9 +299,7 @@ describe("global footer switch: stale page safety", () => {
     const rebranded: EnterpriseGeneralSettingsValue = { ...GENERAL, titleZh: "学习中心", logoDataUrl: null };
     const adapter = makeAdapter();
     view = await mount(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />),
     );
     await settle(20);
     adapter.load.mockResolvedValue(rebranded);
@@ -280,9 +312,7 @@ describe("global footer switch: stale page safety", () => {
   it("does not PUT when the pre-save read fails", async () => {
     const adapter = makeAdapter();
     view = await mount(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />
-      </TableDensityProvider>,
+      withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} canManageGlobal generalSettingsAdapter={adapter} />),
     );
     await settle(20);
     adapter.load.mockRejectedValueOnce(new Error("offline"));

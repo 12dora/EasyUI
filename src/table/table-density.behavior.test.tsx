@@ -1,10 +1,9 @@
 // @vitest-environment happy-dom
 /**
- * 用户风险:行距是一份跨页面的观感偏好,却最容易退化成"某一张表自己的 prop" ——
- * 那样设置页改完只有一张表跟着变。这里钉住四件事:没有 Provider 时全站默认紧凑、
- * 挂上 Provider 后两种表格一起跟随、显式 `density` 仍然压得过上下文,以及档位要
- * 发布到 `<html data-ui-density>` —— 那是表单侧(`--ui-gap-*`)唯一的传输层,漏写
- * 的话设置页改完表格跟着变、表单还是老样子。
+ * 用户风险:表格密度是一份跨页面的观感偏好,却最容易退化成"某一张表自己的 prop" ——
+ * 那样设置页改完只有一张表跟着变。这里钉住三件事:没有 Provider 时全站默认紧凑、
+ * 挂上 Provider 后两种表格一起跟随、显式 `density` 仍然压得过上下文。
+ * (表单的纵向节奏是另一份偏好,见 `../row-spacing.behavior.test.tsx`。)
  */
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -63,7 +62,6 @@ let view: MountedView | null = null;
 afterEach(async () => {
   await view?.unmount();
   view = null;
-  document.documentElement.removeAttribute("data-ui-density");
 });
 
 /** antd 把档位写成根节点的 class(middle 落成 `ant-table-medium`),所以"密度生效了吗"看得见。 */
@@ -110,24 +108,6 @@ describe("表格密度", () => {
         <ClientTable<Row> testId="client" columns={COLUMNS} rows={ROWS} rowKey="id" labels={LABELS} density="compact" />
       </TableDensityProvider>,
     );
-    expect(tableSizeClass(byTestId(view.host, "client"))).toBe("small");
-  });
-
-  it("把档位发布到 <html data-ui-density>,改档时跟着改", async () => {
-    // CSS 侧靠这个属性换 `--ui-gap-*` / `--ui-field-gap`,表单的松紧全挂在它上面。
-    view = await mount(
-      <TableDensityProvider value="comfortable" onChange={() => undefined}>
-        <ClientTable<Row> testId="client" columns={COLUMNS} rows={ROWS} rowKey="id" labels={LABELS} />
-      </TableDensityProvider>,
-    );
-    expect(document.documentElement.getAttribute("data-ui-density")).toBe("comfortable");
-
-    await view.rerender(
-      <TableDensityProvider value="compact" onChange={() => undefined}>
-        <ClientTable<Row> testId="client" columns={COLUMNS} rows={ROWS} rowKey="id" labels={LABELS} />
-      </TableDensityProvider>,
-    );
-    expect(document.documentElement.getAttribute("data-ui-density")).toBe("compact");
     expect(tableSizeClass(byTestId(view.host, "client"))).toBe("small");
   });
 
