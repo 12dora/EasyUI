@@ -3,10 +3,10 @@
  * User risk: this card decides whether the whole company can sign in with a work
  * account, and with which scopes. Two things must hold no matter what: the master
  * switch stays reachable after the block is turned off (otherwise sign-in can never
- * be restored), and the scope boxes can only ever produce a wire value the provider
+ * be restored), and the scope switches can only ever produce a wire value the provider
  * accepts — `openid` first, nothing invented by hand.
  */
-import { act, useState } from "react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { byTestId, click, installReducedMotion, mount, type MountedView } from "./behavior-test-utils";
@@ -86,15 +86,13 @@ async function mountForm(overrides: Partial<EnterpriseOidcConfigurationValue> = 
   return { host: view.host, onPatch };
 }
 
-/** Native activation, so the box's own `checked` flips before React reads it. */
-async function toggleBox(element: HTMLElement): Promise<void> {
-  await act(async () => {
-    (element as HTMLInputElement).click();
-  });
+function scopeSwitch(host: ParentNode, token: string): HTMLButtonElement {
+  return byTestId(host, `enterprise-oidc-scope-${token}`) as HTMLButtonElement;
 }
 
-function scopeBox(host: ParentNode, token: string): HTMLInputElement {
-  return byTestId(host, `enterprise-oidc-scope-${token}`) as HTMLInputElement;
+/** The switch reports its state through `aria-checked`, not a native `checked`. */
+function scopeOn(host: ParentNode, token: string): boolean {
+  return scopeSwitch(host, token).getAttribute("aria-checked") === "true";
 }
 
 beforeEach(() => {
@@ -151,7 +149,7 @@ describe("work-account sign-in card: the master switch", () => {
 
     expect((byTestId(host, "identity-enabled") as HTMLButtonElement).disabled).toBe(true);
     expect(host.querySelector("[data-test-id='enterprise-oidc-save']")).toBeNull();
-    expect(scopeBox(host, "profile").disabled).toBe(true);
+    expect(scopeSwitch(host, "profile").disabled).toBe(true);
   });
 });
 
@@ -162,45 +160,49 @@ describe("work-account sign-in card: scopes", () => {
     const group = byTestId(host, "enterprise-oidc-scopes");
     expect(group.getAttribute("role")).toBe("group");
     expect(group.getAttribute("aria-label")).toBe(labels.scopes);
-    expect(scopeBox(host, "openid").checked).toBe(true);
-    expect(scopeBox(host, "profile").checked).toBe(true);
-    expect(scopeBox(host, "email").checked).toBe(false);
-    expect(scopeBox(host, "dingtalk").checked).toBe(false);
-    // The token is printed next to its plain-words description.
-    expect(scopeBox(host, "dingtalk").closest("label")?.textContent).toBe(`dingtalk${labels.scopeOptions.dingtalk}`);
+    // 四个开关排在同一行,窄屏才折行——不再是竖着堆的四行勾选。
+    expect(group.className).toContain("flex-wrap");
+    expect(scopeSwitch(host, "profile").getAttribute("role")).toBe("switch");
+    expect(scopeOn(host, "openid")).toBe(true);
+    expect(scopeOn(host, "profile")).toBe(true);
+    expect(scopeOn(host, "email")).toBe(false);
+    expect(scopeOn(host, "dingtalk")).toBe(false);
+    // The token is printed beside the switch, with its plain-words description.
+    expect(scopeSwitch(host, "dingtalk").closest("label")?.textContent).toBe(`dingtalk${labels.scopeOptions.dingtalk}`);
   });
 
-  it("keeps openid checked and locked: OIDC has no sign-in without it", async () => {
+  it("keeps openid on and locked: OIDC has no sign-in without it", async () => {
     const { host, onPatch } = await mountForm({ scopes: "" });
 
-    const openid = scopeBox(host, "openid");
-    expect(openid.checked).toBe(true);
+    const openid = scopeSwitch(host, "openid");
+    expect(openid.getAttribute("role")).toBe("switch");
+    expect(scopeOn(host, "openid")).toBe(true);
     expect(openid.disabled).toBe(true);
 
-    await toggleBox(openid);
+    await click(openid);
 
     expect(onPatch).not.toHaveBeenCalled();
-    expect(scopeBox(host, "openid").checked).toBe(true);
+    expect(scopeOn(host, "openid")).toBe(true);
   });
 
-  it("writes back a canonical space-separated value as boxes are ticked and cleared", async () => {
+  it("writes back a canonical space-separated value as switches are flipped on and off", async () => {
     const { host, onPatch } = await mountForm({ scopes: "openid profile" });
 
-    await toggleBox(scopeBox(host, "email"));
+    await click(scopeSwitch(host, "email"));
     expect(onPatch).toHaveBeenLastCalledWith({ scopes: "openid profile email" });
 
-    await toggleBox(scopeBox(host, "dingtalk"));
+    await click(scopeSwitch(host, "dingtalk"));
     expect(onPatch).toHaveBeenLastCalledWith({ scopes: "openid profile email dingtalk" });
 
-    await toggleBox(scopeBox(host, "profile"));
+    await click(scopeSwitch(host, "profile"));
     expect(onPatch).toHaveBeenLastCalledWith({ scopes: "openid email dingtalk" });
-    expect(scopeBox(host, "profile").checked).toBe(false);
+    expect(scopeOn(host, "profile")).toBe(false);
   });
 
   it("drops a token the fixed list does not offer the next time the value is written", async () => {
     const { host, onPatch } = await mountForm({ scopes: "openid offline_access" });
 
-    await toggleBox(scopeBox(host, "email"));
+    await click(scopeSwitch(host, "email"));
 
     expect(onPatch).toHaveBeenLastCalledWith({ scopes: "openid email" });
   });

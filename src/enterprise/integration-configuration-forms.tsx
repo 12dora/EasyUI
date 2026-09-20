@@ -2,7 +2,6 @@
 
 import { useState, type ReactNode } from "react";
 import { Button } from "../primitives/button";
-import { Checkbox } from "../primitives/checkbox";
 import { CollapseReveal } from "../primitives/collapse-reveal";
 import { Field, Input } from "../primitives/field";
 import { FormGrid } from "../primitives/form-grid";
@@ -52,7 +51,7 @@ export interface EnterpriseIntegrationConfigurationLabels {
   clientId: string;
   clientSecret: string;
   scopes: string;
-  /** 授权范围勾选组下的一行说明。手工拼 labels 的宿主可以不给,给了才显示。 */
+  /** 授权范围开关组下的一行说明。手工拼 labels 的宿主可以不给,给了才显示。 */
   scopesHint?: string;
   /** 四个固定授权范围各自的说明,按令牌取用。缺了就只印令牌本身,不至于崩。 */
   scopeOptions?: { openid: string; profile: string; email: string; dingtalk: string };
@@ -211,11 +210,12 @@ function OidcCardActions({ labels, value, disabled, saving, testing, onChange, o
 }
 
 /**
- * 授权范围:固定四项,不开放自定义,所以用勾选组而不是自由文本框——用户不必知道
- * 令牌怎么拼,也不会把一个拼错的范围存进去。openid 是 OIDC 的硬性要求,常勾且不可改。
+ * 授权范围:固定四项,不开放自定义,所以用开关组而不是自由文本框——用户不必知道令牌
+ * 怎么拼,也不会把一个拼错的范围存进去。openid 是 OIDC 的硬性要求,常开且不可改。
  *
- * 勾选组没有单一可关联的控件,`Field` 的 `<label>` 挂不上去,因此另给一层
- * `role="group"` + `aria-label` 让读屏念出组名。整组横跨两列,免得四行勾选把栅格撑歪。
+ * 四个开关排成一行(窄屏自动折行),不再竖着堆四行,栅格里这张卡看起来才不空。
+ * 开关组没有单一可关联的控件,`Field` 的 `<label>` 挂不上去,因此另给一层
+ * `role="group"` + `aria-label` 让读屏念出组名。整组横跨两列。
  */
 function OidcScopeField({ labels, value, disabled, onChange }: { labels: EnterpriseIntegrationConfigurationLabels; value: string; disabled?: boolean; onChange: (value: string) => void }) {
   const selected = parseOidcScopes(value);
@@ -227,15 +227,15 @@ function OidcScopeField({ labels, value, disabled, onChange }: { labels: Enterpr
   };
   return (
     <Field label={labels.scopes} hint={labels.scopesHint} className="sm:col-span-2">
-      <div role="group" aria-label={labels.scopes} className="flex flex-col gap-0.5" data-test-id="enterprise-oidc-scopes">
+      <div role="group" aria-label={labels.scopes} className="flex flex-wrap items-center gap-[var(--ui-gap-md,16px)]" data-test-id="enterprise-oidc-scopes">
         {OIDC_SCOPE_TOKENS.map((token) => (
-          <Checkbox
+          <Switch
             key={token}
             checked={token === OIDC_REQUIRED_SCOPE || selected.has(token)}
             disabled={disabled || token === OIDC_REQUIRED_SCOPE}
-            onChange={(event) => toggle(token, event.target.checked)}
+            onChange={(checked) => toggle(token, checked)}
             data-test-id={`enterprise-oidc-scope-${token}`}
-            label={<ScopeRowLabel token={token} description={labels.scopeOptions?.[token]} />}
+            label={<ScopeSwitchLabel token={token} description={labels.scopeOptions?.[token]} />}
           />
         ))}
       </div>
@@ -243,12 +243,13 @@ function OidcScopeField({ labels, value, disabled, onChange }: { labels: Enterpr
   );
 }
 
-/** 一行勾选:令牌用等宽印出来(它要照抄进登录服务),后面跟一句人话。 */
-function ScopeRowLabel({ token, description }: { token: string; description?: string }) {
+/** 一枚开关的说明:令牌用等宽印出来(它要照抄进登录服务),下面跟一句人话。 */
+function ScopeSwitchLabel({ token, description }: { token: string; description?: string }) {
+  if (!description) return <span className="font-mono text-[12px]">{token}</span>;
   return (
-    <span className="inline-flex items-baseline gap-2">
+    <span className="flex flex-col leading-tight">
       <span className="font-mono text-[12px]">{token}</span>
-      {description ? <span>{description}</span> : null}
+      <span className="text-[12px] text-ink-soft">{description}</span>
     </span>
   );
 }
