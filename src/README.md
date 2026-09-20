@@ -467,7 +467,7 @@ const columns = useMemo(() => [
 | `TableDensityProvider` | 同上 | 受控:`value` + `onChange`(+ `saving`) |
 | `useTableDensity()` | 同上 | `{ density, setDensity, saving }` |
 | `tableSizeOf(density)` | 同上 | 档位 → antd `size`(`small` / `middle`) |
-| `EnterpriseAppearanceSettingsSurface` | `@easy-enterprise/ui/enterprise` | 「外观」设置页,只有「表格密度」一张卡片 |
+| `EnterpriseAppearanceSettingsSurface` | `@easy-enterprise/ui/enterprise` | 「外观」设置页,「视觉效果」分表格行高与表单行距两行 |
 
 约定,不是选项:
 

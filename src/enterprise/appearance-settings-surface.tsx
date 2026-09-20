@@ -153,7 +153,7 @@ function DensityRow({
     <SettingRow label={label}>
       <SegmentedToggle<DensityChoice>
         value={value}
-        options={densityOptions(labels)}
+        options={densityOptions(labels).map((option) => ({ ...option, disabled: saving }))}
         ariaLabel={label}
         dataTestId={`${testIdPrefix}-toggle`}
         dataOptionAttribute="data-density"

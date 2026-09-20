@@ -150,6 +150,23 @@ describe("EnterpriseAppearanceSettingsSurface", () => {
     expect(view.host.querySelector("[data-test-id='appearance-density-saving']")).toBeNull();
   });
 
+  it.each([true, false])("只禁用正在保存的那一行:tableSaving=%s", async (tableSaving) => {
+    const density = vi.fn();
+    const spacing = vi.fn();
+    view = await mount(withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} />, {
+      densitySaving: tableSaving, rowSpacingSaving: !tableSaving,
+      onDensityChange: density, onRowSpacingChange: spacing,
+    }));
+    const table = option(view.host, "appearance-density", "comfortable") as HTMLButtonElement;
+    const row = option(view.host, "appearance-row-spacing", "comfortable") as HTMLButtonElement;
+    expect(table.disabled).toBe(tableSaving);
+    expect(row.disabled).toBe(!tableSaving);
+    await click(table);
+    await click(row);
+    expect(density).toHaveBeenCalledTimes(tableSaving ? 0 : 1);
+    expect(spacing).toHaveBeenCalledTimes(tableSaving ? 1 : 0);
+  });
+
   it("写回失败不冒泡成未捕获的 rejection", async () => {
     view = await mount(
       withProviders(<EnterpriseAppearanceSettingsSurface labels={LABELS} />, {
