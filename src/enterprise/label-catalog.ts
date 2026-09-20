@@ -497,11 +497,11 @@ function generalSettingsEnglish(retry: string): EnterpriseGeneralSettingsLabels 
 }
 
 function appearanceSettingsChinese(retry: string): EnterpriseAppearanceSettingsLabels {
-  return { title: "外观", description: "列表与表格的显示密度。", densityTitle: "表格密度", densityCompact: "紧凑", densityComfortable: "宽松", saving: "正在保存", saveFailed: "外观设置保存失败，请重试", showFooter: "显示页脚", globalLoadFailed: "全局外观设置加载失败", retry, globalSaved: "全局外观设置已保存", globalSaveFailed: "全局外观设置保存失败，请重试" };
+  return { title: "外观", description: "调整界面的显示效果。", visualTitle: "视觉效果", rowSpacing: "行距", densityCompact: "紧凑", densityComfortable: "宽松", saving: "正在保存", saveFailed: "外观设置保存失败，请重试", showFooter: "显示页脚", globalLoadFailed: "全局外观设置加载失败", retry, globalSaved: "全局外观设置已保存", globalSaveFailed: "全局外观设置保存失败，请重试" };
 }
 
 function appearanceSettingsEnglish(retry: string): EnterpriseAppearanceSettingsLabels {
-  return { title: "Appearance", description: "Row density for lists and tables.", densityTitle: "Table density", densityCompact: "Compact", densityComfortable: "Comfortable", saving: "Saving", saveFailed: "Failed to save appearance settings. Try again.", showFooter: "Show footer", globalLoadFailed: "Failed to load global appearance settings", retry, globalSaved: "Global appearance settings saved", globalSaveFailed: "Failed to save global appearance settings. Try again." };
+  return { title: "Appearance", description: "Adjust how the interface is displayed.", visualTitle: "Visual effects", rowSpacing: "Row spacing", densityCompact: "Compact", densityComfortable: "Comfortable", saving: "Saving", saveFailed: "Failed to save appearance settings. Try again.", showFooter: "Show footer", globalLoadFailed: "Failed to load global appearance settings", retry, globalSaved: "Global appearance settings saved", globalSaveFailed: "Failed to save global appearance settings. Try again." };
 }
 
 function authorizationChinese(close: string, loading: string): EnterpriseAccessSettingsLabels["authorization"] {

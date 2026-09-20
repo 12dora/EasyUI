@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 /**
- * 用户风险:密度偏好如果由设置页自己持有一份 state,列表页就不会跟着变 —— 用户改完
+ * 用户风险:行距偏好如果由设置页自己持有一份 state,列表页就不会跟着变 —— 用户改完
  * 回到题库,行高还是老样子。这里钉住设置页读写的确实是 `TableDensityProvider` 那一份,
- * 并且写回在途时有状态可见。
+ * 并且写回在途时有状态可见;另外钉住卡片的形状:一个「视觉效果」标题 + 一行「行距」,
+ * 以后加第二行设置时不至于把这一行拆回去。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -23,8 +24,8 @@ import { toastBus } from "../toast";
 const LABELS: EnterpriseAppearanceSettingsLabels = {
   title: "外观",
   description: "列表与表格的显示密度。",
-  densityTitle: "表格密度",
-  densityHint: "紧凑行更省屏幕。",
+  visualTitle: "视觉效果",
+  rowSpacing: "行距",
   densityCompact: "紧凑",
   densityComfortable: "宽松",
   saving: "正在保存",
@@ -51,6 +52,28 @@ function option(host: ParentNode, density: string): HTMLElement {
 }
 
 describe("EnterpriseAppearanceSettingsSurface", () => {
+  it("卡片是「视觉效果」标题 + 一行「行距」,两个档位都在这一行里", async () => {
+    view = await mount(
+      <TableDensityProvider value="compact" onChange={() => undefined}>
+        <EnterpriseAppearanceSettingsSurface labels={LABELS} />
+      </TableDensityProvider>,
+    );
+    const card = byTestId(view.host, "appearance-density-section");
+    // 标题是卡片标题,不是 Field 的 label —— 它不该挂在 <label> 上。
+    expect(byTestId(card, "appearance-visual-title").textContent).toBe("视觉效果");
+    expect(card.querySelector("label")).toBeNull();
+
+    const toggle = byTestId(card, "appearance-density-toggle");
+    // 「行距」与控件在同一行:标签在左、控件在右,垂直居中,窄屏可换行。
+    const row = toggle.parentElement?.parentElement as HTMLElement;
+    expect(row.textContent).toContain("行距");
+    expect(row.className).toContain("items-center");
+    expect(row.className).toContain("justify-between");
+    expect(row.className).toContain("flex-wrap");
+    expect(toggle.getAttribute("aria-label")).toBe("行距");
+    expect(Array.from(toggle.querySelectorAll("[data-density]")).map((node) => node.textContent)).toEqual(["紧凑", "宽松"]);
+  });
+
   it("选中项来自上下文,不是页面自己的 state", async () => {
     view = await mount(
       <TableDensityProvider value="comfortable" onChange={() => undefined}>
@@ -223,7 +246,6 @@ describe("global footer switch (admin only)", () => {
     expect(zh.showFooter).toBe("显示页脚");
     expect(en.showFooter).toBe("Show footer");
     expect(zh.showFooterHint).toBeUndefined();
-    expect(zh.densityHint).toBeUndefined();
   });
 });
 

@@ -79,6 +79,25 @@
   --ease-press: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-pop: cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* Vertical rhythm — driven by the account-level 行距 (row spacing) preference.
+     `TableDensityProvider` publishes the current density onto <html> as
+     `data-ui-density`, and the two blocks below re-point these variables; every
+     form in the app re-spaces itself without a single prop being passed down.
+     The values here are the **compact** ones on purpose: compact is the global
+     default and is also what SSR renders before hydration, so the first paint
+     already has the final rhythm (no reflow flash) when nothing sets the
+     attribute. Spacing only — control height / radius live in `CONTROL`
+     (control-tokens.ts) and are pinned to the host antd theme, so native and
+     antd controls keep matching inside one row.
+     Components reference these with a `var(--ui-gap-md,16px)`-style fallback, and
+     that fallback is deliberately NOT the compact value: it is the pre-change
+     geometry (12/16/20, 4px) for hosts that never import this file, so they render
+     exactly as before instead of collapsing to zero. Do not "align" the two. */
+  --ui-gap-sm: 8px;
+  --ui-gap-md: 12px;
+  --ui-gap-lg: 16px;
+  --ui-field-gap: 2px;      /* label → control */
+
   /* Type families — `--font-geist-*` are optional host-provided font vars
      (e.g. Next.js next/font). They gracefully fall back to system fonts when
      absent, so the theme is drop-in without any font wiring. */
@@ -86,6 +105,23 @@
   --font-mono: var(--font-geist-mono), "Geist Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
   /* --font-display kept for backward compat, maps to same sans */
   --font-display: var(--font-geist-sans), "Geist", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+}
+
+/* Both steps are spelled out, so `data-ui-density` is always the authority:
+   once the shell publishes a step, the rendered rhythm is the user's choice
+   even if the `:root` defaults above are ever retuned. */
+:root[data-ui-density="compact"] {
+  --ui-gap-sm: 8px;
+  --ui-gap-md: 12px;
+  --ui-gap-lg: 16px;
+  --ui-field-gap: 2px;
+}
+
+:root[data-ui-density="comfortable"] {
+  --ui-gap-sm: 12px;
+  --ui-gap-md: 20px;
+  --ui-gap-lg: 24px;
+  --ui-field-gap: 6px;
 }
 
 @theme inline {

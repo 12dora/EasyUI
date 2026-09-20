@@ -139,7 +139,11 @@ export function Field({ label, info, hint, error, required, htmlFor, children, c
     : children;
 
   return (
-    <div className={`flex flex-col gap-1 ${className}`}>
+    // 标签→控件的间距走 `--ui-field-gap`:它随「行距」偏好整体切换(见 theme.css),
+    // 所以一处设置就能收紧 / 放开全站表单的纵向节奏。控件高度与圆角不在其列。
+    // 兜底 4px 是改造前的老尺寸,故意不等于 theme.css 的缺省档(紧凑 2px):没引这份
+    // theme 的宿主照旧渲染,而不是变量失效塌成 0。
+    <div className={`flex flex-col gap-[var(--ui-field-gap,4px)] ${className}`}>
       {label && (
         <div className="flex min-h-6 items-center gap-1">
           <label htmlFor={controlId}>

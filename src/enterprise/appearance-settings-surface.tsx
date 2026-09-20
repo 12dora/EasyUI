@@ -5,10 +5,11 @@
  *
  * 两张卡片:
  *
- * 1. 表格密度(每个用户都有)。它是一份**账号偏好** —— 宿主把当前值与写回口挂在
- * `TableDensityProvider` 上,这张页面只读写那份上下文,自己既不取数也不落盘。
- * 于是「设置页改一下」与「所有列表页的行高」天然是同一个事实源,不会出现设置页
- * 显示宽松、列表仍然紧凑的两张皮。
+ * 1. 视觉效果(每个用户都有)。目前只有一行:**行距** —— 它既管列表行高,也管全站
+ * 表单里 input 之间的纵向节奏(见 `table/table-density.tsx`)。这是一份**账号偏好**,
+ * 宿主把当前值与写回口挂在 `TableDensityProvider` 上,这张页面只读写那份上下文,
+ * 自己既不取数也不落盘。于是「设置页改一下」与「所有页面的松紧」天然是同一个事实源,
+ * 不会出现设置页显示宽松、列表仍然紧凑的两张皮。
  * 2. 显示页脚(只有管理员,即宿主判定持有 `settings.app_setting.update` 时才画)。它是
  *    **全局设置**,存在通用设置(`/api/v1/app-settings/general` 的 `showFooter`)里:
  *    切换时**紧接着 PUT 之前**再 `load()` 一份最新的通用设置,把它连同新的
@@ -19,7 +20,7 @@
  * `createEnterpriseLabelCatalog` 里有 zh / en 两份),宿主也可以自带。
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { toast } from "../toast";
 import { Button } from "../primitives/button";
 import { Field } from "../primitives/field";
@@ -33,10 +34,10 @@ import { primeEnterpriseGeneralSettings, resolveEnterpriseShowFooter } from "./g
 export interface EnterpriseAppearanceSettingsLabels {
   title: string;
   description: string;
-  /** 卡片标题,例如「表格密度」。 */
-  densityTitle: string;
-  /** 卡片下方一句说明。 */
-  densityHint?: string;
+  /** 卡片标题,例如「视觉效果」。 */
+  visualTitle: string;
+  /** 设置行的标签,例如「行距」。 */
+  rowSpacing: string;
   densityCompact: string;
   densityComfortable: string;
   /** 写回账号偏好时的状态字。 */
@@ -90,7 +91,8 @@ export function EnterpriseAppearanceSettingsSurface({
   return (
     <div data-test-id="appearance-settings-page">
       <PageHeader title={labels.title} subtitle={labels.description} />
-      <div className="space-y-4">
+      {/* 兜底 16px = 改造前的 space-y-4;与 theme.css 的缺省档(紧凑 12px)不同是故意的。 */}
+      <div className="space-y-[var(--ui-gap-md,16px)]">
         <DensitySection labels={labels} />
         {canManageGlobal && generalSettingsAdapter ? (
           <GlobalAppearanceSection labels={labels} adapter={generalSettingsAdapter} />
@@ -100,33 +102,50 @@ export function EnterpriseAppearanceSettingsSurface({
   );
 }
 
+/**
+ * 卡片里的一行设置:左边一句标签,右边控件,同一条基线上。
+ *
+ * 刻意不用 `Field` —— `Field` 是"标签在上、控件在下"的录入布局,而设置页要的是
+ * 一行一个开关的清单式排布,以后再加一行(比如字号、主题)直接多写一个
+ * `<SettingRow>` 就行。窄屏时 `flex-wrap` 让控件掉到下一行,不会把标签挤没。
+ */
+function SettingRow({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <span className="text-[13px] text-ink">{label}</span>
+      <div className="flex flex-wrap items-center gap-3">{children}</div>
+    </div>
+  );
+}
+
 function DensitySection({ labels }: { labels: EnterpriseAppearanceSettingsLabels }) {
   const { density, setDensity, saving } = useTableDensity();
   return (
-      <div className="space-y-4 rounded-md border border-hairline bg-paper p-4" data-test-id="appearance-density-section">
-        <Field label={labels.densityTitle} hint={labels.densityHint}>
-          <div className="flex flex-wrap items-center gap-3">
-            <SegmentedToggle<TableDensity>
-              value={density}
-              options={densityOptions(labels)}
-              ariaLabel={labels.densityTitle}
-              dataTestId="appearance-density-toggle"
-              dataOptionAttribute="data-density"
-              onChange={(next) => {
-                if (next === density) return;
-                // 写回失败的回滚与提示是宿主的事(它才知道用什么提示通道);
-                // 这里只保证一次未捕获的 rejection 不会冒到控制台。
-                void Promise.resolve(setDensity(next)).catch(() => undefined);
-              }}
-            />
-            {saving ? (
-              <span className="text-[12px] text-ink-faint" data-test-id="appearance-density-saving">
-                {labels.saving}
-              </span>
-            ) : null}
-          </div>
-        </Field>
+    <div className="rounded-md border border-hairline bg-paper p-4" data-test-id="appearance-density-section">
+      <p className="text-[14px] font-semibold text-ink" data-test-id="appearance-visual-title">{labels.visualTitle}</p>
+      <div className="mt-4 space-y-[var(--ui-gap-md,16px)]">
+        <SettingRow label={labels.rowSpacing}>
+          <SegmentedToggle<TableDensity>
+            value={density}
+            options={densityOptions(labels)}
+            ariaLabel={labels.rowSpacing}
+            dataTestId="appearance-density-toggle"
+            dataOptionAttribute="data-density"
+            onChange={(next) => {
+              if (next === density) return;
+              // 写回失败的回滚与提示是宿主的事(它才知道用什么提示通道);
+              // 这里只保证一次未捕获的 rejection 不会冒到控制台。
+              void Promise.resolve(setDensity(next)).catch(() => undefined);
+            }}
+          />
+          {saving ? (
+            <span className="text-[12px] text-ink-faint" data-test-id="appearance-density-saving">
+              {labels.saving}
+            </span>
+          ) : null}
+        </SettingRow>
       </div>
+    </div>
   );
 }
 
@@ -195,7 +214,7 @@ function GlobalAppearanceSection({
   const controller = useGlobalAppearanceController(adapter, labels);
   const checked = resolveEnterpriseShowFooter(controller.value);
   return (
-    <div className="space-y-4 rounded-md border border-hairline bg-paper p-4" data-test-id="appearance-global-section">
+    <div className="space-y-[var(--ui-gap-md,16px)] rounded-md border border-hairline bg-paper p-4" data-test-id="appearance-global-section">
       <Field hint={labels.showFooterHint}>
         <div className="flex flex-wrap items-center gap-3">
           <Switch
