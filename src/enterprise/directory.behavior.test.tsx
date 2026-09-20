@@ -7,6 +7,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { toastBus } from "../toast";
 import { EnterpriseAccessSettingsSurface, type EnterpriseAccessSettingsAdapter } from "./access-settings-surface";
 import type { EnterpriseDirectorySettingsValue, EnterpriseDirectorySyncResult } from "./directory-settings-form";
 import { createEnterpriseLabelCatalog } from "./label-catalog";
@@ -57,7 +58,7 @@ function makeAdapter(overrides: Partial<EnterpriseAccessSettingsAdapter> = {}): 
   } as unknown as EnterpriseAccessSettingsAdapter;
 }
 
-async function mountSurface(adapter: EnterpriseAccessSettingsAdapter) {
+async function mountSurface(adapter: EnterpriseAccessSettingsAdapter, feedbackMode: "inline" | "toast" = "inline") {
   view = await mount(
     <EnterpriseAccessSettingsSurface
       adapter={adapter}
@@ -65,6 +66,7 @@ async function mountSurface(adapter: EnterpriseAccessSettingsAdapter) {
       permissions={{ viewIdentity: true, manageIdentity: true, viewAuthorization: false, manageAuthorization: false }}
       locale="en"
       preferredTab="login"
+      feedbackMode={feedbackMode}
     />,
   );
   await settle();
@@ -78,6 +80,7 @@ beforeEach(() => {
 afterEach(async () => {
   await view?.unmount();
   view = null;
+  toastBus.clear();
   vi.restoreAllMocks();
 });
 
@@ -243,5 +246,39 @@ describe("directory last-run report", () => {
     expect(byTestId(mounted.host, "directory-last-sync-trust").textContent).toBe(directoryLabels.trustAuthoritative);
     expect(mounted.host.querySelector("[data-test-id='directory-last-sync-incomplete']")).toBeNull();
     expect(byTestId(mounted.host, "directory-count-deactivated").textContent).toBe("2");
+  });
+});
+
+/**
+ * A directory load that fails must still be recoverable: toast hosts used to get
+ * a section that rendered nothing at all, which left the user no way back.
+ */
+describe("directory settings: a load that failed", () => {
+  it("carries the retry in the inline failure notice, and drops it once the retry succeeds", async () => {
+    const load = vi.fn().mockRejectedValueOnce(new Error("down")).mockResolvedValue(settings);
+    const mounted = await mountSurface(makeAdapter({ loadDirectorySettings: load }));
+
+    expect(byTestId(mounted.host, "directory-settings-failed")).toBeTruthy();
+    expect(mounted.host.querySelector("[data-test-id='directory-settings-section']")).toBeNull();
+
+    await click(byTestId(mounted.host, "directory-settings-retry"));
+    await settle();
+
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(byTestId(mounted.host, "directory-settings-section")).toBeTruthy();
+    // 重试不是常驻控件:读出来之后它就该消失。
+    expect(mounted.host.querySelector("[data-test-id='directory-settings-retry']")).toBeNull();
+  });
+
+  it("gives toast hosts a placeholder with the retry instead of an empty section", async () => {
+    const load = vi.fn().mockRejectedValue(new Error("down"));
+    const mounted = await mountSurface(makeAdapter({ loadDirectorySettings: load }), "toast");
+
+    expect(byTestId(mounted.host, "directory-settings-missing")).toBeTruthy();
+
+    await click(byTestId(mounted.host, "directory-settings-retry"));
+    await settle();
+
+    expect(load).toHaveBeenCalledTimes(2);
   });
 });

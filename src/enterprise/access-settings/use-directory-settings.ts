@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { EnterpriseDirectorySettingsLabels, EnterpriseDirectorySettingsValue } from "../directory-settings-form";
 import type { EnterpriseWriteOnlySecret } from "../integration-configuration-forms";
 import {
@@ -25,6 +25,8 @@ export interface DirectorySettings {
   result: SettingsOutcome | null;
   setCredential: (next: EnterpriseWriteOnlySecret) => void;
   patchValue: (patch: Partial<EnterpriseDirectorySettingsValue>) => void;
+  /** Re-runs the load. The panel only offers it after a load failed. */
+  reload: () => void;
   save: () => Promise<void>;
   test: () => Promise<void>;
   sync: () => Promise<void>;
@@ -66,7 +68,13 @@ export function useDirectorySettings({
   const [credential, setCredential] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
   const [busy, setBusy] = useState<DirectoryOperation | null>("load");
   const [result, setResult] = useState<SettingsOutcome | null>(null);
+  const [loadRevision, setLoadRevision] = useState(0);
   const report = useMemo(() => createOutcomeReporter(toastMode, setResult), [toastMode]);
+
+  const reload = useCallback(() => {
+    setBusy("load");
+    setLoadRevision((current) => current + 1);
+  }, []);
 
   useEffect(() => {
     const load = adapter.loadDirectorySettings;
@@ -77,7 +85,8 @@ export function useDirectorySettings({
       onError: () => report({ ok: false, message: labels.loadFailed }),
       onSettled: () => setBusy(null),
     });
-  }, [adapter, labels.loadFailed, report]);
+    // `report` is keyed by `toastMode`; an explicit retry bumps `loadRevision`.
+  }, [adapter, labels.loadFailed, report, loadRevision]);
 
   const context: DirectoryOperationContext = {
     adapter,
@@ -102,6 +111,7 @@ export function useDirectorySettings({
     result,
     setCredential,
     patchValue: (patch) => setValue((current) => (current ? { ...current, ...patch } : current)),
+    reload,
     save: () => saveDirectory(context),
     test: () => testDirectory(context),
     sync: () => syncDirectory(context),

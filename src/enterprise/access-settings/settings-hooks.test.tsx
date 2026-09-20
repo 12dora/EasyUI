@@ -326,6 +326,18 @@ describe("useDirectorySettings", () => {
     expect(state.current.result).toEqual({ ok: true, message: "Roster applied." });
   });
 
+  it("re-issues the load when the user retries a failed one", async () => {
+    const load = vi.fn().mockRejectedValueOnce(new Error("down")).mockResolvedValue(directory);
+    const state = await mountDirectory(makeAdapter({ loadDirectorySettings: load }), "toast");
+    expect(state.current.value).toBeNull();
+
+    await run(() => state.current.reload());
+
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(state.current.value).toEqual(directory);
+    expect(state.current.busy).toBeNull();
+  });
+
   it("stays inert for a host whose adapter cannot serve the directory", async () => {
     const adapter = makeAdapter({ loadDirectorySettings: undefined, saveDirectorySettings: undefined });
     const state = await mountDirectory(adapter);
