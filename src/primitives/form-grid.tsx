@@ -13,8 +13,9 @@ const COLUMNS_CLASS: Record<FormGridColumns, string> = {
 
 /**
  * 栅格间距走 `--ui-gap-*`,不写死像素:这三个变量由「行距」偏好(设置 → 外观)
- * 在 `<html data-ui-density>` 上整体切换,表单因此跟着列表一起松紧,而不用往下传 prop。
- * 见 `theme.css` 与 `table/table-density.tsx`。
+ * 在 `<html data-ui-density>` 上整体切换,一处设置就把全站表单的纵向节奏一起收紧 / 放开,
+ * 不用往下传 prop。表格行高是另一档偏好(「表格」),两者互不牵连。
+ * 见 `theme.css` 与 `row-spacing.tsx`。
  *
  * 兜底值(12/16/20)是**改造前的老尺寸**,故意与 `theme.css` 里的缺省档(紧凑 8/12/16)
  * 不一致:theme.css 是产品默认,兜底只服务没引这份 theme 的宿主 —— 它们看到的仍是改造前的

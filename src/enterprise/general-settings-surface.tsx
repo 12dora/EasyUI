@@ -306,7 +306,7 @@ function GeneralLocaleFields({
   const english = locale === "en";
   const suffix = english ? "en" : "zh";
   return (
-    <div className="space-y-4">
+    <div className="ui-stack">
       <Field label={labels.appTitle} hint={labels.appTitleHint}>
         <Input
           value={english ? value.titleEn : value.titleZh}
@@ -377,7 +377,7 @@ function GeneralSettingsForm({
   // discarded. No editable control during a save means no edit to lose.
   const disabled = !controller.value || controller.loading || controller.saving;
   return (
-    <div className="space-y-5 rounded-md border border-hairline bg-paper p-4" data-test-id="app-settings-section">
+    <div className="ui-stack-lg rounded-md border border-hairline bg-paper p-4" data-test-id="app-settings-section">
       <GeneralLogoControl
         labels={labels}
         logoDataUrl={value.logoDataUrl}

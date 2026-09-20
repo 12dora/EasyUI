@@ -117,7 +117,7 @@ export function EnterpriseDeliveryStatusDetail({
     raw ? formatEnterpriseTimestamp(raw, { locale, empty: labels.notAvailable, formatTimestamp, timeZone }) : labels.notAvailable;
   const unconfirmed = isEnterpriseDeliveryUnconfirmed(value, now ?? Date.now(), unconfirmedAfterMs);
   return (
-    <div className="space-y-3 rounded-md border border-hairline bg-paper p-4" data-test-id={testId}>
+    <div className="ui-stack-sm rounded-md border border-hairline bg-paper p-4" data-test-id={testId}>
       <header className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[13px] font-medium text-ink">{labels.title}</p>
         <EnterpriseDeliveryStatusBadge status={value.status} labels={labels} />

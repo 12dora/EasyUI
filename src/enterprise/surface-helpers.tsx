@@ -138,11 +138,11 @@ export function EnterpriseLoginSurfaceSkeleton({
       aria-busy="true"
       data-test-id={testId}
     >
-      <div className="w-full max-w-sm space-y-6">
+      <div className="ui-stack-lg w-full max-w-sm">
         <div className="flex flex-col items-center gap-2">
           <div className={`${shimmerClass} h-7 w-32`} />
         </div>
-        <div className="space-y-4 rounded-lg border border-hairline bg-paper p-6 shadow-sm">
+        <div className="ui-stack rounded-lg border border-hairline bg-paper p-6 shadow-sm">
           <div className={`${shimmerClass} h-11 w-full`} />
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-hairline" />
@@ -192,7 +192,7 @@ export function EnterpriseSettingsFormSkeleton({
 }) {
   return (
     <div
-      className="min-h-[220px] space-y-4 rounded-md border border-hairline bg-paper p-4"
+      className="ui-stack min-h-[220px] rounded-md border border-hairline bg-paper p-4"
       aria-busy="true"
       data-test-id={testId}
     >
@@ -222,7 +222,7 @@ export function EnterpriseAuthorizationWorkspaceSkeleton({
   testId?: string;
 }) {
   return (
-    <div className="min-h-[320px] space-y-4" aria-busy="true" data-test-id={testId}>
+    <div className="ui-stack min-h-[320px]" aria-busy="true" data-test-id={testId}>
       <div className="rounded-md border border-hairline bg-paper p-4">
         <div className={`${shimmerClass} mb-3 h-4 w-36`} />
         <div className="grid gap-3 sm:grid-cols-2">

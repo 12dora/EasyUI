@@ -10,7 +10,7 @@ export function IdentityStatusSummary({
   labels: EnterpriseSettingsConfigurationLabels;
 }) {
   return (
-    <div className="space-y-3 rounded-md border border-hairline bg-paper p-4" data-test-id="identity-status-summary">
+    <div className="ui-stack-sm rounded-md border border-hairline bg-paper p-4" data-test-id="identity-status-summary">
       <div>
         <p className="text-[14px] font-semibold text-ink">{labels.oidcTitle}</p>
         <p className="mt-1 text-[12px] text-ink-faint">{labels.oidcDescription}</p>

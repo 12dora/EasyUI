@@ -94,7 +94,7 @@ function EasyAuthConfigurationBlock({
     </div>
   );
   return (
-    <div className="space-y-3" data-test-id="easyauth-settings-block">
+    <div className="ui-stack-sm" data-test-id="easyauth-settings-block">
       <div className="flex justify-end">
         <Button
           variant="outline"

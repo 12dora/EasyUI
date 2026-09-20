@@ -74,10 +74,10 @@ export function EnterpriseCredentialLoginSurface(props: EnterpriseCredentialLogi
           <h1 className="text-[24px] font-semibold tracking-tight text-ink">{labels.title}</h1>
         </div>
         {props.notice ? (
-          <InlineNotice tone={props.notice.tone} title={props.notice.title} message={props.notice.message} className="mb-4" />
+          <InlineNotice tone={props.notice.tone} title={props.notice.title} message={props.notice.message} className="mb-[var(--ui-gap-md,16px)]" />
         ) : null}
         <div className="rounded-lg border border-hairline bg-paper p-6 shadow-sm">
-          <div className="mb-4 flex flex-col gap-3" data-test-id="login-oidc-entry">
+          <div className="mb-[var(--ui-gap-md,16px)] flex flex-col gap-[var(--ui-gap-sm,12px)]" data-test-id="login-oidc-entry">
             <Button
               type="button"
               variant="primary"
@@ -101,7 +101,7 @@ export function EnterpriseCredentialLoginSurface(props: EnterpriseCredentialLogi
               <span className="h-px flex-1 bg-hairline" />
             </div>
           </div>
-          <form onSubmit={(event) => void props.onSubmit(event)} noValidate className="flex flex-col gap-4" data-test-id="login-form">
+          <form onSubmit={(event) => void props.onSubmit(event)} noValidate className="flex flex-col gap-[var(--ui-gap-md,16px)]" data-test-id="login-form">
             <Field label={labels.username} htmlFor="username" required>
               <Input
                 id="username"
@@ -126,7 +126,7 @@ export function EnterpriseCredentialLoginSurface(props: EnterpriseCredentialLogi
               />
             </Field>
             {props.secondFactorMethods ? (
-              <div className="mt-1 flex flex-col gap-4 border-t border-hairline pt-4" data-test-id="login-need-totp">
+              <div className="mt-1 flex flex-col gap-[var(--ui-gap-md,16px)] border-t border-hairline pt-4" data-test-id="login-need-totp">
                 <div>
                   <h2 className="text-[15px] font-semibold text-ink" data-test-id="login-second-factor-title">
                     {labels.secondFactorTitle}
@@ -155,7 +155,7 @@ export function EnterpriseCredentialLoginSurface(props: EnterpriseCredentialLogi
                   </div>
                 ) : null}
                 {props.activeMethod === "passkey" ? (
-                  <div className="flex flex-col gap-3" data-test-id="login-passkey-pane">
+                  <div className="flex flex-col gap-[var(--ui-gap-sm,12px)]" data-test-id="login-passkey-pane">
                     <p className="text-[12px] leading-5 text-ink-soft">{labels.passkeyHint}</p>
                     <Button
                       type="button"
@@ -177,7 +177,7 @@ export function EnterpriseCredentialLoginSurface(props: EnterpriseCredentialLogi
                     ) : null}
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-4" data-test-id="login-totp-pane">
+                  <div className="flex flex-col gap-[var(--ui-gap-md,16px)]" data-test-id="login-totp-pane">
                     <Field label={labels.totpCode} htmlFor="totp" required>
                       <Input
                         id="totp"
@@ -266,5 +266,5 @@ export function EnterpriseChangePasswordForm({ labels, onSubmit, onSuccess, feed
       else setError(labels.failed);
     } finally { setBusy(false); }
   }
-  return <form className="space-y-4" onSubmit={submit} data-test-id="change-password-form">{error && feedbackMode === "inline" ? <InlineNotice tone="error" message={error}/> : null}<Field label={labels.currentPassword} required><Input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} data-test-id="change-password-current"/></Field><Field label={labels.newPassword} required><Input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} aria-invalid={feedbackMode === "toast" && Boolean(error) || undefined} data-test-id="change-password-new"/></Field><Field label={labels.confirmPassword} required><Input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} aria-invalid={feedbackMode === "toast" && Boolean(error) || undefined} data-test-id="change-password-confirm"/></Field><Button type="submit" variant="primary" className="w-full" loading={busy} data-test-id="change-password-submit">{busy ? labels.submitting : labels.submit}</Button></form>;
+  return <form className="ui-stack" onSubmit={submit} data-test-id="change-password-form">{error && feedbackMode === "inline" ? <InlineNotice tone="error" message={error}/> : null}<Field label={labels.currentPassword} required><Input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} data-test-id="change-password-current"/></Field><Field label={labels.newPassword} required><Input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} aria-invalid={feedbackMode === "toast" && Boolean(error) || undefined} data-test-id="change-password-new"/></Field><Field label={labels.confirmPassword} required><Input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} aria-invalid={feedbackMode === "toast" && Boolean(error) || undefined} data-test-id="change-password-confirm"/></Field><Button type="submit" variant="primary" className="w-full" loading={busy} data-test-id="change-password-submit">{busy ? labels.submitting : labels.submit}</Button></form>;
 }

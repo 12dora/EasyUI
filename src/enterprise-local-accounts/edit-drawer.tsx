@@ -278,7 +278,7 @@ export function EditAccountDrawer({
         ) : loadFailed || !detail ? (
           <InlineNotice tone="error" message={labels.loadFailed} actionLabel={labels.retry} onAction={() => void loadDetail()} />
         ) : (
-          <div className="space-y-4">
+          <div className="ui-stack">
             <DrawerSection first>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="text-[15px] font-semibold text-ink">{detail.username}</span>
@@ -295,7 +295,7 @@ export function EditAccountDrawer({
             </DrawerSection>
 
             <DrawerSection title={labels.profileSection}>
-              <div className="space-y-3">
+              <div className="ui-stack-sm">
                 <div>
                   <label htmlFor={emailInputId} className="mb-1 block text-[12px] text-ink-soft">
                     {labels.email}

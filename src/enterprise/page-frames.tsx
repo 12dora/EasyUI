@@ -89,7 +89,7 @@ export function EnterprisePasswordRecoverySurface({
           <div className="mb-8 text-center">
             <h1 className="text-[24px] font-semibold tracking-tight text-ink">{title}</h1>
           </div>
-          <InlineNotice tone="warning" className="mb-4" message={forcedNotice} data-test-id="change-password-forced-notice" />
+          <InlineNotice tone="warning" className="mb-[var(--ui-gap-md,16px)]" message={forcedNotice} data-test-id="change-password-forced-notice" />
           <div className="rounded-lg border border-hairline bg-paper p-6 shadow-sm">{children}</div>
         </div>
       </div>

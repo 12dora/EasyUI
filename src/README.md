@@ -625,9 +625,47 @@ JS 侧同值导出:`APP_SHELL_MAIN_PADDING_TOP_PX`(`{ base: 12, md: 16 }`)与变
 | Status   | `--status-draft/pending/active/stop/archive` (fills, borders, icon glyphs) + `--status-pending-ink` (amber **text**: warning notices — the fill amber is 3.19:1 and fails AA) |
 | Motion   | `--ease-out-paper`, `--ease-press`, `--ease-pop`; `--duration-fast/base/slow/page/dialog` (mirrored in `motion.ts`) |
 | Type     | `--font-sans`, `--font-mono`, `--font-display` |
+| Spacing  | `--ui-field-gap`, `--ui-gap-sm/md/lg`, `--ui-section-gap` —— 竖向行距刻度,见下一节 |
 
 All colors are stored as space-separated RGB channels so you can apply any
 opacity: `rgb(var(--ink) / 0.06)`.
+
+## 竖向行距 (vertical rhythm)
+
+整个套件只有**一把竖向刻度**,定义在 `theme.css`,跟着用户的「行距」偏好(紧凑 / 宽松)
+整体收紧或放宽。**不要再手写 `space-y-4` 这类一次性间距** —— 一个文件写死一个值,正是
+「每页松紧不一样」的来源,而且它不会跟着偏好动。
+
+| 变量 | 紧凑 | 宽松 | 没挂 theme.css 时的兜底 | 管什么 |
+| --- | --- | --- | --- | --- |
+| `--ui-field-gap` | 2px | 6px | 4px | 标签 → 控件(`Field` 自己用) |
+| `--ui-gap-sm` | 8px | 12px | 12px | 同一组里挨得更紧的行 |
+| `--ui-gap-md` | 12px | 20px | 16px | 表单 / 卡片正文里的字段之间 |
+| `--ui-gap-lg` | 16px | 24px | 20px | 页面上一张张卡片之间 |
+| `--ui-section-gap` | 32px | 44px | 40px | `Section` 与 `Section` 之间 |
+
+三个纯 CSS 类(同样在 `theme.css`,`> * + *` 加 `margin-top`),直接替掉原来的 Tailwind
+`space-y-*`:
+
+| 写这个 | 不要再写 | 步长 |
+| --- | --- | --- |
+| `ui-stack` | `space-y-4` | `--ui-gap-md` |
+| `ui-stack-sm` | `space-y-3` | `--ui-gap-sm` |
+| `ui-stack-lg` | `space-y-5` / `space-y-6` | `--ui-gap-lg` |
+
+不用 `space-y-*` 的场合:
+
+- 竖向 flex 的表单容器写 `gap-[var(--ui-gap-sm,12px)]` / `gap-[var(--ui-gap-md,16px)]`
+  (替掉 `flex flex-col gap-3` / `gap-4`);
+- 纯粹用来隔开表单行 / 卡片的 `mt-4` / `mb-4` 写 `mt-[var(--ui-gap-md,16px)]` /
+  `mb-[var(--ui-gap-md,16px)]`;
+- `FormGrid` 的行列间距与 `Field` 的标签间距已经在组件里读这几个变量,调用方什么都不用传;
+- `Dialog` 正文(`.ui-stack`)与 `Section` 的尾部外边距(`--ui-section-gap`)也已经接好。
+
+**刻度不管的东西,别顺手改:**`space-y-1` / `space-y-2`(标题 + 一行说明、徽章簇、正文段落)
+是排版不是行距;所有横向间距(`gap-x-*`、`flex-row` 里的 gap、工具条、`gap-1`/`gap-2` 的行内簇)、
+所有 padding(`p-4`、`px-*`、`py-*`)、控件高度与圆角、表格内部(`src/table/`)都不归它管 ——
+在紧凑档把这些一起收掉,页面会直接看起来是坏的。
 
 ## How EasyTrade consumes it
 

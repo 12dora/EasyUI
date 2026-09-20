@@ -12,7 +12,7 @@ export function PageLoadingSkeleton({ rowCount = 6 }: PageLoadingSkeletonProps) 
     <section
       aria-busy="true"
       aria-live="polite"
-      className="space-y-6"
+      className="ui-stack-lg"
       data-test-id="page-loading-skeleton"
     >
       <header className="border-b border-hairline pb-5">

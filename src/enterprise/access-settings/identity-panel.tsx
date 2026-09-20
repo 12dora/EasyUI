@@ -92,7 +92,7 @@ function renderToastIdentity(context: IdentityRenderContext): ReactNode {
   );
 
   return (
-    <div className="space-y-3">
+    <div className="ui-stack-sm">
       <div className="flex justify-end">
         <Button variant="outline" size="sm" loading={busy === "load"} data-test-id="identity-settings-retry" onClick={identity.reload}>{labels.retry ?? "Retry"}</Button>
       </div>

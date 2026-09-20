@@ -48,12 +48,12 @@ export function EnterpriseSecurityWorkspace({ labels, password, twoFactor, foote
   return (
     <section data-test-id="enterprise-security-settings" data-enterprise-surface="security-settings">
       {showHeader ? <PageHeader title={labels.title} subtitle={labels.description} /> : null}
-      <div className={`${showHeader ? "mt-6 " : ""}space-y-4`}>
+      <div className={`${showHeader ? "mt-6 " : ""}ui-stack`}>
         {password ? (
           <div className="rounded-md border border-hairline bg-paper p-4" data-test-id="password-card">
             <p className="text-[14px] font-semibold text-ink" data-test-id="password-card-title">{labels.passwordTitle}</p>
             <p className="mt-1 text-[12px] text-ink-faint">{labels.passwordDescription}</p>
-            <div className="mt-4">{password}</div>
+            <div className="mt-[var(--ui-gap-md,16px)]">{password}</div>
           </div>
         ) : null}
         {twoFactor ? (

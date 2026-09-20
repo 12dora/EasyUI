@@ -204,7 +204,7 @@ export function EnterpriseDirectorySettingsForm({
         </>
       }
     >
-      <div className="space-y-4" data-test-id="directory-settings-form">
+      <div className="ui-stack" data-test-id="directory-settings-form">
         {/* Feedback for the header actions, so it stays outside the gate: switching the
             block off and saving that is a supported flow, and its result must stay
             readable and in the accessibility tree while the body is inert. */}
@@ -215,7 +215,7 @@ export function EnterpriseDirectorySettingsForm({
             data-test-id="directory-operation-result"
           />
         ) : null}
-        <GatedBody off={!value.enabled} className="space-y-4">
+        <GatedBody off={!value.enabled} className="ui-stack">
           <DirectoryFields
             labels={labels}
             value={value}
@@ -337,7 +337,7 @@ export function EnterpriseDirectorySyncStatusBlock({
     ? formatEnterpriseTimestamp(lastSync.at, { locale, empty: labels.notAvailable, formatTimestamp, timeZone })
     : labels.notAvailable;
   return (
-    <div className="space-y-3 rounded-md border border-hairline bg-paper p-4" data-test-id="directory-last-sync">
+    <div className="ui-stack-sm rounded-md border border-hairline bg-paper p-4" data-test-id="directory-last-sync">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[13px] font-medium text-ink">{labels.lastSyncTitle}</p>
         <span data-test-id="directory-last-sync-status" data-status={lastSync.status}>

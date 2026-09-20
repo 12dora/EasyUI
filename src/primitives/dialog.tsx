@@ -217,7 +217,10 @@ function DialogFrame({
           asideRef={setHeaderAside}
         />
         <HeaderAsideContext.Provider value={headerAside}>
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5 max-md:px-4 max-md:py-4">{children}</div>
+          {/* 正文自己就是一摞行:子节点之间的竖向节奏走共享行距刻度(theme.css 的 `.ui-stack`),
+              跟着用户的「行距」偏好一起收紧 / 放宽;留白(px/py)是容器几何,不归行距管。
+              只传一个子节点的调用方不受影响(`> * + *` 命不中)。 */}
+          <div className="ui-stack min-h-0 flex-1 overflow-y-auto px-6 py-5 max-md:px-4 max-md:py-4">{children}</div>
         </HeaderAsideContext.Provider>
         {footer ? <DialogFooter>{footer}</DialogFooter> : null}
       </div>

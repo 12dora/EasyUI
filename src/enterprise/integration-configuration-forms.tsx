@@ -118,11 +118,11 @@ export function EnterpriseOidcConfigurationForm(props: OidcFormProps) {
         description={labels.oidcDescription}
         actions={<OidcCardActions {...props} />}
       >
-        <div className="space-y-4">
+        <div className="ui-stack">
           {/* 标题行动作的反馈留在闸门之外:关掉这张卡再保存是正常流程,正文变灰之后
               这条结果仍要读得到、也仍在无障碍树里。 */}
           {props.operationResult ? <InlineNotice tone={props.operationResult.ok ? "success" : "error"} message={props.operationResult.message} data-test-id="identity-connection-test-result" /> : null}
-          <GatedBody off={!value.enabled} className="space-y-4">
+          <GatedBody off={!value.enabled} className="ui-stack">
             <Field label={<GuidedLabel label={labels.issuer} guide={labels.guides?.issuer} ariaLabel={labels.guideAriaLabel} testId="identity-guide-issuer" />} htmlFor="enterprise-oidc-issuer">
               <div className="flex items-start gap-2">
                 <Input id="enterprise-oidc-issuer" value={value.issuer} disabled={disabled} className="font-mono" onChange={(event) => props.onChange({ issuer: event.target.value })} />
@@ -143,7 +143,7 @@ export function EnterpriseOidcConfigurationForm(props: OidcFormProps) {
       {!disabled || !props.hideAdvancedWhenDisabled ? (
         <Section title={labels.advancedTitle} description={labels.advancedDescription} actions={<Button variant="ghost" size="sm" onClick={() => setAdvancedOpen((open) => !open)} data-test-id="identity-advanced-toggle">{advancedOpen ? labels.advancedHide : labels.advancedShow}</Button>}>
           <CollapseReveal open={advancedOpen} data-test-id="identity-advanced-reveal">
-            <div className="space-y-4" data-test-id="identity-advanced-fields">
+            <div className="ui-stack" data-test-id="identity-advanced-fields">
               <EnterpriseConfigurationFieldGrid>
                 <TextField id="enterprise-oidc-authorization-endpoint" label={labels.authorizationEndpoint} value={value.authorizationEndpoint} disabled={disabled} onChange={(authorizationEndpoint) => props.onChange({ authorizationEndpoint })} />
                 <TextField id="enterprise-oidc-token-endpoint" label={labels.tokenEndpoint} value={value.tokenEndpoint} disabled={disabled} onChange={(tokenEndpoint) => props.onChange({ tokenEndpoint })} />

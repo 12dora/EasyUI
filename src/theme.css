@@ -80,9 +80,11 @@
   --ease-pop: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Vertical rhythm — driven by the account-level 行距 (row spacing) preference.
-     `TableDensityProvider` publishes the current density onto <html> as
+     `RowSpacingProvider` publishes the current step onto <html> as
      `data-ui-density`, and the two blocks below re-point these variables; every
      form in the app re-spaces itself without a single prop being passed down.
+     Table row height is a SEPARATE account preference (`TableDensityProvider`)
+     and does not touch these variables.
      The values here are the **compact** ones on purpose: compact is the global
      default and is also what SSR renders before hydration, so the first paint
      already has the final rhythm (no reflow flash) when nothing sets the
@@ -97,6 +99,7 @@
   --ui-gap-md: 12px;
   --ui-gap-lg: 16px;
   --ui-field-gap: 2px;      /* label → control */
+  --ui-section-gap: 32px;   /* section → section */
 
   /* Type families — `--font-geist-*` are optional host-provided font vars
      (e.g. Next.js next/font). They gracefully fall back to system fonts when
@@ -115,6 +118,7 @@
   --ui-gap-md: 12px;
   --ui-gap-lg: 16px;
   --ui-field-gap: 2px;
+  --ui-section-gap: 32px;
 }
 
 :root[data-ui-density="comfortable"] {
@@ -122,6 +126,26 @@
   --ui-gap-md: 20px;
   --ui-gap-lg: 24px;
   --ui-field-gap: 6px;
+  --ui-section-gap: 44px;
+}
+
+/* 纵向节奏的三档栈。写成普通 CSS 而不是 Tailwind 的 `space-y-*`:间距要跟着
+   「行距」偏好整体切换,一处改全站动,而 `space-y-4` 是写死的一个数。
+   回退值(12/16/20)= 改动前 `space-y-3/4/5` 的几何,没引入本文件的宿主照旧渲染。
+
+   用法:表单 / 卡片正文里一行一行往下排的容器用 `ui-stack`(字段之间),
+   同一组里挨得更紧的用 `ui-stack-sm`,页面上一张张卡片之间用 `ui-stack-lg`。
+   纯文字的小簇(标题 + 一行说明)保持 `space-y-1/2` —— 那是排版,不是行距。 */
+.ui-stack > * + * {
+  margin-top: var(--ui-gap-md, 16px);
+}
+
+.ui-stack-sm > * + * {
+  margin-top: var(--ui-gap-sm, 12px);
+}
+
+.ui-stack-lg > * + * {
+  margin-top: var(--ui-gap-lg, 20px);
 }
 
 @theme inline {

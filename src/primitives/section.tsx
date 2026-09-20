@@ -11,9 +11,9 @@ interface Props {
   /** A small mono badge to print after the title */
   badge?: ReactNode;
   /**
-   * When true, omit the default trailing `mb-10`. Use for the sole / last
+   * When true, omit the default trailing section gap. Use for the sole / last
    * section inside a padded panel so the panel padding is not doubled with
-   * a 40px empty margin (FE-UXA-11). Default keeps `mb-10` so stacked
+   * an empty margin (FE-UXA-11). Default keeps `--ui-section-gap` so stacked
    * sections in EasyTrade / enterprise settings keep their existing gaps.
    */
   flush?: boolean;
@@ -23,7 +23,8 @@ interface Props {
 
 /**
  * Section spacing contract (FE-UXA-11):
- * - Default: `mb-10` between stacked sections (unchanged for existing callers).
+ * - Default: `mb-[var(--ui-section-gap,40px)]` between stacked sections — the
+ *   section step of the shared 行距 scale (`theme.css`), so 紧凑 / 宽松 moves it.
  * - Terminal / sole child of a panel: pass `flush` so the parent owns padding.
  * - Custom spacing: pass `className` (e.g. `mb-6`) — it is appended after the
  *   default spacing class; use `flush` + `className="mb-6"` for a custom gap.
@@ -46,7 +47,7 @@ export function Section({
   flush = false,
   className = "",
 }: Props) {
-  const spacing = flush ? "" : "mb-10";
+  const spacing = flush ? "" : "mb-[var(--ui-section-gap,40px)]";
   return (
     <section className={`easy-section-enter ${spacing} ${className}`.trim()}>
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-ink/10 pb-2">
