@@ -91,14 +91,6 @@
         186
       ]
     },
-    "src/enterprise/authorization-workspace.tsx": {
-      "file-sloc": [
-        523
-      ],
-      "max-lines": [
-        516
-      ]
-    },
     "src/enterprise/authorization-workspace.tsx::<anonymous>#0": {
       "complexity": [
         12
@@ -109,17 +101,12 @@
         58
       ],
       "max-lines-per-function": [
-        256
+        226
       ]
     },
     "src/enterprise/authorization-workspace.tsx::normalizeEnterpriseManifest": {
       "complexity": [
         20
-      ]
-    },
-    "src/enterprise/directory-settings-form.tsx::EnterpriseDirectorySettingsForm": {
-      "max-lines-per-function": [
-        123
       ]
     },
     "src/enterprise/footer.tsx::isSafeHref": {
@@ -134,7 +121,7 @@
     },
     "src/enterprise/integration-configuration-forms.tsx::EnterpriseOidcConfigurationForm": {
       "complexity": [
-        16
+        14
       ]
     },
     "src/enterprise/label-catalog.ts::chineseCatalog": {

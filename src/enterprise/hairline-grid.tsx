@@ -13,7 +13,7 @@
  */
 import { ConfigProvider, Table } from "antd";
 import type { TableProps } from "antd";
-import type { ReactNode } from "react";
+import type { HTMLAttributes, ReactNode } from "react";
 
 /**
  * Resolved defaults for hosts on the stock theme.css palette — same approach
@@ -32,7 +32,18 @@ export interface HairlineGridProps<RecordType extends object>
   > {
   /** Empty-state copy; rendered like the previous `<p class="p-4 text-center text-ink-faint">` block. */
   empty: ReactNode;
+  /**
+   * Extra class merged onto every header cell. The one supported use is pinning
+   * the header inside a fixed-height scroll viewport
+   * (`"sticky top-0 z-10 bg-paper"`): CSS `position: sticky` only takes effect on
+   * `<th>`/`<td>`, never on the `<tr>` around them, and the header row is owned
+   * by antd — so callers cannot reach it from the outside. Columns keep their own
+   * `onHeaderCell` (e.g. `hairlineHeaderCell`); this class is appended to it.
+   */
+  headerCellClassName?: string;
 }
+
+type HeaderCellFn = (...args: never[]) => HTMLAttributes<HTMLElement>;
 
 /**
  * The raw tables drew a stronger hairline under the header row than between
@@ -45,8 +56,22 @@ export function hairlineHeaderCell() {
 
 export function HairlineGrid<RecordType extends object>({
   empty,
+  headerCellClassName,
+  columns,
   ...tableProps
 }: HairlineGridProps<RecordType>) {
+  const mergedColumns = headerCellClassName && columns
+    ? columns.map((column) => {
+        const existing = (column as { onHeaderCell?: HeaderCellFn }).onHeaderCell;
+        return {
+          ...column,
+          onHeaderCell: (...args: never[]) => {
+            const base = existing ? existing(...args) : {};
+            return { ...base, className: [base.className, headerCellClassName].filter(Boolean).join(" ") };
+          },
+        };
+      }) as typeof columns
+    : columns;
   return (
     <ConfigProvider
       theme={{
@@ -76,6 +101,7 @@ export function HairlineGrid<RecordType extends object>({
     >
       <Table<RecordType>
         {...tableProps}
+        columns={mergedColumns}
         pagination={false}
         locale={{ emptyText: <p className="p-4 text-center text-ink-faint">{empty}</p> }}
       />

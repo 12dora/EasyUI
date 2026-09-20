@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Badge } from "../primitives/badge";
 import { Button } from "../primitives/button";
 import { Dialog } from "../primitives/dialog";
 import { Field, Input } from "../primitives/field";
@@ -11,6 +10,7 @@ import { Section } from "../primitives/section";
 import { AsyncStateTransition } from "../primitives/async-state-transition";
 import { formatEnterpriseTimestamp, type EnterpriseTimestampFormatter } from "./format-timestamp";
 import { HairlineGrid, hairlineHeaderCell } from "./hairline-grid";
+import { EnterpriseMyGrantsSection, EnterprisePermissionCatalogSection, StateBadge } from "./permission-list-sections";
 import { EnterpriseIntegrationFactGrid } from "./shared-settings";
 import { EnterpriseAuthorizationWorkspaceSkeleton } from "./surface-helpers";
 import { toast } from "../toast";
@@ -84,6 +84,12 @@ export interface AuthorizationWorkspaceLabels {
   issuer: string; clientId: string; redirectUri: string; endpoint: string; appKey: string; principalMode: string;
   connectionTest: string; testing: string; connectionOk: string; connectionFailed: string;
   catalogTitle: string; catalogDescription: string; permissionCode: string; permissionName: string; scopes: string; risk: string; status: string;
+  /**
+   * Risk-level values (`riskLevel`): backend sends `"standard"` / `"high"`.
+   * Optional — a missing label falls back to the raw value, so hosts that build
+   * this catalog by hand keep compiling.
+   */
+  riskStandard?: string; riskHigh?: string;
   snapshotsTitle: string; snapshotsDescription: string; user: string; grants: string; roles: string; fetchedAt: string; refresh: string; refreshing: string; expired: string;
   manifestTitle: string; manifestDescription: string; version: string; capabilities: string; permissions: string;
   loading: string; loadFailed: string; empty: string;
@@ -298,40 +304,10 @@ export function EnterpriseAuthorizationWorkspace({
             <DescriptorKeys adapter={adapter} labels={labels} items={descriptorKeys} onChange={setDescriptorKeys} canManage={canManage}/>
           ) : null}
           {!restrictedViewer && adapter.loadMyGrants ? (
-            <Section title={labels.myGrantsTitle} description={labels.myGrantsDescription}>
-              <div className="overflow-x-auto" data-data-grid="authz-my-grants">
-                <HairlineGrid<EnterpriseCurrentGrant>
-                  className="w-full"
-                  showHeader={false}
-                  rowKey={(grant) => `${grant.permissionCode}:${grant.dataScope}`}
-                  dataSource={grants}
-                  empty={labels.empty}
-                  columns={[
-                    { key: "code", dataIndex: "permissionCode", onCell: () => ({ className: "font-mono" }) },
-                    { key: "scope", render: (_, grant) => <Badge tone="neutral">{scopeLabel(grant.dataScope, labels)}</Badge> },
-                  ]}
-                />
-              </div>
-            </Section>
+            <EnterpriseMyGrantsSection grants={grants} catalog={catalog} labels={labels} locale={locale}/>
           ) : null}
           {!restrictedViewer ? (
-            <Section title={labels.catalogTitle} description={labels.catalogDescription}>
-              <div className="overflow-x-auto" data-test-id="authz-permission-catalog">
-                <HairlineGrid<EnterprisePermissionCatalogItem>
-                  className="w-full min-w-[680px]"
-                  rowKey={(item) => item.code}
-                  dataSource={catalog}
-                  empty={labels.empty}
-                  columns={[
-                    { key: "code", title: labels.permissionCode, dataIndex: "code", onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-mono" }) },
-                    { key: "name", title: labels.permissionName, onHeaderCell: hairlineHeaderCell, render: (_, item) => (locale.startsWith("zh") ? item.nameZh : item.nameEn) || labels.notAvailable },
-                    { key: "scopes", title: labels.scopes, onHeaderCell: hairlineHeaderCell, onCell: () => ({ className: "font-mono" }), render: (_, item) => item.supportedScopes.join(", ") },
-                    { key: "risk", title: labels.risk, dataIndex: "riskLevel", onHeaderCell: hairlineHeaderCell },
-                    { key: "status", title: labels.status, onHeaderCell: hairlineHeaderCell, render: (_, item) => <StateBadge value={item.active} labels={labels}/> },
-                  ]}
-                />
-              </div>
-            </Section>
+            <EnterprisePermissionCatalogSection catalog={catalog} labels={labels} locale={locale}/>
           ) : null}
           {!restrictedViewer ? (
             <SnapshotsSection
@@ -393,9 +369,6 @@ function Fact({ label, value, empty }: { label: string; value: ReactNode; empty?
     </div>
   );
 }
-function StateBadge({ value, labels }: { value: boolean; labels: AuthorizationWorkspaceLabels }) {
-  return <Badge tone={value ? "evergreen" : "amber"}>{value ? labels.configured : labels.notConfigured}</Badge>;
-}
 
 type FormatOpts = {
   locale: string;
@@ -404,11 +377,6 @@ type FormatOpts = {
   timeZone?: string;
 };
 
-function scopeLabel(scope: EnterpriseCurrentGrant["dataScope"], labels: AuthorizationWorkspaceLabels) {
-  if (scope === "SELF") return labels.scopeSelf;
-  if (scope === "MANAGED_USERS") return labels.scopeManagedUsers;
-  return labels.scopeAll;
-}
 function downloadManifest(manifest: EnterpriseManifestOverview | null, fileName: string) {
   if (!manifest || typeof document === "undefined") return;
   const url = URL.createObjectURL(new Blob([`${JSON.stringify(manifest, null, 2)}\n`], { type: "application/json" }));
