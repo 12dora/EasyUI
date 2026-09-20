@@ -6,9 +6,12 @@ import { Checkbox } from "../primitives/checkbox";
 import { CollapseReveal } from "../primitives/collapse-reveal";
 import { Field, Input } from "../primitives/field";
 import { FormGrid } from "../primitives/form-grid";
+import { GatedBody } from "../primitives/gated-body";
 import { InfoTooltip } from "../primitives/info-tooltip";
 import { InlineNotice } from "../primitives/inline-notice";
 import { Section } from "../primitives/section";
+import { Switch } from "../primitives/switch";
+import { OIDC_REQUIRED_SCOPE, OIDC_SCOPE_TOKENS, parseOidcScopes, serializeOidcScopes, type OidcScopeToken } from "./access-settings/helpers";
 import { EnterpriseSecretField } from "./shared-settings";
 
 export interface EnterpriseOidcConfigurationValue {
@@ -49,6 +52,10 @@ export interface EnterpriseIntegrationConfigurationLabels {
   clientId: string;
   clientSecret: string;
   scopes: string;
+  /** 授权范围勾选组下的一行说明。手工拼 labels 的宿主可以不给,给了才显示。 */
+  scopesHint?: string;
+  /** 四个固定授权范围各自的说明,按令牌取用。缺了就只印令牌本身,不至于崩。 */
+  scopeOptions?: { openid: string; profile: string; email: string; dingtalk: string };
   authorizationEndpoint: string;
   tokenEndpoint: string;
   jwksUri: string;
@@ -109,28 +116,28 @@ export function EnterpriseOidcConfigurationForm(props: OidcFormProps) {
       <Section
         title={labels.oidcTitle}
         description={labels.oidcDescription}
-        actions={!disabled ? <>
-          {props.onTest ? <Button variant="outline" size="sm" loading={props.testing} onClick={() => void props.onTest?.()} data-test-id="identity-connection-test">{labels.connectionTest}</Button> : null}
-          <Button variant="primary" size="sm" loading={props.saving} onClick={() => void props.onSave()} data-test-id="enterprise-oidc-save">{labels.save}</Button>
-        </> : null}
+        actions={<OidcCardActions {...props} />}
       >
         <div className="space-y-4">
-          <Checkbox label={labels.enabled} checked={value.enabled} disabled={disabled} onChange={(event) => props.onChange({ enabled: event.target.checked })} data-test-id="identity-enabled" />
-          <Field label={<GuidedLabel label={labels.issuer} guide={labels.guides?.issuer} ariaLabel={labels.guideAriaLabel} testId="identity-guide-issuer" />} htmlFor="enterprise-oidc-issuer">
-            <div className="flex items-start gap-2">
-              <Input id="enterprise-oidc-issuer" value={value.issuer} disabled={disabled} className="font-mono" onChange={(event) => props.onChange({ issuer: event.target.value })} />
-              {!disabled && props.onDiscover ? <Button variant="outline" size="md" className="h-[34px] shrink-0" loading={props.discovering} onClick={() => void props.onDiscover?.()} data-test-id="identity-discover">{labels.discover}</Button> : null}
-            </div>
-          </Field>
-          <EnterpriseConfigurationFieldGrid>
-            <TextField id="enterprise-oidc-client-id" label={<GuidedLabel label={labels.clientId} guide={labels.guides?.clientId} ariaLabel={labels.guideAriaLabel} testId="identity-guide-client-id" />} value={value.clientId} disabled={disabled} onChange={(clientId) => props.onChange({ clientId })} />
-            <EnterpriseSecretField id="enterprise-oidc-client-secret" label={<GuidedLabel label={labels.clientSecret} guide={labels.guides?.clientSecret} ariaLabel={labels.guideAriaLabel} testId="identity-guide-client-secret" />} keepHint={labels.authorityHint} clearLabel={labels.clearSecret} configuredHint={value.hasClientSecret ? labels.configured : labels.notConfigured} value={props.clientSecret.value} clear={props.clientSecret.clear} disabled={disabled} onValueChange={(secret) => props.onClientSecretChange({ value: secret, clear: false })} onClearChange={(clear) => props.onClientSecretChange({ value: clear ? "" : props.clientSecret.value, clear })} />
-            <TextField id="enterprise-oidc-scopes" label={labels.scopes} value={value.scopes} disabled={disabled} onChange={(scopes) => props.onChange({ scopes })} />
-            <TextField id="enterprise-oidc-redirect-base" label={labels.redirectBaseUrl} value={value.redirectBaseUrl} disabled={disabled} onChange={(redirectBaseUrl) => props.onChange({ redirectBaseUrl })} />
-            <TextField id="enterprise-oidc-frontend-base" label={labels.frontendBaseUrl} value={value.frontendBaseUrl} disabled={disabled} onChange={(frontendBaseUrl) => props.onChange({ frontendBaseUrl })} />
-          </EnterpriseConfigurationFieldGrid>
-          {labels.redirectUri ? <Field label={labels.redirectUri}><p className="break-all rounded border border-hairline bg-paper-deep px-3 py-2 font-mono text-[12px]" data-test-id="identity-redirect-uri">{value.redirectUri || "—"}</p></Field> : null}
+          {/* 标题行动作的反馈留在闸门之外:关掉这张卡再保存是正常流程,正文变灰之后
+              这条结果仍要读得到、也仍在无障碍树里。 */}
           {props.operationResult ? <InlineNotice tone={props.operationResult.ok ? "success" : "error"} message={props.operationResult.message} data-test-id="identity-connection-test-result" /> : null}
+          <GatedBody off={!value.enabled} className="space-y-4">
+            <Field label={<GuidedLabel label={labels.issuer} guide={labels.guides?.issuer} ariaLabel={labels.guideAriaLabel} testId="identity-guide-issuer" />} htmlFor="enterprise-oidc-issuer">
+              <div className="flex items-start gap-2">
+                <Input id="enterprise-oidc-issuer" value={value.issuer} disabled={disabled} className="font-mono" onChange={(event) => props.onChange({ issuer: event.target.value })} />
+                {!disabled && props.onDiscover ? <Button variant="outline" size="md" className="h-[34px] shrink-0" loading={props.discovering} onClick={() => void props.onDiscover?.()} data-test-id="identity-discover">{labels.discover}</Button> : null}
+              </div>
+            </Field>
+            <EnterpriseConfigurationFieldGrid>
+              <TextField id="enterprise-oidc-client-id" label={<GuidedLabel label={labels.clientId} guide={labels.guides?.clientId} ariaLabel={labels.guideAriaLabel} testId="identity-guide-client-id" />} value={value.clientId} disabled={disabled} onChange={(clientId) => props.onChange({ clientId })} />
+              <EnterpriseSecretField id="enterprise-oidc-client-secret" label={<GuidedLabel label={labels.clientSecret} guide={labels.guides?.clientSecret} ariaLabel={labels.guideAriaLabel} testId="identity-guide-client-secret" />} keepHint={labels.authorityHint} clearLabel={labels.clearSecret} configuredHint={value.hasClientSecret ? labels.configured : labels.notConfigured} value={props.clientSecret.value} clear={props.clientSecret.clear} disabled={disabled} onValueChange={(secret) => props.onClientSecretChange({ value: secret, clear: false })} onClearChange={(clear) => props.onClientSecretChange({ value: clear ? "" : props.clientSecret.value, clear })} />
+              <OidcScopeField labels={labels} value={value.scopes} disabled={disabled} onChange={(scopes) => props.onChange({ scopes })} />
+              <TextField id="enterprise-oidc-redirect-base" label={labels.redirectBaseUrl} value={value.redirectBaseUrl} disabled={disabled} onChange={(redirectBaseUrl) => props.onChange({ redirectBaseUrl })} />
+              <TextField id="enterprise-oidc-frontend-base" label={labels.frontendBaseUrl} value={value.frontendBaseUrl} disabled={disabled} onChange={(frontendBaseUrl) => props.onChange({ frontendBaseUrl })} />
+            </EnterpriseConfigurationFieldGrid>
+            {labels.redirectUri ? <Field label={labels.redirectUri}><p className="break-all rounded border border-hairline bg-paper-deep px-3 py-2 font-mono text-[12px]" data-test-id="identity-redirect-uri">{value.redirectUri || "—"}</p></Field> : null}
+          </GatedBody>
         </div>
       </Section>
       {!disabled || !props.hideAdvancedWhenDisabled ? (
@@ -183,6 +190,66 @@ export function EnterpriseEasyAuthConfigurationForm({ labels, value, credential,
         <TextField id="enterprise-easyauth-request-url" label={labels.permissionRequestUrl} value={value.permissionRequestUrl} disabled={disabled} onChange={(permissionRequestUrl) => onChange({ permissionRequestUrl })}/>
       </EnterpriseConfigurationFieldGrid>
     </Section>
+  );
+}
+
+/**
+ * 卡片标题行右端:总开关 + 连接测试 + 保存。
+ *
+ * 开关和保存都刻意留在 `GatedBody` 之外——关掉之后开关自己仍可操作(否则这张卡再也
+ * 开不回来),而「关掉」这个状态本身也要存得下去。开关只在没有管理权限时置灰。
+ */
+function OidcCardActions({ labels, value, disabled, saving, testing, onChange, onSave, onTest }: OidcFormProps) {
+  return (
+    <>
+      {!disabled && onTest ? <Button variant="outline" size="sm" loading={testing} onClick={() => void onTest()} data-test-id="identity-connection-test">{labels.connectionTest}</Button> : null}
+      {!disabled ? <Button variant="primary" size="sm" loading={saving} onClick={() => void onSave()} data-test-id="enterprise-oidc-save">{labels.save}</Button> : null}
+      {/* 开关摆在最右端,与同一页的「用户目录」卡片对齐。 */}
+      <Switch checked={value.enabled} disabled={disabled} aria-label={labels.enabled} onChange={(enabled) => onChange({ enabled })} data-test-id="identity-enabled" />
+    </>
+  );
+}
+
+/**
+ * 授权范围:固定四项,不开放自定义,所以用勾选组而不是自由文本框——用户不必知道
+ * 令牌怎么拼,也不会把一个拼错的范围存进去。openid 是 OIDC 的硬性要求,常勾且不可改。
+ *
+ * 勾选组没有单一可关联的控件,`Field` 的 `<label>` 挂不上去,因此另给一层
+ * `role="group"` + `aria-label` 让读屏念出组名。整组横跨两列,免得四行勾选把栅格撑歪。
+ */
+function OidcScopeField({ labels, value, disabled, onChange }: { labels: EnterpriseIntegrationConfigurationLabels; value: string; disabled?: boolean; onChange: (value: string) => void }) {
+  const selected = parseOidcScopes(value);
+  const toggle = (token: OidcScopeToken, checked: boolean) => {
+    const next = new Set(selected);
+    if (checked) next.add(token);
+    else next.delete(token);
+    onChange(serializeOidcScopes(next));
+  };
+  return (
+    <Field label={labels.scopes} hint={labels.scopesHint} className="sm:col-span-2">
+      <div role="group" aria-label={labels.scopes} className="flex flex-col gap-0.5" data-test-id="enterprise-oidc-scopes">
+        {OIDC_SCOPE_TOKENS.map((token) => (
+          <Checkbox
+            key={token}
+            checked={token === OIDC_REQUIRED_SCOPE || selected.has(token)}
+            disabled={disabled || token === OIDC_REQUIRED_SCOPE}
+            onChange={(event) => toggle(token, event.target.checked)}
+            data-test-id={`enterprise-oidc-scope-${token}`}
+            label={<ScopeRowLabel token={token} description={labels.scopeOptions?.[token]} />}
+          />
+        ))}
+      </div>
+    </Field>
+  );
+}
+
+/** 一行勾选:令牌用等宽印出来(它要照抄进登录服务),后面跟一句人话。 */
+function ScopeRowLabel({ token, description }: { token: string; description?: string }) {
+  return (
+    <span className="inline-flex items-baseline gap-2">
+      <span className="font-mono text-[12px]">{token}</span>
+      {description ? <span>{description}</span> : null}
+    </span>
   );
 }
 

@@ -75,3 +75,30 @@ export function computeRedirectUri(base: string) {
   const normalized = base.trim().replace(/\/+$/, "");
   return normalized ? `${normalized}/api/v1/auth/oidc/callback` : "";
 }
+
+/**
+ * 工作账号登录支持的授权范围,数组顺序即写回后端的顺序。
+ * 产品上不开放自定义:这四项之外的令牌在下一次保存时被丢弃。
+ */
+export const OIDC_SCOPE_TOKENS = ["openid", "profile", "email", "dingtalk"] as const;
+
+export type OidcScopeToken = (typeof OIDC_SCOPE_TOKENS)[number];
+
+/** OIDC 协议要求必须申请的范围:永远勾上,也永远写进结果。 */
+export const OIDC_REQUIRED_SCOPE: OidcScopeToken = "openid";
+
+/** 把后端存的空格分隔串解析成勾选集合:未知令牌忽略,openid 一定在内。 */
+export function parseOidcScopes(value: string): ReadonlySet<string> {
+  const known = new Set<string>(OIDC_SCOPE_TOKENS);
+  const selected = new Set<string>([OIDC_REQUIRED_SCOPE]);
+  for (const token of (value ?? "").split(/\s+/)) {
+    if (known.has(token)) selected.add(token);
+  }
+  return selected;
+}
+
+/** 把勾选集合写回空格分隔串:按 `OIDC_SCOPE_TOKENS` 的顺序,openid 永远打头。 */
+export function serializeOidcScopes(selected: Iterable<string>): string {
+  const chosen = new Set(selected);
+  return OIDC_SCOPE_TOKENS.filter((token) => token === OIDC_REQUIRED_SCOPE || chosen.has(token)).join(" ");
+}

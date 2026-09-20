@@ -1,7 +1,8 @@
 /**
- * User risk: these four helpers decide which pane opens, what the OIDC provider
- * is told to call back on, whether a stored secret survives a blank box, and
- * whether a superseded load is allowed to overwrite fresher state.
+ * User risk: these helpers decide which pane opens, what the OIDC provider
+ * is told to call back on, which scopes the login request asks for, whether a
+ * stored secret survives a blank box, and whether a superseded load is allowed
+ * to overwrite fresher state.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -9,8 +10,10 @@ import { toast } from "../../toast";
 import {
   computeRedirectUri,
   createOutcomeReporter,
+  parseOidcScopes,
   pickTab,
   runLoadEffect,
+  serializeOidcScopes,
   writeOnlyCredential,
   type AccessSettingsTab,
 } from "./helpers";
@@ -133,5 +136,45 @@ describe("runLoadEffect", () => {
 
     expect(handlers.onValue).not.toHaveBeenCalled();
     expect(handlers.onSettled).not.toHaveBeenCalled();
+  });
+});
+
+describe("parseOidcScopes", () => {
+  it("always reports openid, even for an empty or whitespace-only stored value", () => {
+    expect([...parseOidcScopes("")]).toEqual(["openid"]);
+    expect([...parseOidcScopes("   ")]).toEqual(["openid"]);
+  });
+
+  it("reads back every supported token a stored value carries", () => {
+    const selected = parseOidcScopes("openid profile email dingtalk");
+    expect(selected.has("profile")).toBe(true);
+    expect(selected.has("email")).toBe(true);
+    expect(selected.has("dingtalk")).toBe(true);
+  });
+
+  it("drops tokens outside the fixed list instead of showing an unknown box", () => {
+    const selected = parseOidcScopes("openid offline_access profile");
+    expect([...selected].sort()).toEqual(["openid", "profile"]);
+  });
+});
+
+describe("serializeOidcScopes", () => {
+  it("emits the canonical order regardless of how the set was built", () => {
+    expect(serializeOidcScopes(["dingtalk", "email", "profile", "openid"])).toBe("openid profile email dingtalk");
+  });
+
+  it("keeps openid first even when the caller never selected it", () => {
+    expect(serializeOidcScopes([])).toBe("openid");
+    expect(serializeOidcScopes(["email"])).toBe("openid email");
+  });
+
+  it("drops unknown tokens, so a hand-edited stored value is cleaned up on save", () => {
+    expect(serializeOidcScopes(["openid", "offline_access", "email"])).toBe("openid email");
+  });
+
+  it("round-trips a value minus the box the user just cleared", () => {
+    const selected = new Set(parseOidcScopes("openid profile email dingtalk"));
+    selected.delete("profile");
+    expect(serializeOidcScopes(selected)).toBe("openid email dingtalk");
   });
 });

@@ -5,7 +5,9 @@ import type { EnterpriseOidcConfigurationValue, EnterpriseWriteOnlySecret } from
 import {
   computeRedirectUri,
   createOutcomeReporter,
+  parseOidcScopes,
   runLoadEffect,
+  serializeOidcScopes,
   type SettingsOutcome,
   type SettingsOutcomeReporter,
 } from "./helpers";
@@ -120,6 +122,15 @@ function redirectUriPatch(patch: Partial<EnterpriseOidcConfigurationValue>) {
   return { redirectUri: computeRedirectUri(patch.redirectBaseUrl) };
 }
 
+/**
+ * 保存是授权范围的归一化边界:库里可能存着手工改过的旧值(顺序乱、缺 openid、
+ * 带着界面根本不给勾的令牌),用户不动勾选框直接点保存时,也要按固定清单写回去,
+ * 否则那些令牌会一直躺在库里,而界面上从来没显示过它们。
+ */
+function normalizedForSave(value: EnterpriseOidcConfigurationValue): EnterpriseOidcConfigurationValue {
+  return { ...value, scopes: serializeOidcScopes(parseOidcScopes(value.scopes)) };
+}
+
 /** Write-only secret: a cleared box sends "", a blank one keeps the stored value. */
 function clientSecretPatch({ value, clear }: EnterpriseWriteOnlySecret): { clientSecret?: string } {
   if (clear) return { clientSecret: "" };
@@ -132,7 +143,7 @@ async function saveIdentity(context: IdentityOperationContext): Promise<void> {
   const editableValue = value as EnterpriseOidcConfigurationValue;
   context.begin("save");
   try {
-    const next = await adapter.saveOidcSettings(editableValue, clientSecretPatch(context.clientSecret));
+    const next = await adapter.saveOidcSettings(normalizedForSave(editableValue), clientSecretPatch(context.clientSecret));
     context.setValue(next);
     context.setClientSecret({ value: "", clear: false });
     context.report({ ok: true, message: labels.saved });

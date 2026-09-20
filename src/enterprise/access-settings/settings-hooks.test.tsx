@@ -147,6 +147,20 @@ describe("useIdentitySettings", () => {
     expect(adapter.saveOidcSettings).toHaveBeenLastCalledWith(oidc, { clientSecret: "" });
   });
 
+  it("normalizes the stored scopes on save, even when no box was touched", async () => {
+    const adapter = makeAdapter({
+      loadOidcSettings: vi.fn().mockResolvedValue({ ...oidc, scopes: "email offline_access" }),
+      saveOidcSettings: vi.fn().mockImplementation(async (value: EnterpriseOidcConfigurationValue) => value),
+    });
+    const identity = await mountIdentity(adapter);
+
+    await run(() => identity.current.save());
+
+    // `offline_access` is not offered by the form, so it must not survive a save,
+    // and `openid` is put back: OIDC has no sign-in without it.
+    expect(adapter.saveOidcSettings).toHaveBeenCalledWith(expect.objectContaining({ scopes: "openid email" }), {});
+  });
+
   it("says the save failed instead of leaving the success wording standing", async () => {
     const adapter = makeAdapter({ saveOidcSettings: vi.fn().mockRejectedValue(new Error("409")) });
     const identity = await mountIdentity(adapter);
