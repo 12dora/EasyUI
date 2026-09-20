@@ -250,11 +250,23 @@ describe("business-permission lists — fixed-height viewport", () => {
     // Both lists now have a header row, so both pin it to their own viewport.
     for (const testId of ["authz-my-grants-scroll", "authz-permission-catalog-scroll"]) {
       const viewport = byTestId(host, testId);
-      const header = viewport.querySelector("th");
-      expect(header?.className).toContain("sticky");
-      expect(header?.className).toContain("top-0");
+      const header = viewport.querySelector("th") as HTMLTableCellElement;
+      // The pin must arrive as an inline style. antd's own
+      // `.ant-table-wrapper .ant-table-thead >tr>th` (0-2-2) sets
+      // `position: relative` plus a background of its own and beats any
+      // single-class utility, so a `sticky top-0 z-10 bg-paper` className
+      // would render a header that scrolls away with antd's styling —
+      // structurally indistinguishable from a working one.
+      expect(header.style.position).toBe("sticky");
+      expect(header.style.top).toBe("0px");
+      expect(header.style.zIndex).toBe("10");
+      // Opaque, or body rows scroll through the pinned row (headerBg is transparent).
+      expect(header.style.background).toBe("rgb(var(--paper))");
+      expect(header.className).not.toContain("sticky");
+      // The column's own header style survives the merge.
+      expect(header.style.borderBottomColor).toBeTruthy();
       // …and it sticks to the capped viewport, not to some inner overflow box.
-      expect(nearestScrollAncestor(header!)).toBe(viewport);
+      expect(nearestScrollAncestor(header)).toBe(viewport);
     }
   });
 
@@ -265,8 +277,11 @@ describe("business-permission lists — fixed-height viewport", () => {
       const viewport = byTestId(host, testId);
       expect(viewport.className).not.toContain("max-h-");
       // The header is still printed — there is nothing to pin it to.
-      expect(viewport.querySelector("th")).toBeTruthy();
-      expect(viewport.querySelector("th")?.className).not.toContain("sticky");
+      const header = viewport.querySelector("th") as HTMLTableCellElement;
+      expect(header).toBeTruthy();
+      expect(header.style.position).toBe("");
+      expect(header.style.background).toBe("");
+      expect(header.className).not.toContain("sticky");
     }
   });
 });

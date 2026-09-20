@@ -22,6 +22,12 @@ export interface DirectorySettings {
   value: EnterpriseDirectorySettingsValue | null;
   credential: EnterpriseWriteOnlySecret;
   busy: DirectoryOperation | null;
+  /**
+   * Whether the **last** load attempt failed. Not the same question as
+   * `value === null`: a reload (a new adapter, a locale change) can fail while
+   * the previously loaded value is still on screen, and only this flag says so.
+   */
+  loadFailed: boolean;
   result: SettingsOutcome | null;
   setCredential: (next: EnterpriseWriteOnlySecret) => void;
   patchValue: (patch: Partial<EnterpriseDirectorySettingsValue>) => void;
@@ -67,6 +73,7 @@ export function useDirectorySettings({
   const [value, setValue] = useState<EnterpriseDirectorySettingsValue | null>(null);
   const [credential, setCredential] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
   const [busy, setBusy] = useState<DirectoryOperation | null>("load");
+  const [loadFailed, setLoadFailed] = useState(false);
   const [result, setResult] = useState<SettingsOutcome | null>(null);
   const [loadRevision, setLoadRevision] = useState(0);
   const report = useMemo(() => createOutcomeReporter(toastMode, setResult), [toastMode]);
@@ -81,8 +88,14 @@ export function useDirectorySettings({
     if (!load) return;
     setBusy("load");
     return runLoadEffect(() => load.call(adapter), {
-      onValue: (next) => setValue(next),
-      onError: () => report({ ok: false, message: labels.loadFailed }),
+      onValue: (next) => {
+        setValue(next);
+        setLoadFailed(false);
+      },
+      onError: () => {
+        setLoadFailed(true);
+        report({ ok: false, message: labels.loadFailed });
+      },
       onSettled: () => setBusy(null),
     });
     // `report` is keyed by `toastMode`; an explicit retry bumps `loadRevision`.
@@ -108,6 +121,7 @@ export function useDirectorySettings({
     value,
     credential,
     busy,
+    loadFailed,
     result,
     setCredential,
     patchValue: (patch) => setValue((current) => (current ? { ...current, ...patch } : current)),

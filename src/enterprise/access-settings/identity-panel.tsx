@@ -50,6 +50,7 @@ function renderForm(context: IdentityRenderContext, operationResult: SettingsOut
   return (
     <EnterpriseOidcConfigurationForm
       labels={labels}
+      retryAction={renderRetry(context)}
       value={identity.value as EnterpriseOidcConfigurationValue}
       clientSecret={identity.clientSecret}
       disabled={!canManage}
@@ -68,11 +69,13 @@ function renderForm(context: IdentityRenderContext, operationResult: SettingsOut
 }
 
 /**
- * 重试按钮只在「这次加载失败了」的画面里出现,不做常驻控件:设置读出来之后,
- * 标题行已经有连接测试和保存,再挂一个重试只会让人以为那是必经的一步。
+ * 重试只认「上一次加载失败了」这一件事,不认「手里没有值」:换了适配器或切了语言时
+ * 加载会重跑,这一次失败了、卡里却还留着上次读到的值,用户同样需要一个重试。
+ * 读成功时这里返回 null——它不是常驻控件。
  */
 function renderRetry(context: IdentityRenderContext): ReactNode {
   const { labels, identity } = context;
+  if (!identity.loadFailed) return null;
   return (
     <Button
       variant="outline"
@@ -81,33 +84,33 @@ function renderRetry(context: IdentityRenderContext): ReactNode {
       data-test-id="identity-settings-retry"
       onClick={identity.reload}
     >
-      {labels.retry ?? "Retry"}
+      {labels.retry}
     </Button>
   );
 }
 
-/** Default/inline: loading text + InlineNotice that carries the retry. */
+/** Default/inline: loading text, then either the failure notice or the card — 重试跟着失败走。 */
 function renderInlineIdentity(context: IdentityRenderContext): ReactNode {
   const { labels, identity, canManage } = context;
   const { value, busy, result } = identity;
   if (busy === "load" && !value) return <p className="text-[13px] text-ink-soft">{labels.loading}</p>;
   if (!value) return <InlineNotice tone="error" message={result?.message ?? labels.loadFailed} action={renderRetry(context)} />;
-  if (!canManage) return <IdentityStatusSummary value={value} labels={labels} />;
+  if (!canManage) return <IdentityStatusSummary value={value} labels={labels} actions={renderRetry(context)} />;
   return renderForm(context, result);
 }
 
 /**
  * FE-UXA-10 + FE-FB-01 toast mode: one mounted AsyncStateTransition; missing as —.
  *
- * `empty` 只在加载失败后才到得了(读成功一定有值),所以重试按钮就摆在这块占位里:
- * 真正需要重试的人正看着它,而读成功的人根本看不到它。
+ * 重试跟着失败走:一次值都没读到就挂在这块占位里,已经有值(重跑时失败)就挂在
+ * 卡片标题行,和测试连接、保存同一排。两者互斥,同一时刻只会存在一个。
  */
 function renderToastIdentity(context: IdentityRenderContext): ReactNode {
   const { labels, identity, canManage } = context;
   const { value, busy } = identity;
   const asyncState = busy === "load" && !value ? "loading" : !value ? "empty" : "ready";
   let readyBody: ReactNode = null;
-  if (value) readyBody = canManage ? renderForm(context, null) : <IdentityStatusSummary value={value} labels={labels} />;
+  if (value) readyBody = canManage ? renderForm(context, null) : <IdentityStatusSummary value={value} labels={labels} actions={renderRetry(context)} />;
 
   const missingShell = (
     <div

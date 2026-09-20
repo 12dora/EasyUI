@@ -242,6 +242,22 @@ describe("useIdentitySettings", () => {
     expect(identity.current.result).toBeNull();
   });
 
+  it("flags the last load as failed while the value it already read stays on screen", async () => {
+    const load = vi.fn().mockResolvedValueOnce(oidc).mockRejectedValueOnce(new Error("down")).mockResolvedValue(oidc);
+    const identity = await mountIdentity(makeAdapter({ loadOidcSettings: load }), "toast");
+    expect(identity.current.loadFailed).toBe(false);
+
+    await run(() => identity.current.reload());
+
+    // 值还在(界面上是上次读到的表单),但这一次加载确实失败了——重试得有地方挂。
+    expect(identity.current.value).toEqual(oidc);
+    expect(identity.current.loadFailed).toBe(true);
+
+    await run(() => identity.current.reload());
+
+    expect(identity.current.loadFailed).toBe(false);
+  });
+
   it("re-issues the load when the user retries", async () => {
     const adapter = makeAdapter();
     const identity = await mountIdentity(adapter, "toast");
@@ -336,6 +352,21 @@ describe("useDirectorySettings", () => {
     expect(load).toHaveBeenCalledTimes(2);
     expect(state.current.value).toEqual(directory);
     expect(state.current.busy).toBeNull();
+  });
+
+  it("flags the last load as failed while the value it already read stays on screen", async () => {
+    const load = vi.fn().mockResolvedValueOnce(directory).mockRejectedValueOnce(new Error("down")).mockResolvedValue(directory);
+    const state = await mountDirectory(makeAdapter({ loadDirectorySettings: load }), "toast");
+    expect(state.current.loadFailed).toBe(false);
+
+    await run(() => state.current.reload());
+
+    expect(state.current.value).toEqual(directory);
+    expect(state.current.loadFailed).toBe(true);
+
+    await run(() => state.current.reload());
+
+    expect(state.current.loadFailed).toBe(false);
   });
 
   it("stays inert for a host whose adapter cannot serve the directory", async () => {

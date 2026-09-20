@@ -105,6 +105,11 @@ interface OidcFormProps {
   onTest?: () => void | Promise<void>;
   /** Customs hides protocol endpoints from disabled/view-only forms; omitted preserves the legacy form. */
   hideAdvancedWhenDisabled?: boolean;
+  /**
+   * 只在「上一次加载失败了、但卡里还留着上次读到的值」时由面板传进来的重试按钮。
+   * 它和测试连接、保存同处标题行——不是常驻控件,读成功时这里是空的。
+   */
+  retryAction?: ReactNode;
 }
 
 export function EnterpriseOidcConfigurationForm(props: OidcFormProps) {
@@ -198,9 +203,12 @@ export function EnterpriseEasyAuthConfigurationForm({ labels, value, credential,
  * 开关和保存都刻意留在 `GatedBody` 之外——关掉之后开关自己仍可操作(否则这张卡再也
  * 开不回来),而「关掉」这个状态本身也要存得下去。开关只在没有管理权限时置灰。
  */
-function OidcCardActions({ labels, value, disabled, saving, testing, onChange, onSave, onTest }: OidcFormProps) {
+function OidcCardActions({ labels, value, disabled, saving, testing, retryAction, onChange, onSave, onTest }: OidcFormProps) {
   return (
     <>
+      {/* 重试排在最前:它是「先把设置读回来」,读回来之前测试和保存都没意义。
+          它刻意留在 `!disabled` 之外,只能看不能改的账号同样要能把设置读回来。 */}
+      {retryAction}
       {!disabled && onTest ? <Button variant="outline" size="sm" loading={testing} onClick={() => void onTest()} data-test-id="identity-connection-test">{labels.connectionTest}</Button> : null}
       {!disabled ? <Button variant="primary" size="sm" loading={saving} onClick={() => void onSave()} data-test-id="enterprise-oidc-save">{labels.save}</Button> : null}
       {/* 开关摆在最右端,与同一页的「用户目录」卡片对齐。 */}

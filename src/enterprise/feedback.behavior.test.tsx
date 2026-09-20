@@ -359,3 +359,65 @@ describe("login credential-error classification with host-normalized Error.messa
     expect(toastBus.getSnapshot()).toHaveLength(0);
   });
 });
+
+describe("用户授权 one-click refresh sweep", () => {
+  const authz = labels.access.authorization;
+  const row = (userId: string) => ({
+    userId, displayName: userId, grantCount: 1, snapshotVersion: "v1", roleGroups: ["ops"],
+    fetchedAt: "2026-01-01T00:00:00.000Z", expiresAt: "2027-01-01T00:00:00.000Z", expired: false,
+  });
+
+  /** Inline host (the deployed EasyLearning path): no `feedbackMode`, so failures land in the page. */
+  function workspace(refreshSnapshot: (userId: string) => Promise<unknown>) {
+    const adapter = {
+      loadStatus: vi.fn().mockResolvedValue({ easyauth: { configured: true, hasCredential: true }, principal: {}, catalog: {}, snapshots: {} }),
+      loadCatalog: vi.fn().mockResolvedValue([]),
+      loadSnapshots: vi.fn().mockResolvedValue([row("u1"), row("u2"), row("u3")]),
+      refreshSnapshot: vi.fn(refreshSnapshot),
+    } as unknown as EnterpriseAuthorizationAdapter;
+    return <EnterpriseAuthorizationWorkspace adapter={adapter} labels={authz} locale="en" canManage section="authorization" />;
+  }
+
+  it("refreshes every listed user one request at a time and reports a single aggregate failure", async () => {
+    const order: string[] = [];
+    let inFlight = 0;
+    let peak = 0;
+    view = await mount(workspace(async (userId) => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      order.push(userId);
+      try {
+        await new Promise((resolve) => window.setTimeout(resolve, 1));
+        if (userId === "u1") throw new Error("offline");
+        return row(userId);
+      } finally {
+        inFlight -= 1;
+      }
+    }));
+    await settle(20);
+
+    await click(byTestId(view.host, "authz-snapshots-refresh-all"));
+    await settle(40);
+
+    // Strictly serial, and a failed first row does not strand the rest.
+    expect(peak).toBe(1);
+    expect(order).toEqual(["u1", "u2", "u3"]);
+    // One aggregate sentence survives the later successes, instead of being cleared by them.
+    expect(view.host.textContent).toContain(authz.refreshFailed!);
+  });
+
+  it("keeps the bulk button locked while a single-row refresh is still in flight", async () => {
+    let release: () => void = () => undefined;
+    view = await mount(workspace(() => new Promise((resolve) => { release = () => resolve(row("u1")); })));
+    await settle(20);
+    const bulk = () => byTestId(view!.host, "authz-snapshots-refresh-all") as HTMLButtonElement;
+    expect(bulk().disabled).toBe(false);
+
+    await click(byTestId(view.host, "authz-snapshot-refresh-u1"));
+    expect(bulk().disabled).toBe(true);
+
+    await act(async () => { release(); });
+    await settle(20);
+    expect(bulk().disabled).toBe(false);
+  });
+});

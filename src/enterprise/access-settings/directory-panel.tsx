@@ -50,6 +50,7 @@ export function DirectoryPanel({
     <div data-test-id="directory-settings-section">
       <EnterpriseDirectorySettingsForm
         labels={directoryLabels}
+        retryAction={renderRetry(directory, labels.retry)}
         value={value}
         credential={directory.credential}
         disabled={!canManage}
@@ -79,10 +80,12 @@ function renderLoading(toastMode: boolean, loadingLabel: string): ReactNode {
 }
 
 /**
- * 重试只出现在「这次加载失败了」的画面里:读出来之后,卡片标题行本来就有测试连接、
- * 立即同步和保存,再常驻一个重试只会让人以为那是必经的一步。
+ * 重试只认「上一次加载失败了」这一件事,不认「手里没有值」:换了适配器或切了语言时
+ * 加载会重跑,这一次失败了、卡里却还留着上次读到的值,用户同样需要一个重试。
+ * 读成功时这里返回 null——它不是常驻控件。
  */
 function renderRetry(directory: DirectorySettings, retryLabel?: string): ReactNode {
+  if (!directory.loadFailed) return null;
   return (
     <Button
       variant="outline"
@@ -91,7 +94,7 @@ function renderRetry(directory: DirectorySettings, retryLabel?: string): ReactNo
       data-test-id="directory-settings-retry"
       onClick={directory.reload}
     >
-      {retryLabel ?? "Retry"}
+      {retryLabel}
     </Button>
   );
 }

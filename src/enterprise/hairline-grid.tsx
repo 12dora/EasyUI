@@ -13,7 +13,7 @@
  */
 import { ConfigProvider, Table } from "antd";
 import type { TableProps } from "antd";
-import type { HTMLAttributes, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
 /**
  * Resolved defaults for hosts on the stock theme.css palette — same approach
@@ -33,17 +33,41 @@ export interface HairlineGridProps<RecordType extends object>
   /** Empty-state copy; rendered like the previous `<p class="p-4 text-center text-ink-faint">` block. */
   empty: ReactNode;
   /**
-   * Extra class merged onto every header cell. The one supported use is pinning
-   * the header inside a fixed-height scroll viewport
-   * (`"sticky top-0 z-10 bg-paper"`): CSS `position: sticky` only takes effect on
-   * `<th>`/`<td>`, never on the `<tr>` around them, and the header row is owned
-   * by antd — so callers cannot reach it from the outside. Columns keep their own
-   * `onHeaderCell` (e.g. `hairlineHeaderCell`); this class is appended to it.
+   * Pin the header row to the top of the caller's fixed-height scroll viewport.
+   * CSS `position: sticky` only takes effect on `<th>`/`<td>`, never on the
+   * `<tr>` around them, and the header row is owned by antd — so callers cannot
+   * reach those cells from the outside. Columns keep their own `onHeaderCell`
+   * (e.g. `hairlineHeaderCell`); STICKY_HEADER_CELL is merged over its style.
+   *
+   * Pass it only while the list has rows: an uncapped empty state has nothing
+   * to stick to, and a sticky cell there is dead weight.
    */
-  headerCellClassName?: string;
+  stickyHeader?: boolean;
 }
 
 type HeaderCellFn = (...args: never[]) => HTMLAttributes<HTMLElement>;
+
+/**
+ * Inline style, deliberately — **not** a `sticky top-0 z-10 bg-paper` utility
+ * class. antd ships `.ant-table-wrapper .ant-table-thead >tr>th` — two classes
+ * plus two element selectors (0-2-2) — which sets `position: relative` and a
+ * `background` of its own; a utility class on the same cell is 0-1-0 and loses
+ * the cascade outright, so the header silently scrolls away with antd's own
+ * styling. The `style` attribute is not part of that contest: it outranks every
+ * stylesheet rule short of `!important`, and antd marks none of these
+ * `!important`.
+ *
+ * The background must be opaque or body rows scroll through the pinned row —
+ * the ConfigProvider below sets `headerBg: "transparent"` for the unpinned
+ * case. `rgb(var(--paper))` keeps the host's theme in charge, exactly as the
+ * `bg-paper` class did.
+ */
+const STICKY_HEADER_CELL: CSSProperties = {
+  position: "sticky",
+  top: 0,
+  zIndex: 10,
+  background: "rgb(var(--paper))",
+};
 
 /**
  * The raw tables drew a stronger hairline under the header row than between
@@ -56,18 +80,19 @@ export function hairlineHeaderCell() {
 
 export function HairlineGrid<RecordType extends object>({
   empty,
-  headerCellClassName,
+  stickyHeader,
   columns,
   ...tableProps
 }: HairlineGridProps<RecordType>) {
-  const mergedColumns = headerCellClassName && columns
+  const mergedColumns = stickyHeader && columns
     ? columns.map((column) => {
         const existing = (column as { onHeaderCell?: HeaderCellFn }).onHeaderCell;
         return {
           ...column,
           onHeaderCell: (...args: never[]) => {
             const base = existing ? existing(...args) : {};
-            return { ...base, className: [base.className, headerCellClassName].filter(Boolean).join(" ") };
+            // Column style first: `hairlineHeaderCell`'s borderBottomColor survives.
+            return { ...base, style: { ...base.style, ...STICKY_HEADER_CELL } };
           },
         };
       }) as typeof columns

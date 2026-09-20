@@ -106,7 +106,7 @@ export function EnterpriseMyGrantsSection({
             rowKey={(grant) => `${grant.permissionCode}:${grant.dataScope}`}
             dataSource={grants}
             empty={labels.empty}
-            headerCellClassName={grants.length ? "sticky top-0 z-10 bg-paper" : undefined}
+            stickyHeader={grants.length > 0}
             columns={[
               { key: "code", title: labels.permission || labels.permissionCode, onHeaderCell: hairlineHeaderCell, render: (_, grant) => <PermissionIdentity code={grant.permissionCode} name={permissionNames.get(grant.permissionCode)}/> },
               { key: "scope", title: labels.scopes, onHeaderCell: hairlineHeaderCell, render: (_, grant) => <Badge tone="neutral">{scopeLabel(grant.dataScope, labels)}</Badge> },
@@ -130,7 +130,7 @@ export function EnterprisePermissionCatalogSection({
   return (
     <Section title={labels.catalogTitle} description={labels.catalogDescription}>
       {/* The header sticks to the top of the scroll viewport so the columns stay
-          readable while scrolling (see HairlineGrid#headerCellClassName). */}
+          readable while scrolling (see HairlineGrid#stickyHeader). */}
       <div className={catalog.length ? SCROLL_VIEWPORT : SCROLL_VIEWPORT_UNCAPPED} data-test-id="authz-permission-catalog-scroll">
         <div data-test-id="authz-permission-catalog">
           <HairlineGrid<EnterprisePermissionCatalogItem>
@@ -138,7 +138,7 @@ export function EnterprisePermissionCatalogSection({
             rowKey={(item) => item.code}
             dataSource={catalog}
             empty={labels.empty}
-            headerCellClassName={catalog.length ? "sticky top-0 z-10 bg-paper" : undefined}
+            stickyHeader={catalog.length > 0}
             columns={[
               { key: "code", title: labels.permission || labels.permissionCode, onHeaderCell: hairlineHeaderCell, render: (_, item) => <PermissionIdentity code={item.code} name={(locale.startsWith("zh") ? item.nameZh : item.nameEn) || undefined}/> },
               { key: "scopes", title: labels.scopes, onHeaderCell: hairlineHeaderCell, render: (_, item) => item.supportedScopes.map((scope) => scopeLabel(scope, labels)).join(labels.roleGroupSeparator) || labels.notAvailable },

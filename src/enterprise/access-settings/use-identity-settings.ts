@@ -28,6 +28,12 @@ export interface IdentitySettings {
   value: IdentitySettingsValue | null;
   clientSecret: EnterpriseWriteOnlySecret;
   busy: IdentityOperation | null;
+  /**
+   * Whether the **last** load attempt failed. Not the same question as
+   * `value === null`: a reload (a new adapter, a locale change) can fail while
+   * the previously loaded value is still on screen, and only this flag says so.
+   */
+  loadFailed: boolean;
   result: SettingsOutcome | null;
   setClientSecret: (next: EnterpriseWriteOnlySecret) => void;
   patchValue: (patch: Partial<EnterpriseOidcConfigurationValue>) => void;
@@ -63,6 +69,7 @@ export function useIdentitySettings({
   const [value, setValue] = useState<IdentitySettingsValue | null>(null);
   const [clientSecret, setClientSecret] = useState<EnterpriseWriteOnlySecret>({ value: "", clear: false });
   const [busy, setBusy] = useState<IdentityOperation | null>("load");
+  const [loadFailed, setLoadFailed] = useState(false);
   const [result, setResult] = useState<SettingsOutcome | null>(null);
   const [loadRevision, setLoadRevision] = useState(0);
   const report = useMemo(() => createOutcomeReporter(toastMode, setResult), [toastMode]);
@@ -75,8 +82,14 @@ export function useIdentitySettings({
   useEffect(
     () =>
       runLoadEffect(() => adapter.loadOidcSettings(), {
-        onValue: (next) => setValue(next),
-        onError: () => report({ ok: false, message: labels.loadFailed }),
+        onValue: (next) => {
+          setValue(next);
+          setLoadFailed(false);
+        },
+        onError: () => {
+          setLoadFailed(true);
+          report({ ok: false, message: labels.loadFailed });
+        },
         onSettled: () => setBusy(null),
       }),
     // `report` is keyed by `toastMode`; an explicit retry bumps `loadRevision`.
@@ -106,6 +119,7 @@ export function useIdentitySettings({
     value,
     clientSecret,
     busy,
+    loadFailed,
     result,
     setClientSecret,
     patchValue,

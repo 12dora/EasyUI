@@ -101,7 +101,7 @@
         48
       ],
       "max-lines-per-function": [
-        219
+        214
       ]
     },
     "src/enterprise/authorization-workspace.tsx::normalizeEnterpriseManifest": {

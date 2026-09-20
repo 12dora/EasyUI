@@ -140,6 +140,11 @@ export interface EnterpriseDirectorySettingsFormProps {
   onSave: () => void | Promise<void>;
   onTest?: () => void | Promise<void>;
   onSync?: () => void | Promise<void>;
+  /**
+   * Retry handed in by the panel only while the last load failed and this card is
+   * still showing the previously loaded value. Never a permanent control.
+   */
+  retryAction?: ReactNode;
 }
 
 /**
@@ -166,6 +171,7 @@ export function EnterpriseDirectorySettingsForm({
   onSave,
   onTest,
   onSync,
+  retryAction,
 }: EnterpriseDirectorySettingsFormProps) {
   return (
     <Section
@@ -174,6 +180,9 @@ export function EnterpriseDirectorySettingsForm({
       flush
       actions={
         <>
+          {/* Retry first: reading the settings back comes before testing or saving them.
+              Outside the `!disabled` gate, so a view-only account can recover too. */}
+          {retryAction}
           {!disabled ? (
             <>
               {onTest ? (

@@ -46,34 +46,46 @@ export function SnapshotsSection({
   canManage,
   refreshing,
   onRefresh,
+  onReport,
   formatOpts,
 }: {
   items: readonly EnterprisePermissionSnapshot[];
   labels: AuthorizationWorkspaceLabels;
   canManage: boolean;
   refreshing: string | null;
-  onRefresh: (userId: string) => Promise<void>;
+  /** 刷一个用户,返回是否成功;播报交给 onReport,免得一键刷新弹一串 toast。 */
+  onRefresh: (userId: string) => Promise<boolean>;
+  /** 刷新结果出口:failure 为 null 表示成功;silent 让全成功的一键刷新不播报。 */
+  onReport: (failure: string | null, silent?: boolean) => void;
   formatOpts: FormatOpts;
 }) {
   const [refreshingAll, setRefreshingAll] = useState(false);
+  // 单行刷新与一键刷新共用一把在途锁:两边都只在对方空闲时才可点,
+  // 于是宿主适配器任何时刻都只有一个请求在飞(refreshing 由 workspace 维护)。
+  const busy = refreshingAll || refreshing !== null;
+  async function refreshRow(userId: string) {
+    onReport((await onRefresh(userId)) ? null : labels.loadFailed);
+  }
   // 一键刷新:串行逐个刷新当前列出的用户。宿主适配器直连真实服务,并发 N 个请求会把它打垮。
   async function refreshAll() {
-    if (refreshingAll || items.length === 0) return;
+    if (busy || items.length === 0) return;
     setRefreshingAll(true);
+    let failed = 0;
     try {
-      // 按点击那一刻列出的行来刷新;吞掉单行失败,一个坏行不能把后面的用户堵死
-      // (失败由宿主自己的 toast 通道播报,这里不另加错误面板)。
-      for (const item of items) await onRefresh(item.userId).catch(() => undefined);
+      // 按点击那一刻列出的行来刷新;单行失败只计数不中断,一个坏行不能把后面的用户堵死。
+      for (const item of items) if (!(await onRefresh(item.userId))) failed += 1;
     } finally {
       setRefreshingAll(false);
     }
+    // 整趟只播报一次:有失败就报聚合文案,全成功则静默(inline 宿主顺带清掉旧面板)。
+    onReport(failed > 0 ? (labels.refreshFailed ?? labels.loadFailed) : null, true);
   }
   return (
     <Section
       title={labels.snapshotsTitle}
       description={labels.snapshotsDescription}
       actions={canManage ? (
-        <Button variant="outline" size="sm" loading={refreshingAll} disabled={items.length === 0} onClick={() => void refreshAll()} data-test-id="authz-snapshots-refresh-all">
+        <Button variant="outline" size="sm" loading={refreshingAll} disabled={busy || items.length === 0} onClick={() => void refreshAll()} data-test-id="authz-snapshots-refresh-all">
           {refreshingAll ? labels.refreshing : (labels.refreshAll ?? labels.refresh)}
         </Button>
       ) : null}
@@ -98,7 +110,7 @@ export function SnapshotsSection({
                   // 刷新不再走确认弹窗:点了就刷,按钮自己显示加载态。
                   // 一键刷新进行时禁用单行按钮,避免并发打到宿主适配器。
                   render: (_: unknown, item: EnterprisePermissionSnapshot) => (
-                    <Button variant="ghost" size="sm" loading={refreshing === item.userId} disabled={refreshingAll} onClick={() => void onRefresh(item.userId)} data-test-id={`authz-snapshot-refresh-${item.userId}`}>
+                    <Button variant="ghost" size="sm" loading={refreshing === item.userId} disabled={refreshingAll} onClick={() => void refreshRow(item.userId)} data-test-id={`authz-snapshot-refresh-${item.userId}`}>
                       {refreshing === item.userId ? labels.refreshing : labels.refresh}
                     </Button>
                   ),

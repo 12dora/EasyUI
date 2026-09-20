@@ -29,24 +29,26 @@ const settings: EnterpriseDirectorySettingsValue = {
   lastSync: null,
 };
 
+const oidcSettings = {
+  enabled: true,
+  issuer: "https://id.example.com",
+  authorizationEndpoint: "",
+  tokenEndpoint: "",
+  jwksUri: "",
+  userinfoEndpoint: "",
+  clientId: "trade",
+  hasClientSecret: true,
+  scopes: "openid",
+  redirectBaseUrl: "https://app.example.com",
+  redirectUri: "",
+  frontendBaseUrl: "",
+  serverBaseUrl: "",
+};
+
 function makeAdapter(overrides: Partial<EnterpriseAccessSettingsAdapter> = {}): EnterpriseAccessSettingsAdapter {
   return {
     easyAuthConnectionEditable: true,
-    loadOidcSettings: vi.fn().mockResolvedValue({
-      enabled: true,
-      issuer: "https://id.example.com",
-      authorizationEndpoint: "",
-      tokenEndpoint: "",
-      jwksUri: "",
-      userinfoEndpoint: "",
-      clientId: "trade",
-      hasClientSecret: true,
-      scopes: "openid",
-      redirectBaseUrl: "https://app.example.com",
-      redirectUri: "",
-      frontendBaseUrl: "",
-      serverBaseUrl: "",
-    }),
+    loadOidcSettings: vi.fn().mockResolvedValue(oidcSettings),
     saveOidcSettings: vi.fn(),
     loadEasyAuthSettings: vi.fn(),
     saveEasyAuthSettings: vi.fn(),
@@ -58,8 +60,8 @@ function makeAdapter(overrides: Partial<EnterpriseAccessSettingsAdapter> = {}): 
   } as unknown as EnterpriseAccessSettingsAdapter;
 }
 
-async function mountSurface(adapter: EnterpriseAccessSettingsAdapter, feedbackMode: "inline" | "toast" = "inline") {
-  view = await mount(
+function surfaceNode(adapter: EnterpriseAccessSettingsAdapter, feedbackMode: "inline" | "toast" = "inline") {
+  return (
     <EnterpriseAccessSettingsSurface
       adapter={adapter}
       labels={catalog.access}
@@ -67,8 +69,12 @@ async function mountSurface(adapter: EnterpriseAccessSettingsAdapter, feedbackMo
       locale="en"
       preferredTab="login"
       feedbackMode={feedbackMode}
-    />,
+    />
   );
+}
+
+async function mountSurface(adapter: EnterpriseAccessSettingsAdapter, feedbackMode: "inline" | "toast" = "inline") {
+  view = await mount(surfaceNode(adapter, feedbackMode));
   await settle();
   return view;
 }
@@ -280,5 +286,50 @@ describe("directory settings: a load that failed", () => {
     await settle();
 
     expect(load).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * A reload can fail long after the first one succeeded (a new adapter, a locale
+ * switch): the card then still shows the value it read last time, so the retry
+ * has to be keyed on "the last load failed", not on "there is no value".
+ */
+describe("settings cards: a reload that failed while the form is still on screen", () => {
+  it("puts the retry in the card header next to the other buttons, and drops it once the retry succeeds", async () => {
+    const mounted = await mountSurface(makeAdapter());
+    expect(byTestId(mounted.host, "directory-settings-section")).toBeTruthy();
+    // 读成功时两张卡都没有重试:它不是常驻控件。
+    expect(mounted.host.querySelector("[data-test-id='directory-settings-retry']")).toBeNull();
+    expect(mounted.host.querySelector("[data-test-id='identity-settings-retry']")).toBeNull();
+
+    const failing = makeAdapter({
+      loadOidcSettings: vi.fn().mockRejectedValueOnce(new Error("down")).mockResolvedValue(oidcSettings),
+      loadDirectorySettings: vi.fn().mockRejectedValueOnce(new Error("down")).mockResolvedValue(settings),
+    });
+    await mounted.rerender(surfaceNode(failing));
+    await settle();
+
+    // 表单还在,重试和「测试连接 / 保存」同处标题行。
+    expect(byTestId(mounted.host, "directory-settings-form")).toBeTruthy();
+    const directoryRetry = byTestId(mounted.host, "directory-settings-retry");
+    const identityRetry = byTestId(mounted.host, "identity-settings-retry");
+    expect(directoryRetry.closest("header")).not.toBeNull();
+    expect(directoryRetry.closest("header")?.querySelector("[data-test-id='directory-save']")).not.toBeNull();
+    expect(identityRetry.closest("header")).not.toBeNull();
+    expect(identityRetry.closest("header")?.querySelector("[data-test-id='enterprise-oidc-save']")).not.toBeNull();
+
+    await click(directoryRetry);
+    await settle();
+
+    expect(byTestId(mounted.host, "directory-settings-section")).toBeTruthy();
+    expect(mounted.host.querySelector("[data-test-id='directory-settings-retry']")).toBeNull();
+    // 另一张卡各算各的:目录读回来了,登录那张还没重试过。
+    expect(byTestId(mounted.host, "identity-settings-retry")).toBeTruthy();
+
+    await click(byTestId(mounted.host, "identity-settings-retry"));
+    await settle();
+
+    expect(mounted.host.querySelector("[data-test-id='identity-settings-retry']")).toBeNull();
+    expect(byTestId(mounted.host, "identity-integration-section")).toBeTruthy();
   });
 });

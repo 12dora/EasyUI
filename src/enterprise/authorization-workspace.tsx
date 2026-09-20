@@ -95,6 +95,8 @@ export interface AuthorizationWorkspaceLabels {
   permission?: string;
   /** 用户授权一键刷新:逐个刷新当前列出的用户。缺省回落到 refresh。 */
   refreshAll?: string;
+  /** 一键刷新的聚合失败提示(至少一个用户没刷成)。缺省回落到 loadFailed。 */
+  refreshFailed?: string;
   snapshotsTitle: string; snapshotsDescription: string; user: string; grants: string; roles: string; fetchedAt: string; refresh: string; refreshing: string; expired: string;
   manifestTitle: string; manifestDescription: string; version: string; capabilities: string; permissions: string;
   loading: string; loadFailed: string; empty: string;
@@ -194,16 +196,21 @@ export function EnterpriseAuthorizationWorkspace({
       else setConnection({ ok: false, latencyMs: 0, error: { kind: "request", message: labels.connectionFailed } });
     } finally { setTesting(false); }
   }
-  async function refresh(userId: string) {
-    setRefreshing(userId); setOperationError(null);
+  // 刷新结果的统一出口:inline 宿主写 operationError 面板,toast 宿主弹 toast。
+  // 一键刷新传 silent=true,全成功时只清面板不播报(否则刷 N 个用户会弹 N 条 toast)。
+  function reportRefresh(failure: string | null, silent = false) {
+    if (!toastMode) setOperationError(failure);
+    else if (failure) toast.error(failure);
+    else if (!silent) toast.success(labels.refresh);
+  }
+  // 只做请求与状态更新,成败交给调用方播报:单行刷新一次一报,一键刷新汇总成一条。
+  async function refresh(userId: string): Promise<boolean> {
+    setRefreshing(userId);
     try {
       const next = await adapter.refreshSnapshot(userId);
       setSnapshots((current) => current.map((item) => item.userId === userId ? next : item));
-      if (toastMode) toast.success(labels.refresh);
-    } catch {
-      if (toastMode) toast.error(labels.loadFailed);
-      else setOperationError(labels.loadFailed);
-    } finally { setRefreshing(null); }
+      return true;
+    } catch { return false; } finally { setRefreshing(null); }
   }
   // FE-FB-01: refresh failure must NOT wipe retained successful sections. `error` alone is not missing data.
   const identityMissing = section !== "authorization" && !identity;
@@ -315,14 +322,7 @@ export function EnterpriseAuthorizationWorkspace({
             <EnterprisePermissionCatalogSection catalog={catalog} labels={labels} locale={locale}/>
           ) : null}
           {!restrictedViewer ? (
-            <SnapshotsSection
-              items={snapshots}
-              labels={labels}
-              canManage={canManage}
-              refreshing={refreshing}
-              onRefresh={refresh}
-              formatOpts={formatOpts}
-            />
+            <SnapshotsSection items={snapshots} labels={labels} canManage={canManage} refreshing={refreshing} onRefresh={refresh} onReport={reportRefresh} formatOpts={formatOpts}/>
           ) : null}
           {!restrictedViewer && canManage && adapter.loadManifest ? (
             <ManifestSection manifest={manifest} labels={labels}/>

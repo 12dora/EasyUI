@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { EnterpriseSettingsConfigurationLabels } from "./types";
 import type { IdentitySettingsValue } from "./use-identity-settings";
 
@@ -5,15 +6,21 @@ import type { IdentitySettingsValue } from "./use-identity-settings";
 export function IdentityStatusSummary({
   value,
   labels,
+  actions,
 }: {
   value: IdentitySettingsValue;
   labels: EnterpriseSettingsConfigurationLabels;
+  /** Panel-owned header control — today only the retry, and only after a failed load. */
+  actions?: ReactNode;
 }) {
   return (
     <div className="ui-stack-sm rounded-md border border-hairline bg-paper p-4" data-test-id="identity-status-summary">
-      <div>
-        <p className="text-[14px] font-semibold text-ink">{labels.oidcTitle}</p>
-        <p className="mt-1 text-[12px] text-ink-faint">{labels.oidcDescription}</p>
+      <div className="flex flex-wrap items-start justify-between gap-[var(--ui-gap-md,16px)]">
+        <div>
+          <p className="text-[14px] font-semibold text-ink">{labels.oidcTitle}</p>
+          <p className="mt-1 text-[12px] text-ink-faint">{labels.oidcDescription}</p>
+        </div>
+        {actions}
       </div>
       <dl className="grid gap-2 text-[13px] sm:grid-cols-2">
         <StatusFact label={labels.enabled} value={value.enabled ? labels.enabled : labels.notConfigured} />
