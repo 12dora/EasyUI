@@ -71,14 +71,19 @@ type NotificationPolicyChange = { group: string; managed: boolean } | Notificati
   回 409 `{"code": "notification_group_managed"}`。adapter 把 rejection 做成带
   `status: 409` **或** `code: "notification_group_managed"` 的对象即可
   (`isNotificationManagedConflict` 只认这两样,不 `instanceof` 任何具体错误类);页面收到
-  之后把**当前页签所有还没落地的改动整串丢掉**(包括还排在队列里、尚未发出的那些),再重读
-  一遍——此刻本地那份视图已经不对了,只回滚触发 409 的那一条等于留下一堆同样不作数的乐观值。
-  常量导出为 `NOTIFICATION_GROUP_MANAGED_CODE`。
+  之后把**这个分组**所有还没落地的改动丢掉(包括还排在队列里、尚未发出的那些),再重读一遍。
+  作废范围**停在分组边界上**:同一队列里排着的**别的分组**的改动照发不误 —— 它们与这次托管
+  无关,连坐等于把用户刚点的东西悄悄吃掉。常量导出为 `NOTIFICATION_GROUP_MANAGED_CODE`。
 - **`loadPolicy` 只在管理员切到「平台配置」时才调。** 没有 `canManage` 的账号不会发这个
   请求,后端的 403 也就永远不会出现在正常路径上。
 
 > **adapter 必须是稳定引用**(模块常量或 `useMemo`),与本包其他设置面一个口径:它换一次
 > 引用就重拉一次数据,每次渲染都新建一个对象会变成请求风暴。
+>
+> **两个 `load*` 不能合流到更早的那次在途请求上。** 本页面会在写落地之后主动补拉,一个把
+> 相同 URL 的并发 GET 合并成一份(request de-duplication / `fetch` 缓存)的宿主实现,会让
+> 这次补拉拿回写之前的旧响应,页面就永远停在旧的生效值上。宿主传 `cache: "no-store"`,或
+> 用别的办法绕开自己那层去重。
 
 ```tsx
 const notificationSettingsAdapter: NotificationSettingsAdapter = {
@@ -107,6 +112,12 @@ const notificationSettingsAdapter: NotificationSettingsAdapter = {
   标题行的「平台托管」开关与那枚「由平台统一管理」标签留在表格之外,并且在这一页恒为
   `disabled`:它是状态展示,不是操作入口。
 
+- 「平台配置」里所有分组 `editable = true`,托管开关可操作,表格不置灰。
+- 某个渠道 `available === false` 时,页头下方印**一条** `labels.dingtalkUnavailable`
+  (不是每张卡一条)。
+- 状态:一次都没读到时是骨架屏;读失败时一条 `InlineNotice` + **重试**(重试只跟着失败走,
+  读成功时不是常驻控件);`groups` 为空时是空状态。
+
 ## 4.1 状态模型:已确认值 + 待落地改动
 
 保存不是"把整个分组换成最后一次响应",而是:
@@ -122,17 +133,24 @@ const notificationSettingsAdapter: NotificationSettingsAdapter = {
 - **某一次失败**只丢它自己那条 op,显示值重新算一遍——期间已经成功的兄弟改动自然留着
   (按快照回滚会把它一起吞掉);
 - **每个页签一条串行队列**:同一时刻只有一个写请求在飞,后点的排队等着,但乐观值立刻生效。
-  并发写同一个分组时,两份整组快照必然互相覆盖,所以这里不并发。
+  并发写同一个分组时,两份整组快照必然互相覆盖,所以这里不并发;
+- **409 的作废范围按分组算**,不按页签。触发冲突的那个分组的待落地改动整串丢掉并重读,
+  队列里**别的分组**的改动照发不误 —— 判定走"这条 op 还在不在登记表里",而不是一个页签级
+  的代数,否则一次 409 会把用户在另一个分组上刚点的东西一起吃掉。重读回来的 `confirmed`
+  之上,幸存的改动继续重放。
 
-加载同样有两道闸:每次加载发一个 `loadId`,响应对不上就是被更晚的加载顶掉了,整条丢弃;
-每次保存落地 `revision` +1,加载开始时记下当时的 `revision`,响应回来时对不上说明这份数据
-在读的过程中已经被自己的写改过了,同样丢弃,并在队列清空后补拉一次。组件卸载后所有回调
-一律闭嘴。纯逻辑在 `src/enterprise/notification-settings-state.ts`(有单测)。
-- 「平台配置」里所有分组 `editable = true`,托管开关可操作,表格不置灰。
-- 某个渠道 `available === false` 时,页头下方印**一条** `labels.dingtalkUnavailable`
-  (不是每张卡一条)。
-- 状态:一次都没读到时是骨架屏;读失败时一条 `InlineNotice` + **重试**(重试只跟着失败走,
-  读成功时不是常驻控件);`groups` 为空时是空状态。
+加载有两道闸:每次加载发一个 `loadId`,响应对不上就是被更晚的加载顶掉了,整条丢弃;
+每次写落地 `revision` +1,加载开始时记下当时的 `revision`,响应回来时对不上说明这份数据
+在读的过程中已经被写改过了,同样丢弃,并标记 `needsReload`。
+
+**平台写会把「我的通知」一起标记为过期。** 平台值一变,本人的**生效值**就可能跟着变,而那
+份数据只有 `GET ``` 知道:所以平台侧的写无论成功、失败还是冲突,落地时都给 `mine` 的
+`revision` +1 并置上 `needsReload`。用户在 PATCH 回来之前切回「我的通知」时,那次 GET 是写
+之前发出去的、带回的是旧值,`revision` 对不上于是被丢弃;等**两条队列都空**之后补拉一次。
+`load-start` 会清掉 `needsReload`,所以一次失效只补拉一次,不会转圈。
+
+组件卸载后所有回调一律闭嘴。纯逻辑在 `src/enterprise/notification-settings-state.ts`
+(`notification-settings-state.test.ts` 里有单测)。
 
 ## 5. 权限与导航
 

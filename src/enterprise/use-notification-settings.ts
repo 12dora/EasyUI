@@ -19,6 +19,7 @@ import { toast } from "../toast";
 import {
   applyOps,
   initialNotificationState,
+  notificationOpGroup,
   notificationOpKey,
   notificationTabOf,
   reduceNotifications,
@@ -65,8 +66,11 @@ interface SaveTask {
   saveFailed: string;
   run(): Promise<NotificationGroupView>;
   dispatch: Dispatch;
-  /** 卸载 / 这批 op 已被 409 作废 时返回 false,回调一律闭嘴。 */
+  /** 卸载、或这条 op 已被同分组的 409 作废时返回 false,回调一律闭嘴。 */
   live(): boolean;
+  /** 本条 op 落地:从在途登记里摘掉。 */
+  settle(): void;
+  /** 409:作废**同一分组**的所有待落地改动并重读;别的分组的照常继续发。 */
   onConflict(): void;
 }
 
@@ -75,20 +79,38 @@ interface SaveTask {
  * 显示值由 `applyOps` 重新算,期间成功的兄弟改动自然留在上面,不需要快照回滚。
  */
 async function runNotificationSave(task: SaveTask): Promise<void> {
+  // 排在前面那条的 409 可能已经把本条作废了:那就连请求都不发。
   if (!task.live()) return;
   try {
     const group = await task.run();
     if (!task.live()) return;
+    task.settle();
     task.dispatch({ type: "op-ok", tab: task.tab, opId: task.op.id, group });
   } catch (error) {
     if (!task.live()) return;
     if (isNotificationManagedConflict(error)) {
-      task.dispatch({ type: "op-conflict", tab: task.tab });
       task.onConflict();
     } else {
+      task.settle();
       task.dispatch({ type: "op-fail", tab: task.tab, opId: task.op.id });
     }
     toast.error(task.saveFailed);
+  }
+}
+
+/**
+ * 在途登记:op id → 它属于哪个页签的哪个分组。
+ *
+ * 与 reducer 里的 `ops` 是同一串事件的两份投影:`ops` 供渲染(要走 React 的提交),这份
+ * 供队列判定(必须在点击那一刻就能读到,不能等提交)。两边只在 enqueue / 落地 / 409
+ * 这三处同步更新。
+ */
+type NotificationOpRegistry = Map<number, { tab: NotificationSettingsTab; group: string }>;
+
+/** 作废同一页签同一分组的所有登记。遍历中删除 Map 是安全的。 */
+function cancelGroupOps(registry: NotificationOpRegistry, tab: NotificationSettingsTab, group: string): void {
+  for (const [id, entry] of registry) {
+    if (entry.tab === tab && entry.group === group) registry.delete(id);
   }
 }
 
@@ -105,8 +127,7 @@ function useNotificationRunners(
 ): NotificationRunners {
   const alive = useRef(true);
   const loadIds = useRef({ mine: 0, policy: 0 });
-  // 409 作废整批 op 时 epoch +1,还排在队列里、尚未发出的那些任务据此自行放弃。
-  const epochs = useRef({ mine: 0, policy: 0 });
+  const registry = useRef<NotificationOpRegistry>(new Map());
   const queues = useRef({ mine: Promise.resolve(), policy: Promise.resolve() });
 
   useEffect(() => {
@@ -135,16 +156,19 @@ function useNotificationRunners(
 
   const enqueue = useCallback<NotificationRunners["enqueue"]>(
     (tab, op, run) => {
+      const group = notificationOpGroup(op);
+      registry.current.set(op.id, { tab, group });
       dispatch({ type: "op-add", tab, op });
-      const epoch = epochs.current[tab];
-      const live = () => alive.current && epochs.current[tab] === epoch;
-      // 整批作废:还排在队列里、尚未发出的任务靠 epoch 自行放弃,然后重读当前页签。
+      const live = () => alive.current && registry.current.has(op.id);
+      const settle = () => registry.current.delete(op.id);
+      // 只作废**同一分组**的待落地改动,然后重读本页签;别的分组排在队列里的照发不误。
       const onConflict = () => {
-        epochs.current[tab] += 1;
+        cancelGroupOps(registry.current, tab, group);
+        dispatch({ type: "op-conflict", tab, group });
         load(tab);
       };
       queues.current[tab] = queues.current[tab].then(() =>
-        runNotificationSave({ tab, op, saveFailed, run, dispatch, live, onConflict }),
+        runNotificationSave({ tab, op, saveFailed, run, dispatch, live, settle, onConflict }),
       );
     },
     [dispatch, load, saveFailed],
@@ -167,11 +191,13 @@ export function useNotificationSettings(
     load("mine");
   }, [load]);
 
-  // 丢掉过一次加载结果(读的过程中自己的写落了地)。等队列空了补拉一次,不然页面会一直
-  // 停在乐观值上,直到用户自己去点别的地方。
+  // 本页签被标记为过期了(读的过程中自己的写落了地,或者平台侧刚改完平台值)。等**两条
+  // 队列都空**再补拉:平台写还在路上时拉「我的通知」,拿回来的仍是旧的生效值。
+  // `load-start` 会把 `needsReload` 清掉,所以一次失效只补拉一次,不会转圈。
+  const policyBusy = state.policy.ops.length > 0;
   useEffect(() => {
-    if (current.needsReload && current.ops.length === 0 && !current.loading) load(tab);
-  }, [current.needsReload, current.ops.length, current.loading, load, tab]);
+    if (current.needsReload && current.ops.length === 0 && !policyBusy && !current.loading) load(tab);
+  }, [current.needsReload, current.ops.length, current.loading, policyBusy, load, tab]);
 
   const pending = useMemo(() => {
     const keys = new Set<string>();

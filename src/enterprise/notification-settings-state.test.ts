@@ -14,6 +14,7 @@ import {
   notificationOpKey,
   notificationSwitchKey,
   reduceNotifications,
+  type NotificationAction,
   type NotificationOp,
   type NotificationState,
 } from "./notification-settings-state";
@@ -33,14 +34,25 @@ const GROUP: NotificationGroupView = {
   ],
 };
 
-const VIEW: NotificationPolicyView = { channels: [], groups: [GROUP] };
+/** 第二个分组:409 的作废范围必须停在分组边界上,所以夹具里必须有两个。 */
+const OTHER: NotificationGroupView = { ...GROUP, key: "manager" };
+
+const VIEW: NotificationPolicyView = { channels: [], groups: [GROUP, OTHER] };
 
 function switchOp(id: number, channel: "dingtalk" | "in_app", enabled: boolean): NotificationOp {
   return { id, kind: "switch", change: { group: "learner", scene: "exam", channel, enabled } };
 }
 
-function channelsOf(view: NotificationPolicyView | null) {
-  return view?.groups[0]?.scenes[0]?.channels;
+function otherOp(id: number, enabled: boolean): NotificationOp {
+  return { id, kind: "switch", change: { group: "manager", scene: "exam", channel: "dingtalk", enabled } };
+}
+
+function channelsOf(view: NotificationPolicyView | null, key = "learner") {
+  return view?.groups.find((group) => group.key === key)?.scenes[0]?.channels;
+}
+
+function shown(state: NotificationState) {
+  return applyOps(state.mine.confirmed, state.mine.ops);
 }
 
 function seeded(view: NotificationPolicyView = VIEW): NotificationState {
@@ -103,13 +115,35 @@ describe("reduceNotifications — 保存落地", () => {
     expect(channelsOf(applyOps(state.mine.confirmed, state.mine.ops))).toEqual({ dingtalk: false, in_app: true });
   });
 
-  it("409 把这个页签的待落地改动整串丢掉", () => {
+  it("409 丢掉出事分组的全部待落地改动", () => {
     let state = seeded();
     state = reduceNotifications(state, { type: "op-add", tab: "mine", op: switchOp(1, "dingtalk", true) });
     state = reduceNotifications(state, { type: "op-add", tab: "mine", op: switchOp(2, "in_app", true) });
-    state = reduceNotifications(state, { type: "op-conflict", tab: "mine" });
+    state = reduceNotifications(state, { type: "op-conflict", tab: "mine", group: "learner" });
     expect(state.mine.ops).toEqual([]);
-    expect(channelsOf(applyOps(state.mine.confirmed, state.mine.ops))).toEqual({ dingtalk: false, in_app: false });
+    expect(channelsOf(shown(state))).toEqual({ dingtalk: false, in_app: false });
+  });
+
+  it("409 **只**丢出事的那个分组:别的分组排着的改动照旧重放", () => {
+    let state = seeded();
+    state = reduceNotifications(state, { type: "op-add", tab: "mine", op: switchOp(1, "dingtalk", true) });
+    state = reduceNotifications(state, { type: "op-add", tab: "mine", op: otherOp(2, true) });
+    state = reduceNotifications(state, { type: "op-conflict", tab: "mine", group: "learner" });
+    // 连坐会把用户刚在另一个分组上点的那一下悄悄吃掉。
+    expect(state.mine.ops.map((op) => op.id)).toEqual([2]);
+    expect(channelsOf(shown(state))?.dingtalk).toBe(false);
+    expect(channelsOf(shown(state), "manager")?.dingtalk).toBe(true);
+  });
+
+  it("冲突后重读回来的已确认值上,幸存的改动继续重放", () => {
+    let state = seeded();
+    state = reduceNotifications(state, { type: "op-add", tab: "mine", op: otherOp(2, true) });
+    state = reduceNotifications(state, { type: "op-conflict", tab: "mine", group: "learner" });
+    state = reduceNotifications(state, { type: "load-start", tab: "mine", loadId: 2 });
+    const reloaded: NotificationPolicyView = { channels: [], groups: [{ ...GROUP, managed: true }, OTHER] };
+    state = reduceNotifications(state, { type: "load-ok", tab: "mine", loadId: 2, view: reloaded, canManage: true });
+    expect(shown(state)?.groups[0]?.managed).toBe(true);
+    expect(channelsOf(shown(state), "manager")?.dingtalk).toBe(true);
   });
 
   it("两个页签各存各的 ops,互不影响", () => {
@@ -117,6 +151,45 @@ describe("reduceNotifications — 保存落地", () => {
     state = reduceNotifications(state, { type: "op-add", tab: "policy", op: switchOp(1, "dingtalk", true) });
     expect(state.mine.ops).toEqual([]);
     expect(state.policy.ops).toHaveLength(1);
+  });
+});
+
+describe("reduceNotifications — 平台写让「我的通知」失效", () => {
+  const settledWrites: NotificationAction[] = [
+    { type: "op-ok", tab: "policy", opId: 1, group: GROUP },
+    { type: "op-fail", tab: "policy", opId: 1 },
+    { type: "op-conflict", tab: "policy", group: "learner" },
+  ];
+
+  it.each(settledWrites)("平台写落地($type)把「我的通知」标记为过期", (action) => {
+    let state = seeded();
+    state = reduceNotifications(state, { type: "op-add", tab: "policy", op: switchOp(1, "dingtalk", true) });
+    expect(state.mine.needsReload).toBe(false);
+    // 平台值变了,本人的**生效值**只有 `GET ``` 知道 —— 不标记就会一直停在旧值上。
+    const next = reduceNotifications(state, action);
+    expect(next.mine.needsReload).toBe(true);
+    expect(next.mine.revision).toBe(state.mine.revision + 1);
+  });
+
+  it("平台写落地时已经在路上的那次「我的通知」加载会被丢掉", () => {
+    let state = seeded();
+    state = reduceNotifications(state, { type: "load-start", tab: "mine", loadId: 2 });
+    state = reduceNotifications(state, { type: "op-add", tab: "policy", op: switchOp(1, "dingtalk", true) });
+    state = reduceNotifications(state, { type: "op-ok", tab: "policy", opId: 1, group: GROUP });
+    const stalePersonal: NotificationPolicyView = { channels: [], groups: [{ ...GROUP, managed: true }, OTHER] };
+    state = reduceNotifications(state, { type: "load-ok", tab: "mine", loadId: 2, view: stalePersonal, canManage: true });
+    // 这次 GET 是平台写落地之前发出去的,带回来的是旧的生效值。
+    expect(state.mine.confirmed).toEqual(VIEW);
+    expect(state.mine.needsReload).toBe(true);
+    expect(state.mine.loading).toBe(false);
+  });
+
+  it("「我的通知」自己的写不去碰平台页签", () => {
+    let state = seeded();
+    state = reduceNotifications(state, { type: "op-add", tab: "mine", op: switchOp(1, "dingtalk", true) });
+    state = reduceNotifications(state, { type: "op-ok", tab: "mine", opId: 1, group: GROUP });
+    expect(state.policy.needsReload).toBe(false);
+    expect(state.policy.revision).toBe(0);
   });
 });
 

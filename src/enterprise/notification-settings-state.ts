@@ -64,6 +64,11 @@ export function notificationOpKey(tab: NotificationSettingsTab, op: Notification
     : notificationManagedKey(tab, op.group);
 }
 
+/** 这条改动落在哪个分组上。409 的作废范围、队列的放弃判定都按它算。 */
+export function notificationOpGroup(op: NotificationOp): string {
+  return op.kind === "switch" ? op.change.group : op.group;
+}
+
 function withChannelValue(group: NotificationGroupView, change: NotificationSwitchChange): NotificationGroupView {
   return {
     ...group,
@@ -82,8 +87,7 @@ function replaceGroup(view: NotificationPolicyView, group: NotificationGroupView
 
 /** 单条 op 重放。分组已经不在(重拉之后消失了)就原样返回,不凭空造一个分组出来。 */
 export function applyOp(view: NotificationPolicyView, op: NotificationOp): NotificationPolicyView {
-  const groupKey = op.kind === "switch" ? op.change.group : op.group;
-  const group = view.groups.find((item) => item.key === groupKey);
+  const group = view.groups.find((item) => item.key === notificationOpGroup(op));
   if (!group) return view;
   return replaceGroup(view, op.kind === "switch" ? withChannelValue(group, op.change) : { ...group, managed: op.managed });
 }
@@ -128,7 +132,8 @@ export type NotificationAction =
   | { type: "op-add"; tab: NotificationSettingsTab; op: NotificationOp }
   | { type: "op-ok"; tab: NotificationSettingsTab; opId: number; group: NotificationGroupView }
   | { type: "op-fail"; tab: NotificationSettingsTab; opId: number }
-  | { type: "op-conflict"; tab: NotificationSettingsTab };
+  /** 409:只作废**这一个分组**的待落地改动,别的分组还好好的,不能连坐。 */
+  | { type: "op-conflict"; tab: NotificationSettingsTab; group: string };
 
 function emptyTab(): NotificationTabState {
   return {
@@ -171,9 +176,12 @@ function reduceOps(state: NotificationTabState, action: NotificationAction): Not
     }
     case "op-fail":
       return { ...state, ops: dropOp(state.ops, action.opId), revision: state.revision + 1 };
-    case "op-conflict":
-      // 分组刚被改成托管:本地这些待落地的改动一条都不作数了,整串丢掉再重读。
-      return { ...state, ops: [], revision: state.revision + 1 };
+    case "op-conflict": {
+      // 这个分组刚被改成托管:它自己的待落地改动一条都不作数了。**只丢它的** ——
+      // 队列里排着的别的分组的改动照样有效,连坐会把用户刚点的东西悄悄吃掉。
+      const ops = state.ops.filter((op) => notificationOpGroup(op) !== action.group);
+      return { ...state, ops, revision: state.revision + 1 };
+    }
     default:
       return state;
   }
@@ -187,6 +195,19 @@ function reduceTab(state: NotificationTabState, action: NotificationAction): Not
   return action.type.startsWith("load") ? reduceLoad(state, action) : reduceOps(state, action);
 }
 
+/** 一次写请求落地了(成功 / 失败 / 冲突都算)。 */
+function isSettledWrite(action: NotificationAction): boolean {
+  return action.type === "op-ok" || action.type === "op-fail" || action.type === "op-conflict";
+}
+
+/**
+ * 把一个页签标记为过期:`revision` +1 让**已经在路上**的那次加载作废(它是写之前发出去的,
+ * 回来的会是旧值),`needsReload` 让队列清空后补拉一次。
+ */
+function invalidateTab(state: NotificationTabState): NotificationTabState {
+  return { ...state, revision: state.revision + 1, needsReload: true };
+}
+
 export function reduceNotifications(state: NotificationState, action: NotificationAction): NotificationState {
   if (action.type === "tab") return state.tab === action.tab ? state : { ...state, tab: action.tab };
   if (action.tab === "mine") {
@@ -194,7 +215,10 @@ export function reduceNotifications(state: NotificationState, action: Notificati
     return mine === state.mine ? state : { ...state, mine };
   }
   const policy = reduceTab(state.policy, action);
-  return policy === state.policy ? state : { ...state, policy };
+  if (policy === state.policy) return state;
+  // 平台值一变,本人的**生效值**就可能跟着变,而那份数据只有 `GET ``` 知道 —— 平台写落地
+  // 时必须把「我的通知」一起标记为过期,否则用户在 PATCH 回来之前切回去,就会一直停在旧值上。
+  return { ...state, policy, mine: isSettledWrite(action) ? invalidateTab(state.mine) : state.mine };
 }
 
 export function notificationTabOf(state: NotificationState, tab: NotificationSettingsTab): NotificationTabState {
