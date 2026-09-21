@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import { useEnterpriseFavicon } from "./use-enterprise-favicon";
+
 export interface EnterpriseBrandSlotRenderLinkArgs {
   href: string;
   className: string;
@@ -30,8 +32,12 @@ const BRAND_LINK_CLASS = "flex min-w-0 items-center gap-3 transition-opacity hov
  * twice. Title and subtitle come from the general settings (see
  * `resolveEnterpriseBrand`), which is why both are plain strings here — this
  * component never fetches anything.
+ *
+ * The same logo is also the browser-tab favicon (`useEnterpriseFavicon`), so every host
+ * that renders this slot gets a favicon matching its topbar without any host code.
  */
 export function EnterpriseBrandSlot({ href, title, subtitle, logoSrc, testId, renderLink }: EnterpriseBrandSlotProps) {
+  useEnterpriseFavicon(logoSrc);
   const children = (
     <>
       {logoSrc ? (
