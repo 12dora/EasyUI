@@ -179,15 +179,6 @@ export function rangeDraftOf(days: readonly [string, string] | null | undefined)
 }
 
 /**
- * Where the calendar panel mounts: inside the filter dropdown itself. antd
- * portals it to `document.body` by default, where a click on a day counts as
- * an outside click and closes the header dropdown before anything is picked.
- */
-export function rangePopupContainer(trigger: HTMLElement): HTMLElement {
-  return trigger.closest<HTMLElement>(".ant-table-filter-dropdown") ?? trigger.parentElement ?? document.body;
-}
-
-/**
  * Enter in a date input must not submit the host's outer `<form>` (tables often
  * sit inside one) — same guard as the keyword dropdown / cards search box.
  * The picker still sees the key first (React bubbles inner → outer).
@@ -232,7 +223,14 @@ function DateRangeDropdown({ close, from, to, labels, testId, onApply }: Dropdow
           // Open-ended ranges: "since the 1st" / "up to the 15th" are real questions.
           allowEmpty={[true, true]}
           placeholder={[labels.start, labels.end]}
-          getPopupContainer={rangePopupContainer}
+          // No `getPopupContainer`: antd's `.ant-table-filter-dropdown` is
+          // `overflow: hidden`, so a panel mounted inside it is clipped. The
+          // panel portals to `document.body` and still counts as "inside" the
+          // funnel: both are @rc-component/trigger popups, and the picker's
+          // trigger registers its panel with the enclosing dropdown's trigger
+          // (TriggerContext `registerSubPopup`), whose outside-click check
+          // (`inPopupOrChild`) covers sub-popups. antd's z-index context
+          // stacks the nested panel above the dropdown.
           onChange={(_dates, days) => setDraft(rangeDraftOf(days as [string, string] | null))}
         />
       </div>

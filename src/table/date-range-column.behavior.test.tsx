@@ -19,7 +19,6 @@ import {
   dateRangeColumn,
   dateRangeLabelsOf,
   rangeDraftOf,
-  rangePopupContainer,
 } from "./date-range-column";
 import {
   applyTableQueryPatch,
@@ -217,21 +216,6 @@ describe("the picker inside the header dropdown", () => {
     expect(rangeDraftOf(undefined)).toEqual(["", ""]);
   });
 
-  it("mounts the calendar inside the filter dropdown, not in document.body", () => {
-    const dropdown = document.createElement("div");
-    dropdown.className = "ant-table-filter-dropdown";
-    const wrapper = document.createElement("div");
-    const input = document.createElement("input");
-    wrapper.appendChild(input);
-    dropdown.appendChild(wrapper);
-    expect(rangePopupContainer(input)).toBe(dropdown);
-    // Outside a table (a bare render) it still stays next to the input.
-    const loose = document.createElement("div");
-    const other = document.createElement("input");
-    loose.appendChild(other);
-    expect(rangePopupContainer(other)).toBe(loose);
-  });
-
   it("swallows Enter so a host <form> around the table is not submitted", async () => {
     const mounted = await openDropdown(columnOf(""));
     const input = byTestId(mounted.host, "submitted-picker").querySelector("input")!;
@@ -243,17 +227,70 @@ describe("the picker inside the header dropdown", () => {
     expect(patches).toEqual([]);
   });
 
-  it("inside a real antd Table: the header icon reflects the URL and the dropdown hosts the picker", async () => {
-    const column = columnOf("submittedFrom=2026-09-01");
-    const mounted = await show(<Table<Row> rowKey="id" columns={[column]} dataSource={[]} pagination={false} />);
+  it("inside a real antd Table: picking days keeps the funnel open, 确定 writes both keys and closes it", async () => {
+    const mounted = await show(
+      <Table<Row> rowKey="id" columns={[columnOf("submittedFrom=2026-09-01")]} dataSource={[]} pagination={false} />,
+    );
     expect(byTestId(mounted.host, "submitted-icon").getAttribute("data-active")).toBe("true");
-    const trigger = mounted.host.querySelector(".ant-table-filter-trigger");
-    expect(trigger).not.toBeNull();
-    await click(trigger!);
-    await settle(50);
-    const body = byTestId(document.body, "submitted");
-    const input = byTestId(body, "submitted-picker").querySelector("input")!;
-    expect(input.value).toBe("2026-09-01");
-    expect(rangePopupContainer(input).classList.contains("ant-table-filter-dropdown")).toBe(true);
+
+    await press(mounted.host.querySelector(".ant-table-filter-trigger")!);
+    expect(funnelOpen()).toBe(true);
+    const start = byTestId(document.body, "submitted-picker").querySelector("input")!;
+    expect(start.value).toBe("2026-09-01");
+
+    // Open the calendar: its panel portals to document.body, outside the funnel's DOM.
+    await act(async () => start.focus());
+    await press(start);
+    const panel = document.body.querySelector<HTMLElement>(".ant-picker-dropdown");
+    expect(panel).not.toBeNull();
+    expect(panel!.closest(".ant-table-filter-dropdown")).toBeNull();
+
+    // Day clicks inside that panel are not "outside clicks" for the funnel.
+    await press(dayCell(panel!, "3"));
+    expect(funnelOpen()).toBe(true);
+    await press(dayCell(panel!, "10"));
+    expect(funnelOpen()).toBe(true);
+    expect(patches).toEqual([]);
+
+    await press(byTestId(document.body, "submitted-submit"));
+    expect(patches).toEqual([{ filters: { submittedFrom: ["2026-09-03"], submittedTo: ["2026-09-10"] } }]);
+    expect(funnelOpen()).toBe(false);
+  });
+
+  it("inside a real antd Table: a real outside click (calendar closed) still closes the funnel", async () => {
+    const mounted = await show(
+      <Table<Row> rowKey="id" columns={[columnOf("")]} dataSource={[]} pagination={false} />,
+    );
+    await press(mounted.host.querySelector(".ant-table-filter-trigger")!);
+    expect(funnelOpen()).toBe(true);
+    await press(document.body);
+    expect(funnelOpen()).toBe(false);
+    expect(patches).toEqual([]);
   });
 });
+
+/** A full pointer sequence — rc-trigger decides "outside" on mousedown, rc-picker selects on click. */
+async function press(element: Element) {
+  await act(async () => {
+    for (const type of ["pointerdown", "mousedown", "pointerup", "mouseup", "click"]) {
+      element.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
+    }
+  });
+  await settle(50);
+}
+
+/** Is the header funnel (antd Dropdown holding our dropdown body) currently shown? */
+function funnelOpen(): boolean {
+  const popup = document.body.querySelector("[data-test-id='submitted']")?.closest(".ant-dropdown");
+  // happy-dom 里 antd 的离场动画不会走完:处在 leave 阶段即视为已关闭。
+  if (!popup) return false;
+  return !popup.classList.contains("ant-dropdown-hidden") && !popup.className.includes("-leave");
+}
+
+/** A day of the first (left) month panel, by its number. */
+function dayCell(panel: HTMLElement, day: string): HTMLElement {
+  const cells = Array.from(panel.querySelectorAll<HTMLElement>(".ant-picker-cell-in-view"));
+  const cell = cells.find((node) => node.textContent?.trim() === day);
+  if (!cell) throw new Error(`No day ${day} in the calendar`);
+  return cell;
+}
