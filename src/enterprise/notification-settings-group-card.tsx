@@ -9,12 +9,15 @@
  * 一格是什么。语义也是真的表格:`<th scope="col">` 是渠道,`<th scope="row">` 是场景,读屏
  * 报一格开关时会带上两者。
  *
- * 置灰的口径与「工作账号登录」卡片一致(docs/ACCESS-SETTINGS.md):**只有正文进
- * `GatedBody`**,标题行的开关与那枚「由平台统一管理」标签留在外面——它们说明的正是"为什么
- * 这张表不能动",跟着一起变灰就没人读得到了。
+ * **托管中的分组刻意不用 `GatedBody`。** 「工作账号登录」那张卡关掉之后正文整块 `inert`
+ * (docs/ACCESS-SETTINGS.md),因为那些输入框此刻不代表任何事实;这里正相反——托管中的开关
+ * 展示的是**当前真正生效的值**,用户(尤其读屏用户)必须读得到"哪些通知我还会收到"。
+ * `inert` 会把整张表从无障碍树里摘掉,那就等于对读屏用户隐瞒了生效状态。所以这里只做两件
+ * 事:每个开关各自 `disabled`(读屏播报"已禁用",状态照常播),整块套 `GATED_DIM_CLASS`
+ * 保持与那张卡同一档灰度。
  */
 
-import { GatedBody } from "../primitives/gated-body";
+import { GATED_DIM_CLASS } from "../primitives/gated-body";
 import { Section } from "../primitives/section";
 import { Switch } from "../primitives/switch";
 import {
@@ -55,7 +58,11 @@ export function NotificationGroupCard({ group, labels, locale, policyMode, contr
           <ManagedControl group={group} labels={labels} locale={locale} policyMode={policyMode} controller={controller} />
         }
       >
-        <GatedBody off={readOnly} className="overflow-hidden rounded-md border border-hairline bg-paper">
+        <div
+          className={`overflow-hidden rounded-md border border-hairline bg-paper ${readOnly ? GATED_DIM_CLASS : ""}`}
+          data-test-id={`notification-group-${group.key}-table`}
+          data-readonly={readOnly ? "true" : "false"}
+        >
           <div className="overflow-x-auto">
             <table className="w-full min-w-[420px] table-fixed border-collapse text-left">
               <thead>
@@ -81,7 +88,7 @@ export function NotificationGroupCard({ group, labels, locale, policyMode, contr
               </tbody>
             </table>
           </div>
-        </GatedBody>
+        </div>
       </Section>
     </div>
   );
@@ -94,7 +101,7 @@ export function NotificationGroupCard({ group, labels, locale, policyMode, contr
  * 但必须看得见这一组是不是被托管了,否则"我的开关怎么点都不生效"就成了一桩无解的怪事。
  */
 function ManagedControl({ group, labels, locale, policyMode, controller }: NotificationGroupCardProps) {
-  const key = notificationManagedKey(group.key);
+  const key = notificationManagedKey(controller.tab, group.key);
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
       {!policyMode && group.managed ? (
@@ -110,7 +117,7 @@ function ManagedControl({ group, labels, locale, policyMode, controller }: Notif
         checked={group.managed}
         disabled={!policyMode || controller.isPending(key)}
         aria-label={labels.switchLabel(resolveNotificationText(group.title, locale), labels.managed)}
-        onChange={(managed) => controller.setManaged(group, managed)}
+        onChange={(managed) => controller.setManaged(group.key, managed)}
         data-test-id={`notification-group-${group.key}-managed`}
       />
     </div>
@@ -119,7 +126,7 @@ function ManagedControl({ group, labels, locale, policyMode, controller }: Notif
 
 interface SceneRowProps extends NotificationGroupCardProps {
   scene: NotificationSceneView;
-  /** 整表置灰(托管中的分组在「我的通知」里)。 */
+  /** 整表只读(托管中的分组在「我的通知」里)。只置灰 + 逐个 disabled,**不** inert。 */
   readOnly: boolean;
 }
 
@@ -175,7 +182,7 @@ function ChannelCell({ group, scene, channel, sceneTitle, labels, readOnly, cont
       </td>
     );
   }
-  const key = notificationSwitchKey(group.key, scene.key, channel);
+  const key = notificationSwitchKey(controller.tab, group.key, scene.key, channel);
   return (
     <td className={CHANNEL_COLUMN_CLASS}>
       <div className="flex justify-center">
@@ -183,7 +190,7 @@ function ChannelCell({ group, scene, channel, sceneTitle, labels, readOnly, cont
           checked={value}
           disabled={readOnly || controller.isPending(key)}
           aria-label={labels.switchLabel(sceneTitle, channelLabel)}
-          onChange={(enabled) => controller.setChannel(group, { group: group.key, scene: scene.key, channel, enabled })}
+          onChange={(enabled) => controller.setChannel({ group: group.key, scene: scene.key, channel, enabled })}
           data-test-id={`notification-switch-${scene.key}-${channel}`}
         />
       </div>

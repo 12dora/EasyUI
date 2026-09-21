@@ -1,71 +1,51 @@
 "use client";
 
 /**
- * 「设置 → 通知」的控制器:两份数据(我的 / 平台)、一套乐观保存。
+ * 「设置 → 通知」的控制器:把 `notification-settings-state.ts` 那台纯状态机接上 adapter。
  *
- * 要点:
- * - **两个页签各自一份资源**。「我的通知」读 `load()`,「平台配置」读 `loadPolicy()`;
- *   切页签一律重拉——平台值刚改完,本人的生效值就可能跟着变,拿缓存会给出一张过期的表。
- * - **即点即存,没有保存按钮**。先乐观改本地,再发请求;成功用服务端返回的整个分组替换,
- *   失败回滚并报错。在途期间只禁用**这一个**开关,同一张卡上的其他开关照常可点。
- * - **409 = 分组刚被改成托管**。回滚之外还要重拉「我的通知」:本地这份视图此刻已经不对了。
+ * 三件这里才能做的事:
+ *
+ * 1. **每个页签一条串行队列**。一个页签同一时刻只有一个写请求在飞,后点的排队等着 ——
+ *    但**乐观值立刻生效**,用户看到的是自己刚点的那一下,不是"等一等再动"。排队而不并发,
+ *    是因为并发写同一个分组时,响应里的整组快照必然互相覆盖。
+ * 2. **只禁用被点的那一个开关**。在途判定走 op 的键(键带页签前缀),所以同一张卡上的别的
+ *    开关照常可点,另一个页签上的同名分组也不受牵连。
+ * 3. **卸载后一律闭嘴**。`alive` 一翻,所有还在路上的加载 / 保存回调直接返回,不再 dispatch。
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 
 import { toast } from "../toast";
 import {
+  applyOps,
+  initialNotificationState,
+  notificationOpKey,
+  notificationTabOf,
+  reduceNotifications,
+  type NotificationAction,
+  type NotificationOp,
+  type NotificationSettingsTab,
+} from "./notification-settings-state";
+import {
   isNotificationManagedConflict,
-  type NotificationChannel,
   type NotificationGroupView,
   type NotificationPolicyView,
   type NotificationSettingsAdapter,
   type NotificationSettingsLabels,
-  type NotificationSettingsView,
   type NotificationSwitchChange,
 } from "./notification-settings-types";
 
-export type NotificationSettingsTab = "mine" | "policy";
-
-/** 在途开关的键:一个开关一个键,所以禁用永远只落在被点的那一个上。 */
-export function notificationSwitchKey(group: string, scene: string, channel: NotificationChannel): string {
-  return `${group}::${scene}::${channel}`;
-}
-
-/** 卡片标题行那枚「平台托管」开关的在途键。 */
-export function notificationManagedKey(group: string): string {
-  return `${group}::managed`;
-}
-
-function withChannelValue(
-  channels: Record<NotificationChannel, boolean | null>,
-  channel: NotificationChannel,
-  enabled: boolean,
-): Record<NotificationChannel, boolean | null> {
-  const next: Record<NotificationChannel, boolean | null> = { ...channels };
-  next[channel] = enabled;
-  return next;
-}
-
-/** 把一次渠道改动套进分组,得到乐观值(不改原对象,回滚就是把原对象放回去)。 */
-export function withNotificationChannel(
-  group: NotificationGroupView,
-  change: NotificationSwitchChange,
-): NotificationGroupView {
-  return {
-    ...group,
-    scenes: group.scenes.map((scene) =>
-      scene.key === change.scene
-        ? { ...scene, channels: withChannelValue(scene.channels, change.channel, change.enabled) }
-        : scene,
-    ),
-  };
-}
+export {
+  notificationManagedKey,
+  notificationOpKey,
+  notificationSwitchKey,
+  type NotificationSettingsTab,
+} from "./notification-settings-state";
 
 export interface NotificationSettingsController {
   tab: NotificationSettingsTab;
   canManage: boolean;
-  /** 当前页签的数据;两个页签的形状相同(`canManage` 只在「我的通知」上多一个字段)。 */
+  /** 已确认值 + 待落地改动重放之后的那一份;两个页签形状相同。 */
   view: NotificationPolicyView | null;
   /** 只在「一次都还没读到」时为真:重拉时页面保留已有内容,不闪回骨架屏。 */
   loading: boolean;
@@ -73,150 +53,169 @@ export interface NotificationSettingsController {
   isPending(key: string): boolean;
   selectTab(next: NotificationSettingsTab): void;
   reload(): void;
-  setChannel(group: NotificationGroupView, change: NotificationSwitchChange): void;
-  setManaged(group: NotificationGroupView, managed: boolean): void;
+  setChannel(change: NotificationSwitchChange): void;
+  setManaged(group: string, managed: boolean): void;
 }
 
-interface NotificationResource<T extends NotificationPolicyView> {
-  data: T | null;
-  loading: boolean;
-  failed: boolean;
-  reload(): Promise<void>;
-  applyGroup(group: NotificationGroupView): void;
-}
+type Dispatch = (action: NotificationAction) => void;
 
-const NO_PENDING: ReadonlySet<string> = new Set<string>();
-
-/** 一份可重拉、可按分组局部替换的只读视图。两个页签各持有一份。 */
-function useNotificationResource<T extends NotificationPolicyView>(load: () => Promise<T>): NotificationResource<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setFailed(false);
-    try {
-      setData(await load());
-    } catch {
-      setFailed(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [load]);
-  const applyGroup = useCallback((group: NotificationGroupView) => {
-    setData((current) => {
-      if (!current) return current;
-      return { ...current, groups: current.groups.map((item) => (item.key === group.key ? group : item)) } as T;
-    });
-  }, []);
-  return { data, loading, failed, reload, applyGroup };
-}
-
-interface NotificationSaveOperation {
-  key: string;
-  /** 请求发出前的分组;失败时原样放回去。 */
-  before: NotificationGroupView;
-  /** 乐观值;请求还没回来时先画它。 */
-  after: NotificationGroupView;
-  apply(group: NotificationGroupView): void;
-  mark(key: string, active: boolean): void;
+interface SaveTask {
+  tab: NotificationSettingsTab;
+  op: NotificationOp;
   saveFailed: string;
   run(): Promise<NotificationGroupView>;
+  dispatch: Dispatch;
+  /** 卸载 / 这批 op 已被 409 作废 时返回 false,回调一律闭嘴。 */
+  live(): boolean;
   onConflict(): void;
 }
 
-/** 乐观保存的唯一实现:两个页签、两种改动(渠道 / 托管)都走这一条路径。 */
-async function runNotificationSave(operation: NotificationSaveOperation): Promise<void> {
-  operation.mark(operation.key, true);
-  operation.apply(operation.after);
+/**
+ * 一次保存的落地:成功只把**这一条** op 换成服务端分组,失败只丢**这一条** op ——
+ * 显示值由 `applyOps` 重新算,期间成功的兄弟改动自然留在上面,不需要快照回滚。
+ */
+async function runNotificationSave(task: SaveTask): Promise<void> {
+  if (!task.live()) return;
   try {
-    operation.apply(await operation.run());
+    const group = await task.run();
+    if (!task.live()) return;
+    task.dispatch({ type: "op-ok", tab: task.tab, opId: task.op.id, group });
   } catch (error) {
-    operation.apply(operation.before);
-    toast.error(operation.saveFailed);
-    if (isNotificationManagedConflict(error)) operation.onConflict();
-  } finally {
-    operation.mark(operation.key, false);
+    if (!task.live()) return;
+    if (isNotificationManagedConflict(error)) {
+      task.dispatch({ type: "op-conflict", tab: task.tab });
+      task.onConflict();
+    } else {
+      task.dispatch({ type: "op-fail", tab: task.tab, opId: task.op.id });
+    }
+    toast.error(task.saveFailed);
   }
+}
+
+interface NotificationRunners {
+  load(tab: NotificationSettingsTab): void;
+  enqueue(tab: NotificationSettingsTab, op: NotificationOp, run: () => Promise<NotificationGroupView>): void;
+}
+
+/** 加载与保存两条通路(队列、发号器、存活标记都在这里),与 reducer 分开以免任一函数过长。 */
+function useNotificationRunners(
+  adapter: NotificationSettingsAdapter,
+  dispatch: Dispatch,
+  saveFailed: string,
+): NotificationRunners {
+  const alive = useRef(true);
+  const loadIds = useRef({ mine: 0, policy: 0 });
+  // 409 作废整批 op 时 epoch +1,还排在队列里、尚未发出的那些任务据此自行放弃。
+  const epochs = useRef({ mine: 0, policy: 0 });
+  const queues = useRef({ mine: Promise.resolve(), policy: Promise.resolve() });
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  const load = useCallback(
+    (tab: NotificationSettingsTab) => {
+      const loadId = (loadIds.current[tab] += 1);
+      dispatch({ type: "load-start", tab, loadId });
+      void (async () => {
+        try {
+          const view = tab === "policy" ? await adapter.loadPolicy() : await adapter.load();
+          if (!alive.current) return;
+          dispatch({ type: "load-ok", tab, loadId, view, canManage: "canManage" in view && view.canManage });
+        } catch {
+          if (alive.current) dispatch({ type: "load-fail", tab, loadId });
+        }
+      })();
+    },
+    [adapter, dispatch],
+  );
+
+  const enqueue = useCallback<NotificationRunners["enqueue"]>(
+    (tab, op, run) => {
+      dispatch({ type: "op-add", tab, op });
+      const epoch = epochs.current[tab];
+      const live = () => alive.current && epochs.current[tab] === epoch;
+      // 整批作废:还排在队列里、尚未发出的任务靠 epoch 自行放弃,然后重读当前页签。
+      const onConflict = () => {
+        epochs.current[tab] += 1;
+        load(tab);
+      };
+      queues.current[tab] = queues.current[tab].then(() =>
+        runNotificationSave({ tab, op, saveFailed, run, dispatch, live, onConflict }),
+      );
+    },
+    [dispatch, load, saveFailed],
+  );
+
+  return { load, enqueue };
 }
 
 export function useNotificationSettings(
   adapter: NotificationSettingsAdapter,
   labels: NotificationSettingsLabels,
 ): NotificationSettingsController {
-  const [tab, setTab] = useState<NotificationSettingsTab>("mine");
-  const [pending, setPending] = useState<ReadonlySet<string>>(NO_PENDING);
-  const mine = useNotificationResource<NotificationSettingsView>(useCallback(() => adapter.load(), [adapter]));
-  const policy = useNotificationResource<NotificationPolicyView>(useCallback(() => adapter.loadPolicy(), [adapter]));
-  const { reload: reloadMine, applyGroup: applyMine } = mine;
-  const { reload: reloadPolicy, applyGroup: applyPolicy } = policy;
-  const onPolicy = tab === "policy";
-  const saveFailed = labels.saveFailed;
+  const [state, dispatch] = useReducer(reduceNotifications, initialNotificationState());
+  const { load, enqueue } = useNotificationRunners(adapter, dispatch, labels.saveFailed);
+  const opIds = useRef(0);
+  const tab = state.tab;
+  const current = notificationTabOf(state, tab);
 
   useEffect(() => {
-    void reloadMine();
-  }, [reloadMine]);
+    load("mine");
+  }, [load]);
 
-  const mark = useCallback((key: string, active: boolean) => {
-    setPending((current) => {
-      const next = new Set(current);
-      if (active) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-  }, []);
+  // 丢掉过一次加载结果(读的过程中自己的写落了地)。等队列空了补拉一次,不然页面会一直
+  // 停在乐观值上,直到用户自己去点别的地方。
+  useEffect(() => {
+    if (current.needsReload && current.ops.length === 0 && !current.loading) load(tab);
+  }, [current.needsReload, current.ops.length, current.loading, load, tab]);
+
+  const pending = useMemo(() => {
+    const keys = new Set<string>();
+    for (const op of state.mine.ops) keys.add(notificationOpKey("mine", op));
+    for (const op of state.policy.ops) keys.add(notificationOpKey("policy", op));
+    return keys;
+  }, [state.mine.ops, state.policy.ops]);
 
   // 切页签一律重拉:平台值刚改完,本人的生效值也跟着变了。
   const selectTab = useCallback(
     (next: NotificationSettingsTab) => {
-      setTab(next);
-      void (next === "policy" ? reloadPolicy() : reloadMine());
+      dispatch({ type: "tab", tab: next });
+      load(next);
     },
-    [reloadMine, reloadPolicy],
+    [load],
   );
 
   const setChannel = useCallback(
-    (group: NotificationGroupView, change: NotificationSwitchChange) => {
-      void runNotificationSave({
-        key: notificationSwitchKey(change.group, change.scene, change.channel),
-        before: group,
-        after: withNotificationChannel(group, change),
-        apply: onPolicy ? applyPolicy : applyMine,
-        mark,
-        saveFailed,
-        run: () => (onPolicy ? adapter.savePolicy(change) : adapter.savePreference(change)),
-        onConflict: () => void reloadMine(),
-      });
+    (change: NotificationSwitchChange) => {
+      opIds.current += 1;
+      const op: NotificationOp = { id: opIds.current, kind: "switch", change };
+      enqueue(tab, op, () => (tab === "policy" ? adapter.savePolicy(change) : adapter.savePreference(change)));
     },
-    [adapter, applyMine, applyPolicy, mark, onPolicy, reloadMine, saveFailed],
+    [adapter, enqueue, tab],
   );
 
   const setManaged = useCallback(
-    (group: NotificationGroupView, managed: boolean) => {
-      void runNotificationSave({
-        key: notificationManagedKey(group.key),
-        before: group,
-        after: { ...group, managed },
-        apply: applyPolicy,
-        mark,
-        saveFailed,
-        run: () => adapter.savePolicy({ group: group.key, managed }),
-        onConflict: () => void reloadMine(),
-      });
+    (group: string, managed: boolean) => {
+      opIds.current += 1;
+      const op: NotificationOp = { id: opIds.current, kind: "managed", group, managed };
+      enqueue(tab, op, () => adapter.savePolicy({ group, managed }));
     },
-    [adapter, applyPolicy, mark, reloadMine, saveFailed],
+    [adapter, enqueue, tab],
   );
 
-  const active = onPolicy ? policy : mine;
   return {
     tab,
-    canManage: mine.data?.canManage ?? false,
-    view: active.data,
-    loading: active.loading && !active.data,
-    loadFailed: active.failed,
+    canManage: state.mine.canManage,
+    view: applyOps(current.confirmed, current.ops),
+    loading: current.loading && !current.confirmed,
+    loadFailed: current.failed,
     isPending: (key) => pending.has(key),
     selectTab,
-    reload: () => void (onPolicy ? reloadPolicy() : reloadMine()),
+    reload: () => load(tab),
     setChannel,
     setManaged,
   };

@@ -3,13 +3,16 @@
  * 用户风险(按后果排序):
  *
  * 1. **托管中的分组看起来可点**。成员点了一排开关、页面也跟着动,发出来的通知却一条没变 ——
- *    这类"假状态"比直接报错更伤,所以托管分组的正文必须真的 inert + 置灰,而开关的状态
- *    照常可见(它解释的正是"为什么我改不了")。
- * 2. **乐观更新丢改动**。即点即存没有保存按钮,失败时必须回到原位并报错,不能留一个"我明明
- *    关过"的开关。在途期间只禁用被点的那一个,同一张卡上的其他开关不受牵连。
- * 3. **平台配置改完,「我的通知」还是老样子**。两份数据各拉各的,切回来不重拉就会给出一张
+ *    这类"假状态"比直接报错更伤。所以托管分组的每个开关都要 `disabled` + 整表置灰;但**不能**
+ *    `inert`:开关展示的是当前真正生效的值,读屏用户同样得读得到"我还会收到哪些通知"。
+ * 2. **乐观更新丢改动**。同一个分组上连点两个开关时,先回来的那份整组快照不许把后一个改动
+ *    打回去;某一次失败也只许回滚它自己,期间成功的兄弟改动必须留着。在途期间只禁用被点的
+ *    那一个开关,而且在途判定按页签隔离。
+ * 3. **过期响应覆盖新状态**。被更晚一次加载顶掉的响应、以及读的过程中自己的写已经落地的那份
+ *    数据,一律不准写进状态;组件卸载之后所有回调闭嘴。
+ * 4. **平台配置改完,「我的通知」还是老样子**。两份数据各拉各的,切回来不重拉就会给出一张
  *    过期的表。
- * 4. 不支持的渠道画成破折号,而不是一个永远打不开的开关。
+ * 5. 不支持的渠道画成破折号,而不是一个永远打不开的开关。
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -118,6 +121,22 @@ function switchAt(host: ParentNode, scene: string, channel: string): HTMLButtonE
   return byTestId(host, `notification-switch-${scene}-${channel}`) as HTMLButtonElement;
 }
 
+const MANAGER: NotificationSettingsView = { ...MINE, canManage: true };
+
+function tabOption(host: ParentNode, tab: string): HTMLElement {
+  const element = byTestId(host, "notification-settings-tabs").querySelector(`[data-notification-tab='${tab}']`);
+  if (!(element instanceof HTMLElement)) throw new Error(`missing tab ${tab}`);
+  return element;
+}
+
+/** 只改一个场景的两个渠道,其余原样 —— 服务端返回的"整组快照"。 */
+function servedLearner(dingtalk: boolean, inApp: boolean): NotificationGroupView {
+  return {
+    ...LEARNER,
+    scenes: [{ ...LEARNER.scenes[0]!, channels: { dingtalk, in_app: inApp } }, LEARNER.scenes[1]!],
+  };
+}
+
 let view: MountedView | null = null;
 
 beforeEach(() => {
@@ -144,6 +163,8 @@ describe("EnterpriseNotificationSettingsSurface — 我的通知", () => {
     expect(switchAt(card, "exam.result_released", "in_app").getAttribute("aria-checked")).toBe("false");
     // 开关自己没有可见文案,名字由场景 + 渠道拼出来。
     expect(switchAt(card, "exam.result_released", "in_app").getAttribute("aria-label")).toBe("成绩发布 · 站内通知");
+    // 没有管理权限就没有页签,连控件都不画。
+    expect(view.host.querySelector("[data-test-id='notification-settings-tabs']")).toBeNull();
   });
 
   it("不支持的渠道画破折号,不画开关", async () => {
@@ -154,26 +175,29 @@ describe("EnterpriseNotificationSettingsSurface — 我的通知", () => {
     expect(dash?.textContent).toBe("—");
   });
 
-  it("没有管理权限时没有页签", async () => {
-    view = await open(makeAdapter());
-    expect(view.host.querySelector("[data-test-id='notification-settings-tabs']")).toBeNull();
-  });
-
-  it("托管中的分组整表置灰只读,但开关状态照常可见;托管开关与标签留在灰区之外", async () => {
+  it("托管中的分组置灰只读,但整张表留在无障碍树里 —— 生效状态必须读得到", async () => {
     view = await open(makeAdapter());
     const card = byTestId(view.host, "notification-group-supervisor");
-    const gated = switchAt(card, "plan.overdue", "dingtalk").closest("[inert]");
-    expect(gated).not.toBeNull();
-    expect((gated as HTMLElement).className).toContain("opacity-50");
-    expect(switchAt(card, "plan.overdue", "dingtalk").disabled).toBe(true);
-    expect(switchAt(card, "plan.overdue", "dingtalk").getAttribute("aria-checked")).toBe("true");
-    // 状态开关 + 那句「由平台统一管理」都在正文之外,否则"为什么改不了"也一起变灰了。
+    // 这里刻意不用 `inert`:它会把场景名、说明与当前生效的开关值一起从无障碍树里摘掉,
+    // 而这一页要让人(尤其读屏用户)读到"托管之下我还会收到哪些通知"。
+    expect(card.querySelector("[inert]")).toBeNull();
+    const table = byTestId(card, "notification-group-supervisor-table");
+    expect(table.hasAttribute("inert")).toBe(false);
+    expect(table.className).toContain("opacity-50");
+    expect(table.getAttribute("data-readonly")).toBe("true");
+    const dingtalk = switchAt(card, "plan.overdue", "dingtalk");
+    expect(dingtalk.disabled).toBe(true);
+    expect(dingtalk.getAttribute("aria-disabled")).toBe("true");
+    expect(dingtalk.getAttribute("aria-checked")).toBe("true");
+    expect(dingtalk.getAttribute("aria-label")).toBe("计划逾期 · 钉钉");
+    expect(card.textContent).toContain("下属学习计划逾期时提醒。");
+    // 状态开关 + 那句「由平台统一管理」都在表格之外,自己也不跟着变灰。
     const managed = byTestId(card, "notification-group-supervisor-managed") as HTMLButtonElement;
     expect(managed.disabled).toBe(true);
-    expect(managed.closest("[inert]")).toBeNull();
     expect(byTestId(card, "notification-group-supervisor-tag").textContent).toBe("由平台统一管理");
-    // 没托管的那张卡不挂标签。
+    // 没托管的那张卡不挂标签,表格也不置灰。
     expect(view.host.querySelector("[data-test-id='notification-group-learner-tag']")).toBeNull();
+    expect(byTestId(view.host, "notification-group-learner-table").getAttribute("data-readonly")).toBe("false");
   });
 });
 
@@ -197,11 +221,7 @@ describe("EnterpriseNotificationSettingsSurface — 即点即存", () => {
     // 同一张卡上的别的开关不受牵连。
     expect(switchAt(view.host, "exam.result_released", "dingtalk").disabled).toBe(false);
 
-    const served: NotificationGroupView = {
-      ...LEARNER,
-      scenes: [{ ...LEARNER.scenes[0]!, channels: { dingtalk: false, in_app: true } }, LEARNER.scenes[1]!],
-    };
-    pending.resolve(served);
+    pending.resolve(servedLearner(false, true));
     await settle(20);
     // 服务端那一份是权威:钉钉那格跟着回来的分组变了,不是本地乐观值。
     expect(switchAt(view.host, "exam.result_released", "dingtalk").getAttribute("aria-checked")).toBe("false");
@@ -231,17 +251,76 @@ describe("EnterpriseNotificationSettingsSurface — 即点即存", () => {
   });
 });
 
+describe("EnterpriseNotificationSettingsSurface — 同一分组上的并发改动", () => {
+  it("连点两个开关:请求串行,先回来的整组快照不会把后一个改动打回去", async () => {
+    const adapter = makeAdapter();
+    const first = deferred<NotificationGroupView>();
+    const second = deferred<NotificationGroupView>();
+    adapter.savePreference.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    view = await open(adapter);
+
+    await click(switchAt(view.host, "exam.result_released", "dingtalk")); // A:true → false
+    await click(switchAt(view.host, "exam.result_released", "in_app")); // B:false → true
+
+    // 串行:B 的请求还没发出去(并发写同一个分组时,两份整组快照必然互相覆盖)。
+    expect(adapter.savePreference).toHaveBeenCalledTimes(1);
+    // 但两个乐观值立刻都画出来了 —— 用户不用等。
+    expect(switchAt(view.host, "exam.result_released", "dingtalk").getAttribute("aria-checked")).toBe("false");
+    expect(switchAt(view.host, "exam.result_released", "in_app").getAttribute("aria-checked")).toBe("true");
+    // 没点过的开关照常可点。
+    expect(switchAt(view.host, "course.assigned", "in_app").disabled).toBe(false);
+
+    // A 的响应只知道 A 那一次改动(B 还没到过服务端)。
+    first.resolve(servedLearner(false, false));
+    await settle(20);
+    expect(adapter.savePreference).toHaveBeenCalledTimes(2);
+    // 不重放待落地改动的话,这里会被打回 false。
+    expect(switchAt(view.host, "exam.result_released", "in_app").getAttribute("aria-checked")).toBe("true");
+    expect(switchAt(view.host, "exam.result_released", "dingtalk").disabled).toBe(false);
+    expect(switchAt(view.host, "exam.result_released", "in_app").disabled).toBe(true);
+
+    second.resolve(servedLearner(false, true));
+    await settle(20);
+    expect(switchAt(view.host, "exam.result_released", "dingtalk").getAttribute("aria-checked")).toBe("false");
+    expect(switchAt(view.host, "exam.result_released", "in_app").getAttribute("aria-checked")).toBe("true");
+    expect(switchAt(view.host, "exam.result_released", "in_app").disabled).toBe(false);
+  });
+
+  it("后一次失败只回滚它自己,先成功的那次留着", async () => {
+    const adapter = makeAdapter();
+    const ok = deferred<NotificationGroupView>();
+    const bad = deferred<NotificationGroupView>();
+    adapter.savePreference.mockReturnValueOnce(ok.promise).mockReturnValueOnce(bad.promise);
+    view = await open(adapter);
+    await click(switchAt(view.host, "exam.result_released", "in_app")); // 先点,会成功
+    await click(switchAt(view.host, "exam.result_released", "dingtalk")); // 后点,会失败
+    ok.resolve(servedLearner(true, true));
+    await settle(20);
+    bad.reject(new Error("offline"));
+    await settle(20);
+    // 钉钉回到原位,站内保持成功后的值 —— 按快照回滚会把后者一起吞掉。
+    expect(switchAt(view.host, "exam.result_released", "dingtalk").getAttribute("aria-checked")).toBe("true");
+    expect(switchAt(view.host, "exam.result_released", "in_app").getAttribute("aria-checked")).toBe("true");
+    expect(toastBus.getSnapshot().map((item) => item.message)).toContain("保存失败，请重试。");
+  });
+
+  it("卸载之后落地的响应不再写状态、不再提示", async () => {
+    const adapter = makeAdapter();
+    const hang = deferred<NotificationGroupView>();
+    adapter.savePreference.mockReturnValue(hang.promise);
+    view = await open(adapter);
+    await click(switchAt(view.host, "exam.result_released", "in_app"));
+    await view.unmount();
+    view = null;
+    hang.reject(new Error("offline"));
+    await settle(20);
+    expect(toastBus.getSnapshot()).toHaveLength(0);
+  });
+});
+
 describe("EnterpriseNotificationSettingsSurface — 平台配置", () => {
-  const manager: NotificationSettingsView = { ...MINE, canManage: true };
-
-  function tabOption(host: ParentNode, tab: string): HTMLElement {
-    const element = byTestId(host, "notification-settings-tabs").querySelector(`[data-notification-tab='${tab}']`);
-    if (!(element instanceof HTMLElement)) throw new Error(`missing tab ${tab}`);
-    return element;
-  }
-
   it("切到平台配置读 policy、托管开关可操作,切回我的通知重新读一次", async () => {
-    const adapter = makeAdapter(manager);
+    const adapter = makeAdapter(MANAGER);
     view = await open(adapter);
     expect(adapter.loadPolicy).not.toHaveBeenCalled();
 
@@ -263,17 +342,17 @@ describe("EnterpriseNotificationSettingsSurface — 平台配置", () => {
   });
 
   it("平台配置里托管中的分组也不置灰(editable = true)", async () => {
-    view = await open(makeAdapter(manager));
+    view = await open(makeAdapter(MANAGER));
     await click(tabOption(view.host, "policy"));
     await settle(20);
     const card = byTestId(view.host, "notification-group-supervisor");
-    expect(switchAt(card, "plan.overdue", "dingtalk").closest("[inert]")).toBeNull();
+    expect(byTestId(card, "notification-group-supervisor-table").getAttribute("data-readonly")).toBe("false");
     expect(switchAt(card, "plan.overdue", "dingtalk").disabled).toBe(false);
     expect(card.querySelector("[data-test-id='notification-group-supervisor-tag']")).toBeNull();
   });
 
   it("平台配置里的场景开关走 savePolicy", async () => {
-    const adapter = makeAdapter(manager);
+    const adapter = makeAdapter(MANAGER);
     view = await open(adapter);
     await click(tabOption(view.host, "policy"));
     await settle(20);
@@ -286,6 +365,47 @@ describe("EnterpriseNotificationSettingsSurface — 平台配置", () => {
       enabled: true,
     });
     expect(adapter.savePreference).not.toHaveBeenCalled();
+  });
+
+  it("在途禁用按页签隔离:平台页签上在途的开关不会把「我的通知」里的同一个开关一起禁掉", async () => {
+    const adapter = makeAdapter(MANAGER);
+    const hang = deferred<NotificationGroupView>();
+    adapter.savePolicy.mockReturnValue(hang.promise);
+    view = await open(adapter);
+    await click(tabOption(view.host, "policy"));
+    await settle(20);
+    await click(switchAt(view.host, "exam.result_released", "in_app"));
+    expect(switchAt(view.host, "exam.result_released", "in_app").disabled).toBe(true);
+
+    await click(tabOption(view.host, "mine"));
+    await settle(20);
+    // 在途键不带页签前缀时这里会是 true —— 另一个页签的在途请求不该锁住这一页的开关。
+    expect(switchAt(view.host, "exam.result_released", "in_app").disabled).toBe(false);
+    hang.resolve(LEARNER);
+    await settle(20);
+  });
+
+  it("被顶掉的加载响应不许覆盖更晚那一次", async () => {
+    const adapter = makeAdapter(MANAGER);
+    const first = deferred<NotificationPolicyView>();
+    const second = deferred<NotificationPolicyView>();
+    adapter.loadPolicy.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    view = await open(adapter);
+    await click(tabOption(view.host, "policy")); // 第一次加载,挂着
+    await click(tabOption(view.host, "mine"));
+    await settle(20);
+    await click(tabOption(view.host, "policy")); // 第二次加载
+
+    const managedPolicy = { ...POLICY, groups: [{ ...LEARNER, editable: true, managed: true }] };
+    second.resolve(managedPolicy);
+    await settle(20);
+    const managedSwitch = () => byTestId(view!.host, "notification-group-learner-managed");
+    expect(managedSwitch().getAttribute("aria-checked")).toBe("true");
+
+    // 早发出的那次后回来:必须被整条丢掉,不许把页面打回旧值。
+    first.resolve({ ...POLICY, groups: [{ ...LEARNER, editable: true, managed: false }] });
+    await settle(20);
+    expect(managedSwitch().getAttribute("aria-checked")).toBe("true");
   });
 });
 

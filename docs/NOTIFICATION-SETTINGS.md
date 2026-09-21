@@ -71,10 +71,14 @@ type NotificationPolicyChange = { group: string; managed: boolean } | Notificati
   回 409 `{"code": "notification_group_managed"}`。adapter 把 rejection 做成带
   `status: 409` **或** `code: "notification_group_managed"` 的对象即可
   (`isNotificationManagedConflict` 只认这两样,不 `instanceof` 任何具体错误类);页面收到
-  之后回滚这一次改动,并重新读一遍「我的通知」——此刻本地那份视图已经不对了。
+  之后把**当前页签所有还没落地的改动整串丢掉**(包括还排在队列里、尚未发出的那些),再重读
+  一遍——此刻本地那份视图已经不对了,只回滚触发 409 的那一条等于留下一堆同样不作数的乐观值。
   常量导出为 `NOTIFICATION_GROUP_MANAGED_CODE`。
-- **`loadPolicy` 只在管理员第一次切到「平台配置」时才调。** 没有 `canManage` 的账号不会
-  发这个请求,后端的 403 也就永远不会出现在正常路径上。
+- **`loadPolicy` 只在管理员切到「平台配置」时才调。** 没有 `canManage` 的账号不会发这个
+  请求,后端的 403 也就永远不会出现在正常路径上。
+
+> **adapter 必须是稳定引用**(模块常量或 `useMemo`),与本包其他设置面一个口径:它换一次
+> 引用就重拉一次数据,每次渲染都新建一个对象会变成请求风暴。
 
 ```tsx
 const notificationSettingsAdapter: NotificationSettingsAdapter = {
@@ -90,14 +94,40 @@ const notificationSettingsAdapter: NotificationSettingsAdapter = {
 - `canManage` 为真时页头下方出现分段控件「我的通知 / 平台配置」;否则只有「我的通知」,
   连控件都不画。
 - **切页签一律重拉**。平台值刚改完,本人的生效值就可能跟着变,拿缓存会给出一张过期的表。
-- **即点即存,没有保存按钮**。乐观更新 → 请求 → 成功用返回的分组替换,失败回滚并
-  `toast.error(labels.saveFailed)`。在途期间**只禁用被点的那一个开关**,同一张卡上的
-  其他开关照常可点。
-- 「我的通知」里托管中的分组:正文整表进 `GatedBody`(变灰 + `inert`),但**标题行的
-  「平台托管」开关与那枚「由平台统一管理」标签留在灰区之外**——它们解释的正是"为什么这张表
-  不能动",跟着一起变灰就没人读得到了(与「工作账号登录」卡片同一口径,见
-  [`ACCESS-SETTINGS.md`](ACCESS-SETTINGS.md))。那枚开关在这一页恒为 `disabled`:它是状态
-  展示,不是操作入口。
+- **即点即存,没有保存按钮**。在途期间**只禁用被点的那一个开关**,同一张卡上的其他开关
+  照常可点;在途键带页签前缀,所以平台页签上的在途请求不会把「我的通知」里的同一个开关
+  一起锁住。状态模型见下一节。
+- 「我的通知」里托管中的分组:整张表**变灰、每个开关各自 `disabled`**,但**不** `inert` ——
+  这是与「工作账号登录」卡片(`GatedBody`,见 [`ACCESS-SETTINGS.md`](ACCESS-SETTINGS.md))
+  的一处**刻意不同**。那张卡关掉之后,正文里的输入框此刻不代表任何事实,整块退出无障碍树
+  是对的;这里相反:托管中的开关展示的是**当前真正生效的值**,用户(尤其读屏用户)必须读
+  得到"托管之下我还会收到哪些通知"。`inert` 会把场景名、说明与开关状态一起从无障碍树里摘
+  掉,那等于只对读屏用户隐瞒生效状态。视觉上仍然复用 `GATED_DIM_CLASS`(`GatedBody` 导出的
+  同一档灰度),所以两张卡看起来是一致的。
+  标题行的「平台托管」开关与那枚「由平台统一管理」标签留在表格之外,并且在这一页恒为
+  `disabled`:它是状态展示,不是操作入口。
+
+## 4.1 状态模型:已确认值 + 待落地改动
+
+保存不是"把整个分组换成最后一次响应",而是:
+
+- `confirmed` —— 服务端那一份,只有保存成功或加载成功才动;
+- `ops` —— 一串还没落地的改动,按点击顺序排;
+- 页面显示 `applyOps(confirmed, ops)`,即把待落地的改动**重放**在已确认值之上。
+
+于是:
+
+- **同一个分组连点两个开关**,先回来的那次响应只更新 `confirmed`,另一个开关的改动仍在
+  `ops` 里重放,不会被"整组快照"抹掉;
+- **某一次失败**只丢它自己那条 op,显示值重新算一遍——期间已经成功的兄弟改动自然留着
+  (按快照回滚会把它一起吞掉);
+- **每个页签一条串行队列**:同一时刻只有一个写请求在飞,后点的排队等着,但乐观值立刻生效。
+  并发写同一个分组时,两份整组快照必然互相覆盖,所以这里不并发。
+
+加载同样有两道闸:每次加载发一个 `loadId`,响应对不上就是被更晚的加载顶掉了,整条丢弃;
+每次保存落地 `revision` +1,加载开始时记下当时的 `revision`,响应回来时对不上说明这份数据
+在读的过程中已经被自己的写改过了,同样丢弃,并在队列清空后补拉一次。组件卸载后所有回调
+一律闭嘴。纯逻辑在 `src/enterprise/notification-settings-state.ts`(有单测)。
 - 「平台配置」里所有分组 `editable = true`,托管开关可操作,表格不置灰。
 - 某个渠道 `available === false` 时,页头下方印**一条** `labels.dingtalkUnavailable`
   (不是每张卡一条)。
@@ -149,6 +179,7 @@ const notificationSettingsAdapter: NotificationSettingsAdapter = {
 | 读失败 / 重试 | `notification-settings-load-failed` / `notification-settings-retry` |
 | 卡片列表 | `notification-settings-groups` |
 | 一张卡片 | `notification-group-{group}` |
+| 卡片里的场景表格 | `notification-group-{group}-table`(托管只读时 `data-readonly="true"`) |
 | 平台托管开关 / 静态标签 | `notification-group-{group}-managed` / `notification-group-{group}-tag` |
 | 一格渠道开关 | `notification-switch-{scene}-{channel}` |
 
