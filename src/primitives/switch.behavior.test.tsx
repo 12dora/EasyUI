@@ -92,3 +92,38 @@ describe("Switch 切换", () => {
     expect(onChange).toHaveBeenCalledWith(true);
   });
 });
+
+describe("Switch 标签位置", () => {
+  it("默认 labelPlacement=end:开关在前、文字在后", async () => {
+    view = await mount(<Switch checked={false} onChange={() => undefined} label="启用通知" />);
+    const row = view.host.querySelector("label");
+    if (!row) throw new Error("Missing label");
+
+    expect(row.firstElementChild).toBe(switchOf(view.host));
+    expect(row.lastElementChild?.textContent).toBe("启用通知");
+  });
+
+  it("labelPlacement=start:文字在前、开关在右,点文字照样切换", async () => {
+    const onChange = vi.fn();
+    view = await mount(<Switch checked={false} onChange={onChange} label="profile" labelPlacement="start" />);
+    const row = view.host.querySelector("label");
+    if (!row) throw new Error("Missing label");
+    const control = switchOf(view.host);
+
+    expect(row.firstElementChild?.textContent).toBe("profile");
+    expect(row.lastElementChild).toBe(control);
+    // 可及名称仍来自包裹它的 <label>,换位置不换语义。
+    expect(control.closest("label")).toBe(row);
+
+    await click(row.firstElementChild as HTMLElement);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("没有 label 时 labelPlacement 不起作用,只渲染开关本身", async () => {
+    view = await mount(<Switch checked={false} onChange={() => undefined} labelPlacement="start" aria-label="启用通知" />);
+
+    expect(view.host.querySelector("label")).toBeNull();
+    expect(view.host.firstElementChild).toBe(switchOf(view.host));
+  });
+});

@@ -171,6 +171,20 @@ describe("work-account sign-in card: scopes", () => {
     expect(scopeSwitch(host, "dingtalk").closest("label")?.textContent).toBe(`dingtalk${labels.scopeOptions.dingtalk}`);
   });
 
+  it("prints every scope's text first with its switch on the right", async () => {
+    const { host } = await mountForm();
+
+    for (const token of ["openid", "profile", "email", "dingtalk"]) {
+      const control = scopeSwitch(host, token);
+      const row = control.closest("label");
+      if (!row) throw new Error(`Missing label row for ${token}`);
+      // 文字在前、开关在后:开关是这一行的最后一个子节点,文字(令牌 + 说明)排在它左边。
+      expect(row.lastElementChild).toBe(control);
+      expect(row.firstElementChild).not.toBe(control);
+      expect(row.firstElementChild?.textContent?.startsWith(token)).toBe(true);
+    }
+  });
+
   it("keeps openid on and locked: OIDC has no sign-in without it", async () => {
     const { host, onPatch } = await mountForm({ scopes: "" });
 

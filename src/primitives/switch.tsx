@@ -10,6 +10,10 @@ interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onC
    *  <label> so the text becomes the accessible name *and* a click target. Omit it
    *  when the control is captioned elsewhere and pass `aria-label` instead. */
   label?: ReactNode;
+  /** Which side of the track the `label` sits on. `"end"` (default) keeps the control-first
+   *  order (track, then text); `"start"` prints the text first and puts the track on its
+   *  right — for settings rows that read "what it is → on/off". Ignored without `label`. */
+  labelPlacement?: "start" | "end";
 }
 
 /**
@@ -40,7 +44,7 @@ const thumbClass =
   "transition-transform duration-[var(--duration-fast)] ease-[var(--ease-out-paper)]";
 
 export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch(
-  { checked, onChange, disabled, label, className = "", ...rest },
+  { checked, onChange, disabled, label, labelPlacement = "end", className = "", ...rest },
   ref,
 ) {
   const control = (
@@ -66,8 +70,17 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch
     <label
       className={`inline-flex min-h-9 items-center gap-2 text-[13px] text-ink ${disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
     >
-      {control}
-      <span>{label}</span>
+      {labelPlacement === "start" ? (
+        <>
+          <span>{label}</span>
+          {control}
+        </>
+      ) : (
+        <>
+          {control}
+          <span>{label}</span>
+        </>
+      )}
     </label>
   );
 });

@@ -224,6 +224,7 @@ function OidcCardActions({ labels, value, disabled, saving, testing, retryAction
  * 四个开关排成一行(窄屏自动折行),不再竖着堆四行,栅格里这张卡看起来才不空。
  * 开关组没有单一可关联的控件,`Field` 的 `<label>` 挂不上去,因此另给一层
  * `role="group"` + `aria-label` 让读屏念出组名。整组横跨两列。
+ * 每一项都是「文字在左、开关在右」(`labelPlacement="start"`):先读是什么,再看开没开。
  */
 function OidcScopeField({ labels, value, disabled, onChange }: { labels: EnterpriseIntegrationConfigurationLabels; value: string; disabled?: boolean; onChange: (value: string) => void }) {
   const selected = parseOidcScopes(value);
@@ -244,6 +245,7 @@ function OidcScopeField({ labels, value, disabled, onChange }: { labels: Enterpr
             onChange={(checked) => toggle(token, checked)}
             data-test-id={`enterprise-oidc-scope-${token}`}
             label={<ScopeSwitchLabel token={token} description={labels.scopeOptions?.[token]} />}
+            labelPlacement="start"
           />
         ))}
       </div>
