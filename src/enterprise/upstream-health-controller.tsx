@@ -18,7 +18,7 @@ export interface EnterpriseUpstreamHealthControllerLabels extends UpstreamHealth
   checkedAt: (relative: string) => string; checkedAtNever: string;
   status: { healthy: string; warning: string; unhealthy: string; unknown: string };
   dependencyNames: Record<string, string>;
-  summaries: { healthy: string; warning: string; unhealthy: string; unknown: string; notChecked: string; notSupported: string };
+  summaries: { healthy: string; warning: string; unhealthy: string; unknown: string; notChecked: string; notSupported: string; /** `upstream.not_configured`;缺省时退回 `warning`。 */ notConfigured?: string };
 }
 
 /** Shared polling, race control, formatting and feedback for upstream monitoring. */
@@ -127,4 +127,4 @@ export function EnterpriseUpstreamHealthController({
 }
 
 function normalizeStatus(value: string): keyof EnterpriseUpstreamHealthControllerLabels["status"] { const status = value.toLowerCase(); return status === "healthy" || status === "warning" || status === "unhealthy" ? status : "unknown"; }
-function localizedSummary(code: string | undefined, supported: boolean, labels: EnterpriseUpstreamHealthControllerLabels): string { if (!supported || code === "upstream.not_supported") return labels.summaries.notSupported; if (code === "upstream.healthy") return labels.summaries.healthy; if (code === "upstream.warning") return labels.summaries.warning; if (code === "upstream.unhealthy") return labels.summaries.unhealthy; if (code === "upstream.not_checked") return labels.summaries.notChecked; return labels.summaries.unknown; }
+function localizedSummary(code: string | undefined, supported: boolean, labels: EnterpriseUpstreamHealthControllerLabels): string { if (!supported || code === "upstream.not_supported") return labels.summaries.notSupported; if (code === "upstream.healthy") return labels.summaries.healthy; if (code === "upstream.warning") return labels.summaries.warning; if (code === "upstream.unhealthy") return labels.summaries.unhealthy; if (code === "upstream.not_checked") return labels.summaries.notChecked; if (code === "upstream.not_configured") return labels.summaries.notConfigured ?? labels.summaries.warning; return labels.summaries.unknown; }

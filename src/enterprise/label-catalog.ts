@@ -1,6 +1,7 @@
 import type { EnterpriseAppearanceSettingsLabels } from "./appearance-settings-surface";
 import type { EnterpriseGeneralSettingsLabels } from "./general-settings-surface";
 import type { NotificationSettingsLabels } from "./notification-settings-types";
+import { notificationChannelLabelsChinese, notificationChannelLabelsEnglish } from "./notification-channel-labels";
 import type { EnterpriseLoginControllerLabels, EnterpriseOidcCompleteLabels } from "./auth-controller";
 import type { EnterpriseAccessSettingsLabels } from "./access-settings-surface";
 import type { EnterpriseDeliveryStatusLabels } from "./delivery-status";
@@ -162,7 +163,7 @@ function legacyCatalog(catalog: EnterpriseStaticLabelCatalog): EnterpriseStaticL
           easyauth: "EasyAuth（权限授权）",
           authentik: "Authentik（SSO 登录）",
           authentik_directory: "Authentik 用户目录",
-          scheduler: "定时任务调度器",
+          scheduler: "定时任务调度器", dingtalk_notify: "通知服务（钉钉）",
         },
         summaries: {
           healthy: "连接正常",
@@ -170,7 +171,7 @@ function legacyCatalog(catalog: EnterpriseStaticLabelCatalog): EnterpriseStaticL
           unhealthy: "连接异常",
           unknown: "状态未知",
           notChecked: "尚未检查",
-          notSupported: "当前宿主不提供此能力",
+          notSupported: "当前宿主不提供此能力", notConfigured: "未配置",
         },
       },
       oidcComplete: {
@@ -264,7 +265,7 @@ function legacyCatalog(catalog: EnterpriseStaticLabelCatalog): EnterpriseStaticL
         easyauth: "EasyAuth (authorization)",
         authentik: "Authentik (SSO)",
         authentik_directory: "Authentik directory",
-        scheduler: "Task scheduler",
+        scheduler: "Task scheduler", dingtalk_notify: "Notifications (DingTalk)",
       },
       summaries: {
         healthy: "Connection healthy",
@@ -272,7 +273,7 @@ function legacyCatalog(catalog: EnterpriseStaticLabelCatalog): EnterpriseStaticL
         unhealthy: "Connection unhealthy",
         unknown: "Status unknown",
         notChecked: "Not checked",
-        notSupported: "This host does not provide this capability",
+        notSupported: "This host does not provide this capability", notConfigured: "Not configured",
       },
     },
     oidcComplete: {
@@ -346,7 +347,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       permissionDeniedDetail,
       permissionDeniedAction,
     },
-    upstream: { title: "系统服务", description: "查看登录与权限等系统服务的运行状态。", refresh: "立即刷新", refreshing: "正在刷新", empty: "暂无服务", lastChecked: "最近检查", endpoint: "地址", loadFailed: "系统服务状态加载失败", checkSucceeded: "状态检查完成", checkFailed: "状态检查失败", permissionDenied: "当前账号没有访问系统服务状态的权限。", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `检查于 ${relative}`, checkedAtNever: "尚未检查", status: { healthy: "正常", warning: "警告", unhealthy: "异常", unknown: "尚未检查" }, dependencyNames: { database: "数据库", easyauth: "权限服务", authentik: "工作账号登录", authentik_directory: "用户目录", scheduler: "定时任务" }, summaries: { healthy: "运行正常", warning: "需要关注", unhealthy: "服务异常", unknown: "状态未知", notChecked: "尚未检查", notSupported: "当前环境不支持此服务" } },
+    upstream: { title: "系统服务", description: "查看登录与权限等系统服务的运行状态。", refresh: "立即刷新", refreshing: "正在刷新", empty: "暂无服务", lastChecked: "最近检查", endpoint: "地址", loadFailed: "系统服务状态加载失败", checkSucceeded: "状态检查完成", checkFailed: "状态检查失败", permissionDenied: "当前账号没有访问系统服务状态的权限。", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `检查于 ${relative}`, checkedAtNever: "尚未检查", status: { healthy: "正常", warning: "警告", unhealthy: "异常", unknown: "尚未检查" }, dependencyNames: { database: "数据库", easyauth: "权限服务", authentik: "工作账号登录", authentik_directory: "用户目录", scheduler: "定时任务", dingtalk_notify: "通知服务（钉钉）" }, summaries: { healthy: "运行正常", warning: "需要关注", unhealthy: "服务异常", unknown: "状态未知", notChecked: "尚未检查", notSupported: "当前环境不支持此服务", notConfigured: "尚未配置" } },
     delivery: {
       title: "发送状态",
       statusLabels: { queued: "排队中", accepted: "已受理(待发送)", sent: "已发送", delivered: "已投递(不代表已读)", failed: "失败", superseded: "已作废" },
@@ -433,7 +434,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       permissionDeniedDetail,
       permissionDeniedAction,
     },
-    upstream: { title: "System services", description: "Check the status of sign-in and permissions services.", refresh: "Refresh now", refreshing: "Refreshing", empty: "No services", lastChecked: "Last checked", endpoint: "URL", loadFailed: "Failed to load system service status", checkSucceeded: "Status check completed", checkFailed: "Status check failed", permissionDenied: "This account cannot view system service status.", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `Checked ${relative}`, checkedAtNever: "Not checked yet", status: { healthy: "Healthy", warning: "Warning", unhealthy: "Unhealthy", unknown: "Not checked" }, dependencyNames: { database: "Database", easyauth: "Permissions service", authentik: "Work-account sign-in", authentik_directory: "User directory", scheduler: "Task scheduler" }, summaries: { healthy: "Running normally", warning: "Needs attention", unhealthy: "Service issue", unknown: "Status unknown", notChecked: "Not checked", notSupported: "Not available in this environment" } },
+    upstream: { title: "System services", description: "Check the status of sign-in and permissions services.", refresh: "Refresh now", refreshing: "Refreshing", empty: "No services", lastChecked: "Last checked", endpoint: "URL", loadFailed: "Failed to load system service status", checkSucceeded: "Status check completed", checkFailed: "Status check failed", permissionDenied: "This account cannot view system service status.", permissionDeniedDetail, permissionDeniedAction, checkedAt: (relative) => `Checked ${relative}`, checkedAtNever: "Not checked yet", status: { healthy: "Healthy", warning: "Warning", unhealthy: "Unhealthy", unknown: "Not checked" }, dependencyNames: { database: "Database", easyauth: "Permissions service", authentik: "Work-account sign-in", authentik_directory: "User directory", scheduler: "Task scheduler", dingtalk_notify: "Notifications (DingTalk)" }, summaries: { healthy: "Running normally", warning: "Needs attention", unhealthy: "Service issue", unknown: "Status unknown", notChecked: "Not checked", notSupported: "Not available in this environment", notConfigured: "Not configured" } },
     delivery: {
       title: "Delivery status",
       statusLabels: { queued: "Queued", accepted: "Accepted (not sent yet)", sent: "Sent", delivered: "Delivered (not a read receipt)", failed: "Failed", superseded: "Superseded" },
@@ -510,11 +511,11 @@ function appearanceSettingsEnglish(retry: string): EnterpriseAppearanceSettingsL
 // 通知设置页(场景开关)。两种 copyMode 用同一份文案:开关是什么、托管意味着什么,
 // 与宿主是内部系统还是对客系统无关。
 function notificationSettingsChinese(retry: string): NotificationSettingsLabels {
-  return { title: "通知", description: "选择接收哪些通知，以及通过哪些渠道接收。", tabs: { mine: "我的通知", policy: "平台配置" }, policyDescription: "为各角色设置通知的平台值。开启平台托管后，该角色的通知由平台统一管理，成员无法自行更改。", managed: "平台托管", managedTag: "由平台统一管理", columns: { scene: "通知场景", dingtalk: "钉钉", inApp: "站内通知" }, unsupported: "不支持", dingtalkUnavailable: "钉钉通知尚未配置，相关开关暂不生效。", saveFailed: "保存失败，请重试。", loadFailed: "无法加载通知设置", retry, empty: "暂无可设置的通知", switchLabel: (scene, channel) => `${scene} · ${channel}` };
+  return { title: "通知", description: "选择接收哪些通知，以及通过哪些渠道接收。", tabs: { mine: "我的通知", policy: "平台配置" }, policyDescription: "为各角色设置通知的平台值。开启平台托管后，该角色的通知由平台统一管理，成员无法自行更改。", managed: "平台托管", managedTag: "由平台统一管理", columns: { scene: "通知场景", dingtalk: "钉钉", inApp: "站内通知" }, unsupported: "不支持", dingtalkUnavailable: "钉钉通知尚未配置，相关开关暂不生效。", saveFailed: "保存失败，请重试。", loadFailed: "无法加载通知设置", retry, empty: "暂无可设置的通知", switchLabel: (scene, channel) => `${scene} · ${channel}`, channel: notificationChannelLabelsChinese() };
 }
 
 function notificationSettingsEnglish(retry: string): NotificationSettingsLabels {
-  return { title: "Notifications", description: "Choose which notifications you receive and where.", tabs: { mine: "My notifications", policy: "Platform settings" }, policyDescription: "Set platform values for each role. When platform managed is on, members can't change that role's notifications.", managed: "Platform managed", managedTag: "Managed by your organization", columns: { scene: "Notification", dingtalk: "DingTalk", inApp: "In-app" }, unsupported: "Not supported", dingtalkUnavailable: "DingTalk isn't set up yet. These switches won't take effect until it is.", saveFailed: "Couldn't save. Try again.", loadFailed: "Couldn't load notification settings", retry, empty: "No notifications to configure", switchLabel: (scene, channel) => `${scene} · ${channel}` };
+  return { title: "Notifications", description: "Choose which notifications you receive and where.", tabs: { mine: "My notifications", policy: "Platform settings" }, policyDescription: "Set platform values for each role. When platform managed is on, members can't change that role's notifications.", managed: "Platform managed", managedTag: "Managed by your organization", columns: { scene: "Notification", dingtalk: "DingTalk", inApp: "In-app" }, unsupported: "Not supported", dingtalkUnavailable: "DingTalk isn't set up yet. These switches won't take effect until it is.", saveFailed: "Couldn't save. Try again.", loadFailed: "Couldn't load notification settings", retry, empty: "No notifications to configure", switchLabel: (scene, channel) => `${scene} · ${channel}`, channel: notificationChannelLabelsEnglish() };
 }
 
 function authorizationChinese(close: string, loading: string): EnterpriseAccessSettingsLabels["authorization"] {

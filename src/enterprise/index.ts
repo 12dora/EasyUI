@@ -18,8 +18,12 @@ export * from "./notification-settings-types";
 export {
   EnterpriseNotificationSettingsSurface,
   type EnterpriseNotificationSettingsSurfaceProps,
+  type NotificationSettingsSection,
 } from "./notification-settings-surface";
+export { NotificationChannelPanel, type NotificationChannelPanelProps } from "./notification-channel-panel";
+export * from "./use-dingtalk-channel";
 export * from "./brand-slot";
+export * from "./use-enterprise-favicon";
 export * from "./app-frame";
 export * from "./identity-label";
 export * from "./permission-onboarding";

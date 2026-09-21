@@ -94,6 +94,35 @@ const notificationSettingsAdapter: NotificationSettingsAdapter = {
 };
 ```
 
+### 3.1 通知渠道(可选)
+
+```ts
+interface NotificationSettingsAdapter {
+  // ……上面四个方法……
+  loadDingtalkChannel?(): Promise<DingtalkChannelSettings>;                        // GET  …/channels/dingtalk
+  saveDingtalkChannel?(patch: DingtalkChannelSettingsUpdate): Promise<DingtalkChannelSettings>; // PUT …/channels/dingtalk
+  testDingtalkChannel?(): Promise<NotificationChannelTestResult>;                  // POST …/channels/dingtalk/test
+}
+interface DingtalkChannelSettings {
+  baseUrl: string; appKey: string; baseUrlInherited: boolean; appKeyInherited: boolean;
+  hasCredential: boolean; credentialSource: "settings" | "env" | "none"; configured: boolean; updatedAt: string | null;
+}
+interface DingtalkChannelSettingsUpdate { baseUrl?: string; appKey?: string; credential?: string } // 缺键 = 不改,"" = 清除
+interface NotificationChannelTestResult { ok: boolean; latencyMs?: number | null; errorKind?: string | null; errorDetail?: string | null }
+```
+
+三个方法**都**实现了、且当前账号 `canManage`,页头下方才出现页签条「通知规则 / 通知渠道」;
+否则页面与之前完全一样(没有页签条)。钉钉应用自己的 AppKey / AppSecret / AgentId 在
+EasyAuth 里维护,这里只配 EasyAuth 地址、应用标识与本应用的**通知凭据**:
+
+- 只发改过的字段;继承自「登录与权限」的地址 / 标识只当占位符,不进 PUT 体。
+- 凭据只写:输入框永远从空开始,留空不改;只有 `credentialSource === "settings"` 时才有
+  「清除已保存的凭据」(发 `""`)。来自部署环境时只给一句只读说明。
+- 「测试连接」测的是**已保存**的配置(后端探测,不发钉钉消息):有未保存改动时不发请求,
+  提示先保存。结果按 `errorKind`(`auth` / `unreachable` / `not_configured` / 其他)给一句话。
+- 钉钉未配置的提示:管理员多一个「前往配置」(切到通知渠道并聚焦该页签);没有管理权限的
+  人看到「请联系管理员」版本。渠道保存成功后切回通知规则会重读一次。
+
 ## 4. 页面行为
 
 - `canManage` 为真时页头下方出现分段控件「我的通知 / 平台配置」;否则只有「我的通知」,
@@ -169,6 +198,10 @@ const notificationSettingsAdapter: NotificationSettingsAdapter = {
 
 它与收件箱的 `catalog.notifications` 是**两个独立的键**,不要互相复用。
 
+「通知渠道」的文案在 `notificationSettings.channel`(`NotificationChannelSettingsLabels`,
+源文件 `src/enterprise/notification-channel-labels.ts`),同样两种 copyMode 共用。手工拼
+labels 的宿主不给 `channel` 时,页签条不画。
+
 | 键 | zh-CN | en |
 | --- | --- | --- |
 | `title` | 通知 | Notifications |
@@ -200,6 +233,12 @@ const notificationSettingsAdapter: NotificationSettingsAdapter = {
 | 卡片里的场景表格 | `notification-group-{group}-table`(托管只读时 `data-readonly="true"`) |
 | 平台托管开关 / 静态标签 | `notification-group-{group}-managed` / `notification-group-{group}-tag` |
 | 一格渠道开关 | `notification-switch-{scene}-{channel}` |
+| 页签条 / 页签 | `notification-settings-sections` / `notification-settings-section-{rules\|channels}` |
+| 「前往配置」 | `notification-channel-configure` |
+| 钉钉渠道卡 / 状态徽标 | `notification-dingtalk-channel` / `notification-dingtalk-status`(`data-configured`) |
+| 保存 / 测试连接 / 结果 | `notification-dingtalk-save` / `notification-dingtalk-test` / `notification-dingtalk-result` |
+| 凭据 / 清除 / 环境说明 | `notification-dingtalk-credential` / `notification-dingtalk-credential-clear` / `notification-dingtalk-credential-env` |
+| 渠道读失败 / 重试 / 骨架屏 | `notification-dingtalk-load-failed` / `notification-dingtalk-retry` / `notification-dingtalk-skeleton` |
 
 场景 key 带点(`exam.result_released`)是正常的,test id 里原样保留——选择器写成
 `[data-test-id='notification-switch-exam.result_released-dingtalk']` 即可。
