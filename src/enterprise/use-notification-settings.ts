@@ -145,7 +145,7 @@ function useNotificationRunners(
         try {
           const view = tab === "policy" ? await adapter.loadPolicy() : await adapter.load();
           if (!alive.current) return;
-          dispatch({ type: "load-ok", tab, loadId, view, canManage: "canManage" in view && view.canManage });
+          dispatch({ type: "load-ok", tab, loadId, view, canManage: "canManage" in view && view.canManage === true });
         } catch {
           if (alive.current) dispatch({ type: "load-fail", tab, loadId });
         }
