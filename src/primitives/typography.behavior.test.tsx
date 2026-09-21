@@ -34,7 +34,7 @@ const SUB_12PX_EXEMPT: Record<string, string> = {
 };
 
 /**
- * `--signal` / `--status-pending` / `--evergreen` 是填充档,各自都有承载文字的 `-ink` 兄弟。
+ * `--signal` / `--status-pending` / `--evergreen` / `--plum` 是填充档,各自都有承载文字的 `-ink` 兄弟。
  * 它们一旦出现在 `text-` 工具类里,就说明有文字直接吃了填充色的对比度(红 4.83:1、琥珀 3.19:1、
  * 绿 3.77:1,后两者本来就不过 AA)。下面几处例外的共同点是:着色对象是 aria-hidden 的字形或
  * 必填星号 —— 是标记不是文案,按 1.4.11 的 3:1 图形口径走,而不是 4.5:1 的文本口径。
@@ -101,10 +101,10 @@ describe("套件级排版下限", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("填充档 --signal / --status-pending / --evergreen 不给文字上色(aria-hidden 字形除外)", () => {
+  it("填充档 --signal / --status-pending / --evergreen / --plum 不给文字上色(aria-hidden 字形除外)", () => {
     const offenders = scan().flatMap(({ rel, body }) => {
       if (rel in FILL_TOKEN_AS_TEXT_EXEMPT) return [];
-      return [...body.matchAll(/text-\[rgb\(var\(--(?:signal|status-pending|evergreen)\)\)\]/g)].map(
+      return [...body.matchAll(/text-\[rgb\(var\(--(?:signal|status-pending|evergreen|plum)\)\)\]/g)].map(
         ([match]) => `${rel}: ${match}`,
       );
     });
@@ -205,6 +205,19 @@ describe("颜色承载文字时用 -ink 档", () => {
     expect(badge.className).not.toContain("text-[rgb(var(--evergreen))]");
   });
 
+  it("Badge 的 plum:文字 plum-ink,边框与底色仍是 plum —— 多选题型不再借用「正确」的绿", async () => {
+    view = await mount(<Badge tone="plum">多选</Badge>);
+    const badge = view.host.firstElementChild as HTMLElement;
+
+    expect(badge.textContent).toBe("多选");
+    expect(badge.className).toContain("border-[rgb(var(--plum))]/40");
+    expect(badge.className).toContain("bg-[rgb(var(--plum))]/[0.08]");
+    // 12px 的标签:填充紫红在自家底色上只有 4.18:1,必须换 -ink 档。
+    expect(badge.className).toContain("text-[rgb(var(--plum-ink))]");
+    expect(badge.className).not.toContain("text-[rgb(var(--plum))]");
+    expect(badge.className).not.toContain("evergreen");
+  });
+
   it("Badge 的 pending:与 signal 同一条着色配方,只是换成琥珀的填充档 / -ink 档", async () => {
     view = await mount(<Badge tone="pending">待批改</Badge>);
     const badge = view.host.firstElementChild as HTMLElement;
@@ -280,7 +293,7 @@ describe("-ink 档的对比度(WCAG 2.1)", () => {
   const paper = token("paper");
   const paperDeep = token("paper-deep");
 
-  it.each(["signal-ink", "status-pending-ink", "evergreen-ink"])("--%s 在 paper 与 paper-deep 上都过 AA", (name) => {
+  it.each(["signal-ink", "status-pending-ink", "evergreen-ink", "plum-ink"])("--%s 在 paper 与 paper-deep 上都过 AA", (name) => {
     const ink = token(name);
 
     expect(contrast(ink, paper)).toBeGreaterThanOrEqual(4.5);
@@ -298,12 +311,13 @@ describe("-ink 档的对比度(WCAG 2.1)", () => {
   });
 
   /**
-   * 三种题型徽标的颜色 —— 单选 `bond`、多选 `evergreen`、简答 `pending` —— 都是 12px 文字压在
+   * 三种题型徽标的颜色 —— 单选 `bond`、多选 `plum`、简答 `pending` —— 都是 12px 文字压在
    * 自家 8% 底色上(Badge 的 tinted 配方)。三档一起钉住:改任何一个令牌都不许掉到 AA 以下。
    */
   it.each([
     ["bond", "bond"],
     ["evergreen", "evergreen-ink"],
+    ["plum", "plum-ink"],
     ["status-pending", "status-pending-ink"],
   ])("题型徽标 --%s 的文字档在自家 8%% 底色上过 AA", (fillName, textName) => {
     const fill = token(fillName);
@@ -311,6 +325,14 @@ describe("-ink 档的对比度(WCAG 2.1)", () => {
     for (const base of [paper, paperDeep]) {
       expect(contrast(token(textName), wash(fill, base, 0.08))).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it("紫红也必须拆 -ink —— --plum 在自家 8% 底色上不过 AA", () => {
+    const plum = token("plum");
+
+    // 4.18:1(paper)/ 4.00:1(paper-deep):这就是 --plum-ink 存在的理由。
+    expect(contrast(plum, wash(plum, paper, 0.08))).toBeLessThan(4.5);
+    expect(contrast(plum, wash(plum, paperDeep, 0.08))).toBeLessThan(4.5);
   });
 
   it("绿与琥珀必须拆 -ink,靛蓝不用 —— 填充档在自家 8% 底色上的实测", () => {

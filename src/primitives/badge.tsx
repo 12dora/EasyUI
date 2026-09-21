@@ -8,6 +8,7 @@ export type BadgeTone =
   | "signal"
   | "pending"
   | "bond"
+  | "plum"
   | "faint";
 
 const TONE: Record<BadgeTone, string> = {
@@ -35,6 +36,11 @@ const TONE: Record<BadgeTone, string> = {
   // own 8% wash, so the label clears AA on the fill token itself.
   bond:
     "border-[rgb(var(--bond))]/40 text-[rgb(var(--bond))] bg-[rgb(var(--bond))]/[0.08]",
+  // Fuchsia badge: a categorical tone with no status meaning (the 多选 question-type tag), so it
+  // never reads as evergreen's "correct". Same fill/`-ink` split as `evergreen`: on its own 8% wash
+  // #C026D3 is 4.18:1 on paper / 4.00:1 on paper-deep and misses AA; #A21CAF gives 5.62:1 / 5.38:1.
+  plum:
+    "border-[rgb(var(--plum))]/40 text-[rgb(var(--plum-ink))] bg-[rgb(var(--plum))]/[0.08]",
 };
 
 /**
