@@ -10,8 +10,9 @@ import { isValidElement, type ReactNode } from "react";
 import type { ColumnType, ColumnsType, TableProps } from "antd/es/table";
 import type { CompareFn } from "antd/es/table/interface";
 
+import type { DateRangeFilter } from "./date-range-column";
 import type { MobileColumn } from "./table-columns";
-import type { TableSortOrder } from "./table-query";
+import { dateRangeFilters, type TableSortOrder } from "./table-query";
 
 /** 动作列默认的列 key(`DataTable` 的 `actions` 生成的就是它)。 */
 export const DEFAULT_ACTIONS_KEY = "actions";
@@ -160,14 +161,30 @@ export function isEmptyCell(node: ReactNode): boolean {
   return node === null || node === undefined || node === "" || node === false;
 }
 
-/** 受控筛选列:`filteredValue` 有定义(装饰器无选择时给 `null`,不是 `undefined`)。 */
+/**
+ * 受控筛选列:`filteredValue` 有定义(装饰器无选择时给 `null`,不是 `undefined`)。
+ *
+ * 日期区间列不算:它的列 key 是合成的、不是查询参数,两个真正的 key 由 `dateRangePatchOf` 写。
+ */
 function filteredColumns<T>(columns: ColumnsType<T>): readonly MobileColumn<T>[] {
-  return plainColumns(columns).filter((column) => column.filteredValue !== undefined);
+  return plainColumns(columns).filter((column) => column.filteredValue !== undefined && !column.dateRange);
 }
 
-/** 表头检索列(`searchColumn` / `clientSearchColumn` 产出的 `filterDropdown`)。 */
+/**
+ * 表头检索列(`searchColumn` / `clientSearchColumn` 产出的 `filterDropdown`)。
+ *
+ * 日期区间列(`dateRangeColumn`)同样有 `filterDropdown`,但它不是关键词:带 `dateRange`
+ * 标记的列不算检索列,由 `dateRangeColumnsOf` 另行接走。
+ */
 export function searchColumnsOf<T>(columns: ColumnsType<T>): readonly MobileColumn<T>[] {
-  return plainColumns(columns).filter((column) => column.filterDropdown !== undefined);
+  return plainColumns(columns).filter((column) => column.filterDropdown !== undefined && !column.dateRange);
+}
+
+/** 日期区间列(`dateRangeColumn` 产出、带 `dateRange` 标记)的区间状态,附上列标题的纯文本。 */
+export function dateRangesOf<T>(columns: ColumnsType<T>): readonly (DateRangeFilter & { title: string })[] {
+  return plainColumns(columns).flatMap((column) =>
+    column.dateRange ? [{ ...column.dateRange, title: columnTitleText(column) }] : [],
+  );
 }
 
 /** 枚举筛选列(`filterColumn` 产出的 `filters`)。 */
@@ -197,6 +214,19 @@ export function filterPatchOf<T>(
   }
   patch[param] = [...values];
   return patch;
+}
+
+/**
+ * 一次日期区间改动 → 一份完整的 patch:其余受控筛选列照旧带上(与 `filterPatchOf` 同一口径),
+ * 区间的两个 key 一起写(开放的一端给空数组,即清掉)。
+ */
+export function dateRangePatchOf<T>(
+  columns: ColumnsType<T>,
+  range: DateRangeFilter,
+  from: string,
+  to: string,
+): Record<string, string[]> {
+  return { ...filterPatchOf(columns, range.fromKey, []), ...dateRangeFilters(range.fromKey, range.toKey, from, to) };
 }
 
 /** 某列当前的检索/筛选值。 */

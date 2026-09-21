@@ -17,9 +17,12 @@ import type { ColumnFilterItem } from "antd/es/table/interface";
 
 import { Input, Select } from "../primitives/field";
 import type { DataTableLabels } from "./data-table";
+import { swallowEnter, type DateRangeFilter } from "./date-range-column";
 import {
   columnKeyOf,
   columnTitleText,
+  dateRangePatchOf,
+  dateRangesOf,
   filterPatchOf,
   filterValuesOf,
   optionColumnsOf,
@@ -78,13 +81,12 @@ export function TableCardsToolbar<T extends object>({
   clearable,
   onSortChange,
 }: ToolbarProps<T>) {
-  const searches = onFilters ? searchColumnsOf(columns) : [];
-  const options = onFilters ? optionColumnsOf(columns) : [];
+  const { searches, ranges, options } = filterControlsOf(columns, onFilters !== undefined);
   // 多选筛选走横排的开关芯片:原生 <select multiple> 在手机上是个被裁成两行的列表框,按不动。
   const chips = options.filter((column) => column.filterMultiple === true);
   const picks = options.filter((column) => column.filterMultiple !== true);
   const sortable = sortColumnsOf(columns);
-  if (searches.length === 0 && options.length === 0 && sortable.length === 0) return null;
+  if ([searches, ranges, options, sortable].every((list) => list.length === 0)) return null;
   const applyFilter = (param: string, values: readonly string[]) => onFilters?.(filterPatchOf(columns, param, values));
   return (
     <div className="mb-3 flex flex-col gap-2" data-test-id={`${testId}-toolbar`}>
@@ -98,6 +100,7 @@ export function TableCardsToolbar<T extends object>({
           onApply={(value) => applyFilter(columnKeyOf(column), value ? [value] : [])}
         />
       ))}
+      <CardsDateRanges ranges={ranges} columns={columns} testId={testId} onFilters={onFilters} />
       {chips.map((column) => (
         <CardsChips
           key={columnKeyOf(column)}
@@ -133,6 +136,37 @@ export function TableCardsToolbar<T extends object>({
       )}
     </div>
   );
+}
+
+/** 工具条上的筛选类控件;没有 `onFilters` 时一个都不给(改了也没处交)。 */
+interface FilterControls<T extends object> {
+  searches: readonly MobileColumn<T>[];
+  ranges: readonly (DateRangeFilter & { title: string })[];
+  options: readonly MobileColumn<T>[];
+}
+
+function filterControlsOf<T extends object>(columns: ColumnsType<T>, enabled: boolean): FilterControls<T> {
+  if (!enabled) return { searches: [], ranges: [], options: [] };
+  return { searches: searchColumnsOf(columns), ranges: dateRangesOf(columns), options: optionColumnsOf(columns) };
+}
+
+interface DateRangesProps<T extends object> {
+  ranges: FilterControls<T>["ranges"];
+  columns: ColumnsType<T>;
+  testId: string;
+  onFilters?: (filters: Record<string, string[]>) => void;
+}
+
+/** 每个日期区间列一组控件;改动走 `dateRangePatchOf`(两个 key 一起写,其余受控筛选列照旧带上)。 */
+function CardsDateRanges<T extends object>({ ranges, columns, testId, onFilters }: DateRangesProps<T>) {
+  return ranges.map((range) => (
+    <CardsDateRange
+      key={`${range.fromKey}..${range.toKey}`}
+      range={range}
+      testId={`${testId}-range-${range.fromKey}`}
+      onApply={(from, to) => onFilters?.(dateRangePatchOf(columns, range, from, to))}
+    />
+  ));
 }
 
 interface SearchProps {
@@ -173,6 +207,67 @@ function CardsSearch({ applied, placeholder, testId, onApply }: SearchProps) {
         apply();
       }}
     />
+  );
+}
+
+interface DateRangeProps {
+  range: DateRangeFilter & { title: string };
+  testId: string;
+  onApply: (from: string, to: string) => void;
+}
+
+const DATE_CLASS = "min-w-0 flex-1 text-[13px]";
+
+/**
+ * 日期区间(`dateRangeColumn`):两个原生日期输入,选完即提交 —— 和原生下拉同一个理由,
+ * 手机上 `type="date"` 拉起系统日期选择器,比浮层里的双月日历好按得多。
+ *
+ * 两端各自可空(开放区间);`min` / `max` 让系统选择器不给出倒挂的区间,万一倒挂,
+ * `dateRangePatchOf` 也会把两端对调后再交出去。有值时给一个重置按钮同时清掉两个 key。
+ */
+function CardsDateRange({ range, testId, onApply }: DateRangeProps) {
+  const { from, to, labels, title } = range;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={title} data-test-id={testId}>
+      <span className="text-[12px] text-ink-faint">{title}</span>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <Input
+          type="date"
+          className={DATE_CLASS}
+          value={from}
+          max={to || undefined}
+          placeholder={labels.start}
+          aria-label={`${title} ${labels.start}`}
+          data-test-id={`${testId}-from`}
+          onKeyDown={swallowEnter}
+          onChange={(event) => onApply(event.target.value, to)}
+        />
+        <span aria-hidden="true" className="text-ink-faint">
+          –
+        </span>
+        <Input
+          type="date"
+          className={DATE_CLASS}
+          value={to}
+          min={from || undefined}
+          placeholder={labels.end}
+          aria-label={`${title} ${labels.end}`}
+          data-test-id={`${testId}-to`}
+          onKeyDown={swallowEnter}
+          onChange={(event) => onApply(from, event.target.value)}
+        />
+      </div>
+      {(from || to) && (
+        <button
+          type="button"
+          className="min-h-8 px-2 text-[12px] text-ink-soft"
+          data-test-id={`${testId}-reset`}
+          onClick={() => onApply("", "")}
+        >
+          {labels.reset}
+        </button>
+      )}
+    </div>
   );
 }
 

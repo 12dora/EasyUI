@@ -39,8 +39,10 @@ export {
   DEFAULT_PAGE_SIZE,
   PAGE_SIZE_OPTIONS,
   applyTableQueryPatch,
+  dateRangeFilters,
   formatSort,
   hasTableFilters,
+  isIsoDay,
   mergeTableQueryParams,
   parseSort,
   parseTableQuery,
@@ -79,6 +81,17 @@ export {
   type SearchColumnOptions,
   type TableHeaderLabels,
 } from "./table-columns";
+
+export {
+  DATE_RANGE_DAY_FORMAT,
+  DATE_RANGE_LABELS_EN,
+  DEFAULT_DATE_RANGE_LABELS,
+  dateRangeColumn,
+  dateRangeLabelsOf,
+  type DateRangeColumnOptions,
+  type DateRangeFilter,
+  type DateRangeLabels,
+} from "./date-range-column";
 
 export {
   DEFAULT_TABLE_DENSITY,

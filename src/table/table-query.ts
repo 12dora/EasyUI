@@ -101,6 +101,16 @@ export interface TableQueryConfig {
    * (`q`) and id-shaped parameters (`examId`) do not belong here.
    */
   filterOptions?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Day-valued parameters (`dateRangeColumn`'s `fromKey` / `toKey`): each holds
+   * one inclusive `YYYY-MM-DD` day.
+   *
+   * Parsing keeps only the first well-formed calendar day, so a hand-edited
+   * `?submittedFrom=yesterday` or a repeated key never reaches the backend (as
+   * garbage or as a comma-joined pair) — the parameter just falls back to its
+   * default. Undeclared means "do not validate".
+   */
+  dateKeys?: readonly string[];
 }
 
 /** One header action often changes a filter *and* the page, so changes land together. */
@@ -167,14 +177,42 @@ function parseFilters(params: URLSearchParams, config: TableQueryConfig): Record
   const filters: Record<string, string[]> = {};
   for (const key of config.keys) {
     const allowed = config.filterOptions?.[key];
-    const values = params
+    const accepted = params
       .getAll(key)
       .filter((value) => value !== "")
       .filter((value) => !allowed || allowed.includes(value));
+    const values = config.dateKeys?.includes(key) ? accepted.filter(isIsoDay).slice(0, 1) : accepted;
     const resolved = values.length > 0 ? values : defaultFilters(config, key);
     if (resolved.length > 0) filters[key] = resolved;
   }
   return filters;
+}
+
+/**
+ * A real calendar day written as `YYYY-MM-DD` (the date-range filters' URL and
+ * request format). `2026-02-30` is rejected, not rolled over into March.
+ */
+export function isIsoDay(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+/**
+ * Two bounds → the filter patch for both keys. An open bound clears its key
+ * (`[]`, the kit's "cleared" value); reversed bounds are swapped, so the
+ * backend never sees `from > to` (it answers that with a 422).
+ */
+export function dateRangeFilters(
+  fromKey: string,
+  toKey: string,
+  from: string,
+  to: string,
+): Record<string, string[]> {
+  const [start, end] = from && to && from > to ? [to, from] : [from, to];
+  return { [fromKey]: start ? [start] : [], [toKey]: end ? [end] : [] };
 }
 
 /** With a whitelist declared, a wild sort key is dropped: a bad bookmark must not break the table. */
@@ -260,7 +298,11 @@ export function mergeTableQueryParams(raw: string, state: TableQueryState, confi
   return merged.toString();
 }
 
-/** Query state → list request parameters. Multi-select values are comma-joined into one parameter. */
+/**
+ * Query state → list request parameters. Multi-select values are comma-joined
+ * into one parameter; single-valued ones (a keyword, a date-range bound) go out
+ * as the plain string.
+ */
 export function tableListParams(state: TableQueryState): ListParams {
   const params: Record<string, string | number> = {};
   for (const [key, values] of Object.entries(state.filters)) {

@@ -18,6 +18,7 @@ import type { ColumnFilterItem, FilterDropdownProps, SortOrder } from "antd/es/t
 
 import { Button } from "../primitives/button";
 import { Input } from "../primitives/field";
+import type { DateRangeFilter, DateRangeLabels } from "./date-range-column";
 import { matchesPersonQuery, type PersonQuerySubject } from "./person-query";
 import { sameFilterValues, type TableQueryState } from "./table-query";
 
@@ -52,6 +53,13 @@ export interface MobileColumn<T> extends ColumnType<T> {
    * 关在 `filterDropdown` 的闭包里读不到,所以在这里留一份。手动填也可以。
    */
   searchPlaceholder?: string;
+  /**
+   * 日期区间列的标记,由 `dateRangeColumn` 写上。
+   *
+   * 这种列也有 `filterDropdown`,但它不是关键词检索:手机卡片靠这个标记把它从检索框里剔出去,
+   * 换成两个原生日期输入(区间的两个 key、当前值与文案都在这里)。
+   */
+  dateRange?: DateRangeFilter;
 }
 
 // 下面的装饰器都收 / 回 `MobileColumn`:标记才能写在最里层的列字面量上而不被 TS 拒收,
@@ -75,6 +83,11 @@ export interface TableHeaderLabels {
   search: string;
   reset: string;
   filter: string;
+  /**
+   * `dateRangeColumn` 的文案(确定 / 重置 / 开始日期 / 结束日期);只覆盖给出的那几句,
+   * 其余用中文缺省值。英文宿主传 `DATE_RANGE_LABELS_EN`。
+   */
+  dateRange?: Partial<DateRangeLabels>;
 }
 
 interface KeywordLabels {

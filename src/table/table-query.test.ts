@@ -11,8 +11,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyTableQueryPatch,
+  dateRangeFilters,
   formatSort,
   hasTableFilters,
+  isIsoDay,
   mergeTableQueryParams,
   parseSort,
   parseTableQuery,
@@ -124,6 +126,65 @@ describe("parseTableQuery with the backend whitelists", () => {
       page: 1,
       pageSize: 20,
     });
+  });
+});
+
+describe("date-range keys (dateRangeColumn)", () => {
+  const DATED: TableQueryConfig = {
+    keys: ["q", "submittedFrom", "submittedTo"],
+    dateKeys: ["submittedFrom", "submittedTo"],
+  };
+
+  it("sends both bounds to the backend as plain YYYY-MM-DD strings", () => {
+    const state = parseTableQuery("submittedFrom=2026-09-01&submittedTo=2026-09-15", DATED);
+    expect(tableListParams(state)).toEqual({
+      submittedFrom: "2026-09-01",
+      submittedTo: "2026-09-15",
+      page: 1,
+      pageSize: 20,
+    });
+    expect(hasTableFilters(state, DATED)).toBe(true);
+  });
+
+  it("keeps one well-formed day per key: no comma-joined pair, no garbage", () => {
+    // A repeated key would otherwise go out as "2026-09-01,2026-09-02".
+    expect(parseTableQuery("submittedFrom=2026-09-01&submittedFrom=2026-09-02", DATED).filters).toEqual({
+      submittedFrom: ["2026-09-01"],
+    });
+    expect(parseTableQuery("submittedFrom=yesterday&submittedTo=2026-02-30", DATED).filters).toEqual({});
+    // Without `dateKeys` the kit does not validate.
+    expect(parseTableQuery("submittedFrom=yesterday", { keys: ["submittedFrom"] }).filters).toEqual({
+      submittedFrom: ["yesterday"],
+    });
+  });
+
+  it("writes and clears both keys in one patch, back to page 1", () => {
+    const start = parseTableQuery("submittedFrom=2026-09-01&submittedTo=2026-09-15&page=4", DATED);
+    const range = (from: string, to: string) => ({
+      filters: dateRangeFilters("submittedFrom", "submittedTo", from, to),
+    });
+    const cleared = applyTableQueryPatch(start, range("", ""), DATED);
+    expect(cleared.filters).toEqual({});
+    expect(cleared.page).toBe(1);
+    expect(serialiseTableQuery(cleared, DATED)).toBe("");
+
+    const open = applyTableQueryPatch(start, range("2026-09-03", ""), DATED);
+    expect(serialiseTableQuery(open, DATED)).toBe("submittedFrom=2026-09-03");
+  });
+
+  it("builds the two-key patch, swapping reversed bounds", () => {
+    expect(dateRangeFilters("from", "to", "2026-09-15", "2026-09-01")).toEqual({
+      from: ["2026-09-01"],
+      to: ["2026-09-15"],
+    });
+    expect(dateRangeFilters("from", "to", "", "2026-09-01")).toEqual({ from: [], to: ["2026-09-01"] });
+  });
+
+  it("accepts only real calendar days", () => {
+    expect(isIsoDay("2024-02-29")).toBe(true);
+    expect(isIsoDay("2026-02-29")).toBe(false);
+    expect(isIsoDay("2026-9-1")).toBe(false);
+    expect(isIsoDay("")).toBe(false);
   });
 });
 
