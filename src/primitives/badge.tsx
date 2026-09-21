@@ -6,6 +6,7 @@ export type BadgeTone =
   | "amber"
   | "evergreen"
   | "signal"
+  | "pending"
   | "bond"
   | "faint";
 
@@ -20,6 +21,13 @@ const TONE: Record<BadgeTone, string> = {
   // status word is text, and it sits on a red-tinted surface where #DC2626 loses contrast.
   signal:
     "border-[rgb(var(--signal))]/40 text-[rgb(var(--signal-ink))] bg-[rgb(var(--signal))]/[0.08]",
+  // Amber badge: the real amber lives in the status ramp (`--amber` is the blue primary action),
+  // so border + tint take `--status-pending` and the label takes `--status-pending-ink` — same
+  // split as `signal`, for the same reason. On this tone's own 8% wash the fill #D97706 measures
+  // 2.93:1 on paper / 2.80:1 on paper-deep and fails AA outright; #92400E gives 6.51:1 / 6.24:1,
+  // clear of the 4.5:1 floor the 12px label needs.
+  pending:
+    "border-[rgb(var(--status-pending))]/40 text-[rgb(var(--status-pending-ink))] bg-[rgb(var(--status-pending))]/[0.08]",
   bond:
     "border-[rgb(var(--bond))]/40 text-[rgb(var(--bond))] bg-[rgb(var(--bond))]/[0.08]",
 };

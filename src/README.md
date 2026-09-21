@@ -622,7 +622,7 @@ JS 侧同值导出:`APP_SHELL_MAIN_PADDING_TOP_PX`(`{ base: 12, md: 16 }`)与变
 | Text     | `--ink`, `--ink-soft`, `--ink-faint` |
 | Borders  | `--hairline`, `--hairline-strong`, `--hairline-soft` |
 | Accents  | `--amber` (primary/blue) + `--amber-soft`, `--signal` (danger/red fills, icons, required marks) + `--signal-ink` (red **text**: errors, notices, status words), `--bond` (indigo), `--evergreen` (success) |
-| Status   | `--status-draft/pending/active/stop/archive` (fills, borders, icon glyphs) + `--status-pending-ink` (amber **text**: warning notices — the fill amber is 3.19:1 and fails AA) |
+| Status   | `--status-draft/pending/active/stop/archive` (fills, borders, icon glyphs) + `--status-pending-ink` (amber **text**: warning notices, `Badge tone="pending"` — the fill amber is 3.19:1 and fails AA) |
 | Motion   | `--ease-out-paper`, `--ease-press`, `--ease-pop`; `--duration-fast/base/slow/page/dialog` (mirrored in `motion.ts`) |
 | Type     | `--font-sans`, `--font-mono`, `--font-display` |
 | Spacing  | `--ui-field-gap`, `--ui-gap-sm/md/lg`, `--ui-section-gap` —— 竖向行距刻度,见下一节 |

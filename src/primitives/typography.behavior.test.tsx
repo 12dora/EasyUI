@@ -173,6 +173,24 @@ describe("颜色承载文字时用 -ink 档", () => {
     expect(notice.className).toContain("border-[rgb(var(--status-pending))]/35");
   });
 
+  it("Badge 的 pending:与 signal 同一条着色配方,只是换成琥珀的填充档 / -ink 档", async () => {
+    view = await mount(<Badge tone="pending">待批改</Badge>);
+    const badge = view.host.firstElementChild as HTMLElement;
+
+    expect(badge.textContent).toBe("待批改");
+    // 边框与底色走填充档 `--status-pending`(`--amber` 是蓝色的主操作档,不是琥珀)。
+    expect(badge.className).toContain("border-[rgb(var(--status-pending))]/40");
+    expect(badge.className).toContain("bg-[rgb(var(--status-pending))]/[0.08]");
+    // 文字走 -ink 档:12px 的标签吃填充色在自家底色上只有 2.9:1。
+    expect(badge.className).toContain("text-[rgb(var(--status-pending-ink))]");
+    expect(badge.className).not.toContain("text-[rgb(var(--status-pending))]");
+    // 与兄弟色档共用同一套几何与透明度配方(/40 边框 + 8% 底色),没有自造一份。
+    const recipe = (className: string) => className.replace(/--status-pending-ink|--status-pending|--signal-ink|--signal/g, "X");
+    const signalView = await mount(<Badge tone="signal">同步失败</Badge>);
+    expect(recipe(badge.className)).toBe(recipe((signalView.host.firstElementChild as HTMLElement).className));
+    await signalView.unmount();
+  });
+
   it("AppErrorState 的 503 圆标是 aria-hidden 字形,所以留在填充档而不是 -ink 档", async () => {
     view = await mount(<AppErrorState kind="resourceUnavailable" title="服务暂不可用" />);
     const icon = view.host.querySelector('[data-test-id="app-error-icon"]') as HTMLElement;
@@ -244,6 +262,15 @@ describe("-ink 档的对比度(WCAG 2.1)", () => {
 
     expect(contrast(token("status-pending-ink"), surface)).toBeGreaterThanOrEqual(4.5);
     // 这一条才是 --status-pending-ink 存在的理由:同一块底色上,填充档只有 2.69:1。
+    expect(contrast(fill, surface)).toBeLessThan(3);
+  });
+
+  it("Badge 的 pending 在自家 8% 底色上也过 AA —— 徽标文字就是 12px 的下限场景", () => {
+    const fill = token("status-pending");
+    // Badge 的 tinted 配方:bg-[rgb(var(--status-pending))]/[0.08],最差情况铺在 paper-deep 上。
+    const surface = wash(fill, paperDeep, 0.08);
+
+    expect(contrast(token("status-pending-ink"), surface)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(fill, surface)).toBeLessThan(3);
   });
 });
