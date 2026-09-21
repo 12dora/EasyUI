@@ -24,8 +24,12 @@ const TONE_CLASS: Record<InlineNoticeTone, string> = {
   // Same split for amber, and it matters more here: the words land on this tone's own 12%
   // wash, where `--status-pending` is 2.69:1. `--status-pending-ink` is 5.98:1 on it.
   warning: "border-[rgb(var(--status-pending))]/35 bg-[rgb(var(--status-pending))]/[0.12] text-[rgb(var(--status-pending-ink))]",
+  // Indigo is the exception that keeps the fill token for its words: 5.58:1 on this tone's own
+  // 8% wash (paper) / 5.34:1 (paper-deep), so `--bond` has no `-ink` sibling to switch to.
   info: "border-[rgb(var(--bond))]/25 bg-[rgb(var(--bond))]/[0.08] text-[rgb(var(--bond))]",
-  success: "border-[rgb(var(--evergreen))]/30 bg-[rgb(var(--evergreen))]/[0.08] text-[rgb(var(--evergreen))]",
+  // Green splits like red and amber: on this tone's own 8% wash `--evergreen` is 3.42:1 and
+  // misses AA for the 14px notice text; `--evergreen-ink` is 4.98:1 there (4.77:1 on paper-deep).
+  success: "border-[rgb(var(--evergreen))]/30 bg-[rgb(var(--evergreen))]/[0.08] text-[rgb(var(--evergreen-ink))]",
 };
 
 /**

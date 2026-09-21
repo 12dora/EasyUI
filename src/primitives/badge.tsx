@@ -15,8 +15,11 @@ const TONE: Record<BadgeTone, string> = {
   faint: "border-ink/10 text-ink-faint bg-paper-deep/60",
   ink: "border-ink/80 text-paper bg-ink",
   amber: "border-[rgb(var(--amber))]/40 text-[rgb(var(--amber))] bg-[rgb(var(--amber))]/[0.08]",
+  // Green badge: same fill/`-ink` split as `signal` and `pending`. On this tone's own 8% wash
+  // #059669 is 3.42:1 on paper / 3.28:1 on paper-deep and misses AA; #047857 gives 4.98:1 / 4.77:1,
+  // clear of the 4.5:1 floor the 12px label needs.
   evergreen:
-    "border-[rgb(var(--evergreen))]/40 text-[rgb(var(--evergreen))] bg-[rgb(var(--evergreen))]/[0.08]",
+    "border-[rgb(var(--evergreen))]/40 text-[rgb(var(--evergreen-ink))] bg-[rgb(var(--evergreen))]/[0.08]",
   // Red badge: fill + border keep `--signal`, the label itself goes `--signal-ink` — the
   // status word is text, and it sits on a red-tinted surface where #DC2626 loses contrast.
   signal:
@@ -28,6 +31,8 @@ const TONE: Record<BadgeTone, string> = {
   // clear of the 4.5:1 floor the 12px label needs.
   pending:
     "border-[rgb(var(--status-pending))]/40 text-[rgb(var(--status-pending-ink))] bg-[rgb(var(--status-pending))]/[0.08]",
+  // Indigo needs no `-ink` sibling: #4F46E5 is 5.58:1 on paper / 5.34:1 on paper-deep over its
+  // own 8% wash, so the label clears AA on the fill token itself.
   bond:
     "border-[rgb(var(--bond))]/40 text-[rgb(var(--bond))] bg-[rgb(var(--bond))]/[0.08]",
 };

@@ -34,10 +34,12 @@ const SUB_12PX_EXEMPT: Record<string, string> = {
 };
 
 /**
- * `--signal` / `--status-pending` 是填充档,各自都有承载文字的 `-ink` 兄弟。它们一旦出现在
- * `text-` 工具类里,就说明有文字直接吃了填充色的对比度(红 4.83:1、琥珀 3.19:1,后者本来就不过
- * AA)。下面几处例外的共同点是:着色对象是 aria-hidden 的字形或必填星号 —— 是标记不是文案,
- * 按 1.4.11 的 3:1 图形口径走,而不是 4.5:1 的文本口径。
+ * `--signal` / `--status-pending` / `--evergreen` 是填充档,各自都有承载文字的 `-ink` 兄弟。
+ * 它们一旦出现在 `text-` 工具类里,就说明有文字直接吃了填充色的对比度(红 4.83:1、琥珀 3.19:1、
+ * 绿 3.77:1,后两者本来就不过 AA)。下面几处例外的共同点是:着色对象是 aria-hidden 的字形或
+ * 必填星号 —— 是标记不是文案,按 1.4.11 的 3:1 图形口径走,而不是 4.5:1 的文本口径。
+ *
+ * `--bond` 不在这张表里:靛蓝在自家 8% 底色上仍有 5.58:1,是唯一不需要 `-ink` 兄弟的强调色。
  */
 const FILL_TOKEN_AS_TEXT_EXEMPT: Record<string, string> = {
   "primitives/field.tsx": "必填星号 *;同一行的 label 与 error 文案分别走 ink / signal-ink",
@@ -99,10 +101,10 @@ describe("套件级排版下限", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("填充档 --signal / --status-pending 不给文字上色(aria-hidden 字形除外)", () => {
+  it("填充档 --signal / --status-pending / --evergreen 不给文字上色(aria-hidden 字形除外)", () => {
     const offenders = scan().flatMap(({ rel, body }) => {
       if (rel in FILL_TOKEN_AS_TEXT_EXEMPT) return [];
-      return [...body.matchAll(/text-\[rgb\(var\(--(?:signal|status-pending)\)\)\]/g)].map(
+      return [...body.matchAll(/text-\[rgb\(var\(--(?:signal|status-pending|evergreen)\)\)\]/g)].map(
         ([match]) => `${rel}: ${match}`,
       );
     });
@@ -171,6 +173,36 @@ describe("颜色承载文字时用 -ink 档", () => {
     expect(notice.className).not.toContain("text-[rgb(var(--status-pending))]");
     expect(notice.className).toContain("bg-[rgb(var(--status-pending))]/[0.12]");
     expect(notice.className).toContain("border-[rgb(var(--status-pending))]/35");
+  });
+
+  it("InlineNotice 的 success:文字 evergreen-ink,边框与底色仍是 evergreen", async () => {
+    view = await mount(<InlineNotice tone="success" title="导入完成" message="新增 12 条" />);
+    const notice = view.host.firstElementChild as HTMLElement;
+
+    expect(notice.className).toContain("text-[rgb(var(--evergreen-ink))]");
+    expect(notice.className).not.toContain("text-[rgb(var(--evergreen))]");
+    expect(notice.className).toContain("bg-[rgb(var(--evergreen))]/[0.08]");
+    expect(notice.className).toContain("border-[rgb(var(--evergreen))]/30");
+  });
+
+  it("InlineNotice 的 info:靛蓝是唯一不拆 -ink 的强调色(自家底色上 5.58:1)", async () => {
+    view = await mount(<InlineNotice tone="info" message="同步将在 5 分钟后开始" />);
+    const notice = view.host.firstElementChild as HTMLElement;
+
+    expect(notice.className).toContain("text-[rgb(var(--bond))]");
+    expect(notice.className).toContain("bg-[rgb(var(--bond))]/[0.08]");
+  });
+
+  it("Badge 的 evergreen:文字 evergreen-ink,边框与底色仍是 evergreen", async () => {
+    view = await mount(<Badge tone="evergreen">已启用</Badge>);
+    const badge = view.host.firstElementChild as HTMLElement;
+
+    expect(badge.textContent).toBe("已启用");
+    expect(badge.className).toContain("border-[rgb(var(--evergreen))]/40");
+    expect(badge.className).toContain("bg-[rgb(var(--evergreen))]/[0.08]");
+    // 12px 的标签:填充绿在自家底色上只有 3.42:1,必须换 -ink 档。
+    expect(badge.className).toContain("text-[rgb(var(--evergreen-ink))]");
+    expect(badge.className).not.toContain("text-[rgb(var(--evergreen))]");
   });
 
   it("Badge 的 pending:与 signal 同一条着色配方,只是换成琥珀的填充档 / -ink 档", async () => {
@@ -248,7 +280,7 @@ describe("-ink 档的对比度(WCAG 2.1)", () => {
   const paper = token("paper");
   const paperDeep = token("paper-deep");
 
-  it.each(["signal-ink", "status-pending-ink"])("--%s 在 paper 与 paper-deep 上都过 AA", (name) => {
+  it.each(["signal-ink", "status-pending-ink", "evergreen-ink"])("--%s 在 paper 与 paper-deep 上都过 AA", (name) => {
     const ink = token(name);
 
     expect(contrast(ink, paper)).toBeGreaterThanOrEqual(4.5);
@@ -265,12 +297,31 @@ describe("-ink 档的对比度(WCAG 2.1)", () => {
     expect(contrast(fill, surface)).toBeLessThan(3);
   });
 
-  it("Badge 的 pending 在自家 8% 底色上也过 AA —— 徽标文字就是 12px 的下限场景", () => {
-    const fill = token("status-pending");
-    // Badge 的 tinted 配方:bg-[rgb(var(--status-pending))]/[0.08],最差情况铺在 paper-deep 上。
-    const surface = wash(fill, paperDeep, 0.08);
+  /**
+   * 三种题型徽标的颜色 —— 单选 `bond`、多选 `evergreen`、简答 `pending` —— 都是 12px 文字压在
+   * 自家 8% 底色上(Badge 的 tinted 配方)。三档一起钉住:改任何一个令牌都不许掉到 AA 以下。
+   */
+  it.each([
+    ["bond", "bond"],
+    ["evergreen", "evergreen-ink"],
+    ["status-pending", "status-pending-ink"],
+  ])("题型徽标 --%s 的文字档在自家 8%% 底色上过 AA", (fillName, textName) => {
+    const fill = token(fillName);
 
-    expect(contrast(token("status-pending-ink"), surface)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(fill, surface)).toBeLessThan(3);
+    for (const base of [paper, paperDeep]) {
+      expect(contrast(token(textName), wash(fill, base, 0.08))).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("绿与琥珀必须拆 -ink,靛蓝不用 —— 填充档在自家 8% 底色上的实测", () => {
+    const green = token("evergreen");
+    const indigo = token("bond");
+    const amber = token("status-pending");
+
+    // 3.42:1(paper)/ 3.28:1(paper-deep):这就是 --evergreen-ink 存在的理由。
+    expect(contrast(green, wash(green, paperDeep, 0.08))).toBeLessThan(4.5);
+    expect(contrast(amber, wash(amber, paperDeep, 0.08))).toBeLessThan(3);
+    // --bond 没有 -ink 兄弟,正因为它自己就够:5.58:1(paper)/ 5.34:1(paper-deep)。
+    expect(contrast(indigo, wash(indigo, paperDeep, 0.08))).toBeGreaterThanOrEqual(4.5);
   });
 });
