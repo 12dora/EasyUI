@@ -14,6 +14,11 @@ export * from "./footer";
 export * from "./general-settings-surface";
 export * from "./appearance-settings-surface";
 export * from "./general-settings-store";
+export * from "./notification-settings-types";
+export {
+  EnterpriseNotificationSettingsSurface,
+  type EnterpriseNotificationSettingsSurfaceProps,
+} from "./notification-settings-surface";
 export * from "./brand-slot";
 export * from "./app-frame";
 export * from "./identity-label";

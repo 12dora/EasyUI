@@ -1,5 +1,6 @@
 import type { EnterpriseAppearanceSettingsLabels } from "./appearance-settings-surface";
 import type { EnterpriseGeneralSettingsLabels } from "./general-settings-surface";
+import type { NotificationSettingsLabels } from "./notification-settings-types";
 import type { EnterpriseLoginControllerLabels, EnterpriseOidcCompleteLabels } from "./auth-controller";
 import type { EnterpriseAccessSettingsLabels } from "./access-settings-surface";
 import type { EnterpriseDeliveryStatusLabels } from "./delivery-status";
@@ -19,7 +20,7 @@ export interface EnterpriseCatalogBrand {
 export interface EnterpriseStaticLabelCatalog {
   locale: EnterpriseCatalogLocale;
   metadata: { title: string; description: string };
-  navigation: { menu: string; close: string; backToMain: string; settings: string; security: string; access: string; upstream: string; general: string; appearance: string; dashboard: string; backToSecurity: string };
+  navigation: { menu: string; close: string; backToMain: string; settings: string; security: string; access: string; upstream: string; general: string; appearance: string; notificationSettings: string; dashboard: string; backToSecurity: string };
   common: { permissionDenied: string; loading: string; retry: string; notAvailable: string; permissionCount: (count: number) => string };
   shell: EnterpriseShellLabels;
   login: EnterpriseLoginControllerLabels;
@@ -32,6 +33,8 @@ export interface EnterpriseStaticLabelCatalog {
   generalSettings: EnterpriseGeneralSettingsLabels;
   /** 「外观」设置页(表格密度);见 `EnterpriseAppearanceSettingsSurface`。 */
   appearanceSettings: EnterpriseAppearanceSettingsLabels;
+  /** 「通知」设置页(场景开关);见 `EnterpriseNotificationSettingsSurface`。与收件箱的 `notifications` 是两回事。 */
+  notificationSettings: NotificationSettingsLabels;
   /** User-menu identity line; see `resolveEnterpriseIdentityLabel`. */
   identity: { admin: string; user: string; guest: string };
   /** Full-page zero-grant landing; see `EnterprisePermissionOnboarding`. */
@@ -291,7 +294,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
   return {
     locale: "zh-CN",
     metadata: { title: brand.appName, description: brand.appDescription },
-    navigation: { menu: "菜单", close, backToMain: "返回主菜单", settings: "设置", security: "安全", access: "登录与权限", upstream: "系统服务", general: "通用", appearance: "外观", dashboard: "工作台", backToSecurity: "返回安全设置" },
+    navigation: { menu: "菜单", close, backToMain: "返回主菜单", settings: "设置", security: "安全", access: "登录与权限", upstream: "系统服务", general: "通用", appearance: "外观", notificationSettings: "通知", dashboard: "工作台", backToSecurity: "返回安全设置" },
     common: { permissionDenied, loading, retry, notAvailable: "—", permissionCount: (count) => `${count} 项权限` },
     shell: { switchLanguage: "切换语言", notifications: "通知", notificationsEmpty: "暂无通知", notificationsLoadFailed: "通知加载失败", notificationsClearAll: "全部清除", notificationsViewAll: "查看全部", notificationsDismiss: "忽略", userMenu: "用户菜单", securitySettings: "安全设置", logout: "退出登录", loggingOut: "正在退出" },
     login: {
@@ -361,7 +364,7 @@ function chineseCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "通知中心", description: "查看并处理当前账号的企业通知。", empty: "暂无通知", loadFailed: "通知加载失败", retry, dismiss: "忽略" },
-    generalSettings: generalSettingsChinese(retry), appearanceSettings: appearanceSettingsChinese(retry), ...identityAndOnboardingChinese(),
+    generalSettings: generalSettingsChinese(retry), appearanceSettings: appearanceSettingsChinese(retry), notificationSettings: notificationSettingsChinese(retry), ...identityAndOnboardingChinese(),
     public: { loginEyebrow: "企业账号", loggedOutTitle: "已退出登录", loggedOutDescription: "当前会话已结束。", loginAgain: "重新登录", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "正在完成工作账号登录…", missingTitle: "登录未完成", missingDescription: "工作账号登录未完成，请重新登录。", back: "返回登录" },
   };
@@ -378,7 +381,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
   return {
     locale: "en",
     metadata: { title: brand.appName, description: brand.appDescription },
-    navigation: { menu: "Menu", close, backToMain: "Back to main menu", settings: "Settings", security: "Security", access: "Sign-in & permissions", upstream: "System services", general: "General", appearance: "Appearance", dashboard: "Workbench", backToSecurity: "Back to security settings" },
+    navigation: { menu: "Menu", close, backToMain: "Back to main menu", settings: "Settings", security: "Security", access: "Sign-in & permissions", upstream: "System services", general: "General", appearance: "Appearance", notificationSettings: "Notifications", dashboard: "Workbench", backToSecurity: "Back to security settings" },
     common: { permissionDenied, loading, retry, notAvailable: "—", permissionCount: (count) => `${count} permissions` },
     shell: { switchLanguage: "Switch language", notifications: "Notifications", notificationsEmpty: "No notifications", notificationsLoadFailed: "Failed to load notifications", notificationsClearAll: "Clear all", notificationsViewAll: "View all", notificationsDismiss: "Dismiss", userMenu: "User menu", securitySettings: "Security settings", logout: "Log out", loggingOut: "Logging out" },
     login: {
@@ -448,7 +451,7 @@ function englishCatalog(brand: EnterpriseCatalogBrand): EnterpriseStaticLabelCat
       notAvailable: "—",
     },
     notifications: { title: "Notification center", description: "Review and dismiss notifications for this account.", empty: "No notifications", loadFailed: "Failed to load notifications", retry, dismiss: "Dismiss" },
-    generalSettings: generalSettingsEnglish(retry), appearanceSettings: appearanceSettingsEnglish(retry), ...identityAndOnboardingEnglish(),
+    generalSettings: generalSettingsEnglish(retry), appearanceSettings: appearanceSettingsEnglish(retry), notificationSettings: notificationSettingsEnglish(retry), ...identityAndOnboardingEnglish(),
     public: { loginEyebrow: "Enterprise account", loggedOutTitle: "You’re signed out", loggedOutDescription: "The current session has ended.", loginAgain: "Sign in again", footer: brand.footerText ?? brand.appName },
     oidcComplete: { processing: "Completing work-account sign-in…", missingTitle: "Sign-in didn’t finish", missingDescription: "Work-account sign-in didn’t finish. Please try again.", back: "Back to sign in" },
   };
@@ -502,6 +505,16 @@ function appearanceSettingsChinese(retry: string): EnterpriseAppearanceSettingsL
 
 function appearanceSettingsEnglish(retry: string): EnterpriseAppearanceSettingsLabels {
   return { title: "Appearance", description: "Adjust how the interface is displayed.", visualTitle: "Visual effects", tableDensity: "Table", rowSpacing: "Row spacing", densityCompact: "Compact", densityComfortable: "Comfortable", saving: "Saving", saveFailed: "Failed to save appearance settings. Try again.", showFooter: "Show footer", globalLoadFailed: "Failed to load global appearance settings", retry, globalSaved: "Global appearance settings saved", globalSaveFailed: "Failed to save global appearance settings. Try again." };
+}
+
+// 通知设置页(场景开关)。两种 copyMode 用同一份文案:开关是什么、托管意味着什么,
+// 与宿主是内部系统还是对客系统无关。
+function notificationSettingsChinese(retry: string): NotificationSettingsLabels {
+  return { title: "通知", description: "选择接收哪些通知，以及通过哪些渠道接收。", tabs: { mine: "我的通知", policy: "平台配置" }, policyDescription: "为各角色设置通知的平台值。开启平台托管后，该角色的通知由平台统一管理，成员无法自行更改。", managed: "平台托管", managedTag: "由平台统一管理", columns: { scene: "通知场景", dingtalk: "钉钉", inApp: "站内通知" }, unsupported: "不支持", dingtalkUnavailable: "钉钉通知尚未配置，相关开关暂不生效。", saveFailed: "保存失败，请重试。", loadFailed: "无法加载通知设置", retry, empty: "暂无可设置的通知", switchLabel: (scene, channel) => `${scene} · ${channel}` };
+}
+
+function notificationSettingsEnglish(retry: string): NotificationSettingsLabels {
+  return { title: "Notifications", description: "Choose which notifications you receive and where.", tabs: { mine: "My notifications", policy: "Platform settings" }, policyDescription: "Set platform values for each role. When platform managed is on, members can't change that role's notifications.", managed: "Platform managed", managedTag: "Managed by your organization", columns: { scene: "Notification", dingtalk: "DingTalk", inApp: "In-app" }, unsupported: "Not supported", dingtalkUnavailable: "DingTalk isn't set up yet. These switches won't take effect until it is.", saveFailed: "Couldn't save. Try again.", loadFailed: "Couldn't load notification settings", retry, empty: "No notifications to configure", switchLabel: (scene, channel) => `${scene} · ${channel}` };
 }
 
 function authorizationChinese(close: string, loading: string): EnterpriseAccessSettingsLabels["authorization"] {
