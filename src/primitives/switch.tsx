@@ -24,9 +24,9 @@ interface SwitchProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onC
  * thumb, just a hairline `ring-1 ring-ink/10`.
  *
  * Colour comes from the existing tokens only: the off track is a neutral ink alpha
- * (same family as Button's `border-ink/30` / `bg-ink/[0.04]`), the on track is the
- * system accent `--amber` that Checkbox already uses, and the focus ring is byte-for-byte
- * Checkbox's.
+ * (same family as Button's `border-ink/30` / `bg-ink/[0.04]`), the on track is navy
+ * `bg-ink` — the same fill as the primary Button, so "on" reads as the site's action colour —
+ * and the focus ring is byte-for-byte Checkbox's.
  *
  * Motion uses the kit tokens (`--duration-fast` / `--ease-out-paper`) rather than a raw
  * literal; `prefers-reduced-motion` is neutralised by the global rule in `theme.css`
@@ -60,7 +60,7 @@ export const Switch = forwardRef<HTMLButtonElement, SwitchProps>(function Switch
         rest.onClick?.(event);
         if (!disabled) onChange(!checked);
       }}
-      className={`${trackClass} ${checked ? "bg-[rgb(var(--amber))]" : "bg-ink/[0.14]"} ${className}`}
+      className={`${trackClass} ${checked ? "bg-ink" : "bg-ink/[0.14]"} ${className}`}
     >
       <span className={`${thumbClass} ${checked ? "translate-x-[14px]" : "translate-x-0"}`} />
     </button>
